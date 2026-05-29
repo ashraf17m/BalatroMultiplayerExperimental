@@ -1,0 +1,68 @@
+local match_domain = MP.UTILS.load_required_domain(
+	"MATCH",
+	"build_initial_state",
+	"multiplayer/domain/match.lua",
+	"Multiplayer match domain is missing."
+)
+if not match_domain then return nil end
+
+MP.create_enemy_state = match_domain.create_enemy_state
+MP.get_or_create_match_enemy_state = match_domain.get_or_create_enemy_state
+MP.prune_stale_match_enemies = match_domain.prune_stale_enemies
+MP.sync_resume_match_enemies_from_lobby = match_domain.sync_resume_enemies_from_lobby_players
+MP.seed_match_enemies_from_lobby_players = match_domain.seed_enemies_from_lobby_players
+MP.sync_match_enemy_from_lobby_player = match_domain.sync_enemy_from_lobby_snapshot_player
+MP.sync_match_enemies_from_lobby_snapshot = match_domain.sync_enemies_from_lobby_snapshot
+MP.apply_match_enemy_team_assignment = match_domain.apply_enemy_team_assignment
+MP.apply_local_match_player_info = match_domain.apply_local_player_info
+MP.apply_remote_match_money_update = match_domain.apply_remote_money_update
+MP.set_match_timer_value = match_domain.set_timer_value
+MP.stop_match_timer_runtime = match_domain.stop_timer_runtime
+MP.start_match_timer_runtime = match_domain.start_timer_runtime
+MP.apply_match_timer_state = match_domain.apply_timer_state
+MP.reset_match_timer_for_ante = match_domain.reset_timer_for_ante
+MP.lock_match_timer_for_ante = match_domain.lock_timer_for_ante
+MP.apply_match_timer_skip_for_ante = match_domain.apply_timer_skip_for_ante
+MP.begin_match_pvp_countdown = match_domain.begin_pvp_countdown
+MP.tick_match_pvp_countdown = match_domain.tick_pvp_countdown
+MP.set_match_spent_before_shop = match_domain.set_spent_before_shop
+MP.set_match_applying_remote_money = match_domain.set_applying_remote_money
+MP.set_match_shared_score_text = match_domain.set_shared_score_text
+MP.set_match_misprint_display = match_domain.set_misprint_display
+MP.set_match_pincher_unlocked = match_domain.set_pincher_unlocked
+MP.increment_match_asteroids = match_domain.increment_asteroids
+MP.consume_match_asteroids = match_domain.consume_asteroids
+MP.increment_match_pizza_discards = match_domain.increment_pizza_discards
+MP.consume_match_pizza_discards = match_domain.consume_pizza_discards
+MP.apply_match_enemy_info = match_domain.apply_enemy_info
+MP.apply_match_enemy_location = match_domain.apply_enemy_location
+MP.reset_match_ready_blind_state = match_domain.reset_ready_blind_state
+MP.set_match_ready_blind_state = match_domain.set_ready_blind_state
+MP.queue_match_next_blind_context = match_domain.queue_next_blind_context
+MP.clear_match_next_blind_context = match_domain.clear_next_blind_context
+MP.set_match_location = match_domain.set_location
+MP.apply_local_match_hand_score = match_domain.apply_local_hand_score
+MP.begin_new_match_round = match_domain.begin_new_round
+MP.set_match_skip_ready_blind_row = match_domain.set_skip_ready_blind_row
+MP.prepare_match_blind_selection = match_domain.prepare_blind_selection
+MP.advance_match_furthest_blind = match_domain.advance_furthest_blind
+MP.clear_match_end_pvp = match_domain.clear_end_pvp
+MP.set_match_wait_for_enemy_furthest_blind = match_domain.set_wait_for_enemy_furthest_blind
+MP.mark_match_ante_key_processed = match_domain.mark_ante_key_processed
+MP.mark_match_duplicate_end = match_domain.mark_duplicate_end
+MP.mark_match_end_pvp = match_domain.mark_end_pvp
+MP.mark_match_won = match_domain.mark_match_won
+MP.apply_saved_match_state = match_domain.apply_saved_state
+MP.get_default_match_starting_lives = match_domain.get_default_starting_lives
+MP.build_initial_match_round_state = match_domain.build_initial_round_state
+MP.build_initial_match_team_state = match_domain.build_initial_team_state
+MP.build_initial_match_economy_state = match_domain.build_initial_economy_state
+MP.build_initial_match_timer_state = match_domain.build_initial_timer_state
+MP.build_initial_match_meta_state = match_domain.build_initial_meta_state
+MP.build_initial_match_end_game_state = match_domain.build_initial_end_game_state
+MP.build_initial_match_state = match_domain.build_initial_state
+MP.ensure_match_runtime_state = match_domain.ensure_state
+MP.initialize_match_runtime_state = match_domain.initialize_runtime_state
+MP.reset_game_states = match_domain.reset_state
+
+return match_domain

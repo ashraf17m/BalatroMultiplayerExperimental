@@ -1,0 +1,25 @@
+[manifest]
+version = "1.0.0"
+dump_lua = true
+priority = 2147483600
+
+
+# ---- Oracle Deck
+
+
+# show max alert
+# janky since we check the text instead of a condition but hey easily fixed
+[[patches]]
+[patches.pattern]
+target = 'functions/common_events.lua'
+pattern = '''        attention_text({
+          text = text..tostring(math.abs(mod)),'''
+position = 'before'
+payload = '''
+if text == "MAX" and MP and MP.ORACLE then
+	MP.ORACLE.show_max_alert(dollar_UI)
+	return
+end
+'''
+match_indent = true
+times = 1
