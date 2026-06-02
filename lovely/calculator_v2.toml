@@ -1,0 +1,31 @@
+[manifest]
+version = "1.0"
+dump_lua = true
+priority = 1
+
+# Shared calculator shell plus the native scoring engine.
+
+[[patches]]
+[patches.copy]
+target = "functions/common_events.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Core/Calculator.lua",
+    "compatibility/Calculator/Experimental/Result.lua",
+    "compatibility/Calculator/Experimental/Signature.lua",
+    "compatibility/Calculator/Experimental/Context.lua",
+    "compatibility/Calculator/Experimental/DryRun.lua",
+    "compatibility/Calculator/Experimental/StateGuard.lua",
+    "compatibility/Calculator/Experimental/ProbabilityPolicy.lua",
+    "compatibility/Calculator/Experimental/NativeExact.lua",
+    "compatibility/Calculator/Experimental/CalculatorV2.lua",
+]
+
+[[patches]]
+[patches.copy]
+target = "functions/UI_definitions.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Core/UI.lua",
+    "compatibility/Calculator/Core/Interface.lua",
+]

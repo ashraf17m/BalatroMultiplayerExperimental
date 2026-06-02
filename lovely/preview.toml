@@ -1,0 +1,50 @@
+[manifest]
+version = "1.0"
+dump_lua = true
+priority = 0
+
+# The original calculator is intentionally loaded through this Lovely manifest
+# instead of the normal multiplayer bootstrap/startup.lua path. Runtime
+# enablement is still gated through MP.INTEGRATIONS.Preview inside the original
+# calculator files themselves.
+
+[[patches]]
+[patches.copy]
+target = "globals.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Original/InitSimulate.lua",
+    "compatibility/Calculator/Original/InitPreview.lua",
+]
+
+[[patches]]
+[patches.copy]
+target = "main.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Original/CorePreview.lua",
+    "compatibility/Calculator/Original/UtilsPreview.lua",
+]
+
+[[patches]]
+[patches.copy]
+target = "functions/common_events.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Original/EngineSimulate.lua",
+    "compatibility/Calculator/Original/EngineSimulate_helpers.lua",
+    "compatibility/Calculator/Original/EngineSimulate_integration.lua",
+    "compatibility/Calculator/Original/UtilsSimulate.lua",
+]
+
+[[patches]]
+[patches.copy]
+target = "card.lua"
+position = "append"
+sources = [
+    "compatibility/Calculator/Original/Jokers/_Vanilla.lua",
+    "compatibility/Calculator/Original/Jokers/_Vanilla_progression.lua",
+    "compatibility/Calculator/Original/Jokers/_Vanilla_synergies.lua",
+    "compatibility/Calculator/Original/Jokers/_Vanilla_advanced.lua",
+    "compatibility/Calculator/Original/Jokers/Multiplayer.lua",
+]

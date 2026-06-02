@@ -1,0 +1,48 @@
+local content_runtime = MP.CONTENT.RUNTIME
+
+SMODS.Consumable({
+	key = "ectoplasm_sandbox",
+	set = "Spectral",
+	pos = { x = 8, y = 4 },
+	config = { mp_sticker_balanced = true },
+	loc_vars = function(self, info_queue, card)
+		info_queue[#info_queue + 1] = G.P_CENTERS.e_negative
+		return { vars = { G.GAME.ecto_minus or 1 } }
+	end,
+	in_pool = function(self)
+		return content_runtime.is_ruleset_active("sandbox")
+	end,
+	use = function(self, card, area, copier)
+		local editionless_jokers = SMODS.Edition:get_edition_cards(G.jokers, true)
+		G.E_MANAGER:add_event(Event({
+			trigger = "after",
+			delay = 0.4,
+			func = function()
+				-- Randomly pick one of three negative effects
+				local effect = math.floor(pseudorandom("ectoplasm_sandbox") * 3) + 1
+
+				if effect == 1 then
+					G.GAME.round_resets.hands = G.GAME.round_resets.hands - 1
+					ease_hands_played(-1)
+				elseif effect == 2 then
+					G.GAME.round_resets.discards = G.GAME.round_resets.discards - 1
+					ease_discard(-1)
+				else
+					G.hand:change_size(-1)
+				end
+
+				-- positive effect: negative joker
+				if #editionless_jokers then
+					local eligible_card = pseudorandom_element(editionless_jokers, "ectoplasm")
+					eligible_card:set_edition({ negative = true })
+				end
+
+				card:juice_up(0.3, 0.5)
+				return true
+			end,
+		}))
+	end,
+	can_use = function(self, card)
+		return true
+	end,
+})

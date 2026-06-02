@@ -1,0 +1,25 @@
+[manifest]
+version = "1.0.0"
+dump_lua = true
+priority = 2147483600
+
+[[patches]]
+[patches.pattern]
+target = "functions/common_events.lua"
+pattern = '''G.GAME.dollars = G.GAME.dollars + mod'''
+position = 'at'
+payload = '''
+    if G.GAME.modifiers.oracle_max and MP and MP.ORACLE then
+        mod = MP.ORACLE.apply_dollar_cap(mod, G.GAME.dollars, G.GAME.modifiers.oracle_max + G.GAME.interest_cap)
+        if MP.ORACLE.should_show_max(mod, G.GAME.dollars, G.GAME.modifiers.oracle_max + G.GAME.interest_cap) then
+            text = "MAX"
+            col = G.C.RED
+        end
+    end
+    G.GAME.dollars = G.GAME.dollars + mod
+    if MP.LOBBY.code and to_big(mod) < to_big(0) then
+        MP.GAME.spent_total = to_big(MP.GAME.spent_total) + (to_big(mod) * to_big(-1))
+    end
+'''
+match_indent = true
+times = 1

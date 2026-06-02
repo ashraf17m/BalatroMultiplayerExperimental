@@ -1,0 +1,12 @@
+# Local editor/system files
+.vscode/
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local environment overrides and runtime output
+.env
+.env.*
+*.log
+logs/
