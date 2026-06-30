@@ -62,14 +62,25 @@ MP.HOOKS.register_method_hook(CardArea, "CardArea", "shuffle", "mp.the_order.det
 })
 
 local original_pseudorandom_element = pseudorandom_element
+
+local function get_joker_pool_key(value)
+	if type(value) ~= "table" or type(value.ability) ~= "table" or value.ability.set ~= "Joker" then
+		return nil
+	end
+
+	local center = value.config and value.config.center
+	return center and center.key or nil
+end
+
 function pseudorandom_element(_t, seed, args)
 	if MP.should_use_the_order() then
-		local is_joker = true
+		local is_joker = false
 		for _, value in pairs(_t) do
-			if not (type(value) == "table" and value.ability and value.ability.set == "Joker") then
+			if not get_joker_pool_key(value) then
 				is_joker = false
 				break
 			end
+			is_joker = true
 		end
 
 		if is_joker then
@@ -78,7 +89,7 @@ function pseudorandom_element(_t, seed, args)
 
 			for key, value in pairs(_t) do
 				keys[#keys + 1] = { k = key, v = value }
-				local joker_key = value.config.center.key
+				local joker_key = get_joker_pool_key(value)
 				grouped_jokers[joker_key] = grouped_jokers[joker_key] or {}
 				grouped_jokers[joker_key][#grouped_jokers[joker_key] + 1] = value
 			end
@@ -86,7 +97,7 @@ function pseudorandom_element(_t, seed, args)
 			local true_seed = pseudorandom(seed or math.random())
 			for key, cards in pairs(grouped_jokers) do
 				table.sort(cards, function(left, right)
-					return left.sort_id < right.sort_id
+					return (left.sort_id or 0) < (right.sort_id or 0)
 				end)
 				local mega_seed = key .. true_seed
 				for _, card in ipairs(cards) do
