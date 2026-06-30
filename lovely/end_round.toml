@@ -14,7 +14,7 @@ payload = '''
 if MP.handle_duplicate_end() then
 	return true
 end
-if MP.LOBBY.code then
+if MP.is_mp_or_ghost and MP.is_mp_or_ghost() then
 	MP.GAME.round_ended = true
 end
 '''
@@ -28,7 +28,7 @@ target = "functions/state_events.lua"
 pattern = '''-- context.end_of_round calculations'''
 position = 'before'
 payload = '''
-if MP.LOBBY.code then
+if MP.is_mp_or_ghost and MP.is_mp_or_ghost() then
 	game_over = false
 end
 '''
@@ -42,7 +42,7 @@ target = "functions/state_events.lua"
 pattern = '''if game_over then'''
 position = 'before'
 payload = '''
-if MP.LOBBY.code then
+if MP.is_mp_or_ghost and MP.is_mp_or_ghost() then
 	game_won = nil
 	G.GAME.won = nil
 end
@@ -57,7 +57,9 @@ target = "functions/state_events.lua"
 pattern = '''G.FUNCS.draw_from_discard_to_deck()'''
 position = 'after'
 payload = '''
-MP.handle_deck_out()
+if MP.handle_deck_out() then
+	return true
+end
 '''
 match_indent = true
 times = 1
@@ -168,7 +170,8 @@ function ease_ante(mod)
 '''
 position = 'after'
 payload = '''
-if MP.LOBBY.code and not MP.LOBBY.config.disable_live_and_timer_hud then
+local mp_lobby_config = MP.LOBBY and MP.LOBBY.config or {}
+if MP.is_mp_or_ghost and MP.is_mp_or_ghost() and not mp_lobby_config.disable_live_and_timer_hud then
 	MP.suppress_next_event = true
 end
 '''

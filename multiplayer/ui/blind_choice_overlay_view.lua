@@ -4,7 +4,7 @@ MP.UI.BLIND_CHOICE_OVERLAY = MP.UI.BLIND_CHOICE_OVERLAY or {}
 local blind_choice_overlay = MP.UI.BLIND_CHOICE_OVERLAY
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
-local function create_select_blind_button(type, run_info, blind_context, disabled)
+local function create_select_blind_button(type, run_info, blind_context)
 	if not run_info then
 		return {
 			n = G.UIT.R,
@@ -12,7 +12,7 @@ local function create_select_blind_button(type, run_info, blind_context, disable
 				id = "select_blind_button",
 				align = "cm",
 				ref_table = blind_context.blind_choice.config,
-				colour = disabled and G.C.UI.BACKGROUND_INACTIVE or G.C.ORANGE,
+				colour = G.C.ORANGE,
 				minh = 0.6,
 				minw = 2.7,
 				padding = 0.07,
@@ -30,8 +30,8 @@ local function create_select_blind_button(type, run_info, blind_context, disable
 						ref_table = BALATRO.get_round_reset_value and BALATRO.get_round_reset_value("loc_blind_states", {}) or {},
 						ref_value = type,
 						scale = 0.45,
-						colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.UI.TEXT_LIGHT,
-						shadow = not disabled,
+						colour = G.C.UI.TEXT_LIGHT,
+						shadow = true,
 					},
 				},
 			},
@@ -66,7 +66,6 @@ local function create_select_blind_button(type, run_info, blind_context, disable
 end
 
 function blind_choice_overlay.create_box(type, run_info, blind_context)
-	local disabled = false
 	local preview = MP.UI.BLIND_CHOICE_PREVIEW
 	local extras = preview and preview.get_blind_choice_extras and preview.get_blind_choice_extras(type, run_info) or nil
 
@@ -96,11 +95,11 @@ function blind_choice_overlay.create_box(type, run_info, blind_context)
 						n = G.UIT.R,
 						config = { align = "cm", padding = 0.2 },
 						nodes = {
-							create_select_blind_button(type, run_info, blind_context, disabled),
+							create_select_blind_button(type, run_info, blind_context),
 						},
 					},
-					preview and preview.create_name_node and preview.create_name_node(blind_context, disabled) or nil,
-					preview and preview.create_details_node and preview.create_details_node(blind_context, disabled) or nil,
+					preview and preview.create_name_node and preview.create_name_node(blind_context) or nil,
+					preview and preview.create_details_node and preview.create_details_node(blind_context) or nil,
 				},
 			},
 			{

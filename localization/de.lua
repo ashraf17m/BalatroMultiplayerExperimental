@@ -230,6 +230,7 @@ return {
 			k_connected = "Verbunden zum Service",
 			k_warn_service = "WARNUNG: Konnten denn Mehrspieler service nicht finden",
 			k_set_name = "Setzt dein Benutzername im Hauptmenü! (Mods > Multiplayer > Config)",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			k_lobby_options = "Lobby Optionen",
 			k_connect_player = "Verbundene Spieler:",
 			k_opts_only_host = "Nur der Lobby Host kann diese Option ändern",

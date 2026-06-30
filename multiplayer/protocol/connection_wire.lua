@@ -23,12 +23,22 @@ function MP.CONNECTION_WIRE.build_connect_payload()
 	}
 end
 
-function MP.CONNECTION_WIRE.build_identity_payload(username, blind_col, mod_hash)
-	return build_system_packet("identity", {
+function MP.CONNECTION_WIRE.build_identity_payload(username, blind_col, mod_hash, blind_target_scale)
+	local payload = {
 		username = username,
 		blindCol = normalize_blind_col(blind_col),
 		modHash = mod_hash,
-	})
+	}
+	local numeric_blind_target_scale = tonumber(blind_target_scale)
+	if
+		numeric_blind_target_scale
+		and numeric_blind_target_scale == numeric_blind_target_scale
+		and numeric_blind_target_scale ~= math.huge
+		and numeric_blind_target_scale ~= -math.huge
+	then
+		payload.blindTargetScale = math.max(0, numeric_blind_target_scale)
+	end
+	return build_system_packet("identity", payload)
 end
 
 function MP.CONNECTION_WIRE.build_rejoin_payload(code, reconnect_token)

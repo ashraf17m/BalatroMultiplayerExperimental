@@ -7,52 +7,31 @@ local function apply_ruleset_options(definition, options)
 	return definition
 end
 
-local standard_ruleset_silent_bans = {
-	"j_hanging_chad",
-	"j_ticket",
-	"j_selzer",
-	"j_turtle_bean",
-	"j_bloodstone",
-	"c_ouija",
-}
-
-local standard_ruleset_reworked_jokers = {
-	"j_mp_hanging_chad",
-	"j_mp_ticket",
-	"j_mp_seltzer",
-	"j_mp_turtle_bean",
-}
-
-local function copy_list(list)
-	local copy = {}
-	for i, value in ipairs(list) do
-		copy[i] = value
+local function normalize_layers(layers)
+	if layers == nil then
+		return {}
 	end
-	return copy
+	if type(layers) == "string" then
+		return { layers }
+	end
+	return layers
 end
 
-local function apply_list_default(definition, key, list)
-	if definition[key] == nil then
-		definition[key] = copy_list(list)
+local function has_layer(layers, layer_name)
+	for _, name in ipairs(layers) do
+		if name == layer_name then
+			return true
+		end
 	end
+	return false
 end
 
-local function with_standard_ruleset_defaults(definition)
-	definition.multiplayer_content = true
-	definition.standard = true
-	apply_list_default(definition, "banned_silent", standard_ruleset_silent_bans)
-	apply_list_default(definition, "banned_jokers", {})
-	apply_list_default(definition, "banned_consumables", { "c_justice" })
-	apply_list_default(definition, "banned_vouchers", {})
-	apply_list_default(definition, "banned_enhancements", {})
-	apply_list_default(definition, "banned_tags", {})
-	apply_list_default(definition, "banned_blinds", {})
-	apply_list_default(definition, "reworked_jokers", standard_ruleset_reworked_jokers)
-	apply_list_default(definition, "reworked_consumables", { "c_mp_ouija_standard" })
-	apply_list_default(definition, "reworked_vouchers", {})
-	apply_list_default(definition, "reworked_enhancements", { "m_mp_display_glass" })
-	apply_list_default(definition, "reworked_tags", {})
-	apply_list_default(definition, "reworked_blinds", {})
+local function with_standard_ruleset_layer(definition)
+	local layers = normalize_layers(definition.layers)
+	if not has_layer(layers, "standard") then
+		table.insert(layers, 1, "standard")
+	end
+	definition.layers = layers
 	return definition
 end
 
@@ -88,7 +67,7 @@ local function inject_standard_ruleset_in_group(group_key, group_order, key, sel
 		create_info_menu = options.create_info_menu or create_standard_ruleset_info_menu(description_key, options),
 	}
 	apply_ruleset_options(definition, options)
-	return MP.Ruleset(with_standard_ruleset_defaults(definition)):inject()
+	return MP.Ruleset(with_standard_ruleset_layer(definition)):inject()
 end
 
 function MP.inject_custom_standard_ruleset(key, selection_order, description_key, options)

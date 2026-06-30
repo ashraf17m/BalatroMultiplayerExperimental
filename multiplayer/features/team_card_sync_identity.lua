@@ -72,7 +72,7 @@ end
 
 function team_card_sync.assign_initial_team_card_ids()
 	local playing_cards = BALATRO.get_playing_cards() or {}
-	local prefix = MP.uses_shared_sync_group() and "TEAM"
+	local prefix = (MP.is_shared_card_sync_enabled and MP.is_shared_card_sync_enabled()) and "TEAM"
 		or (BALATRO.get_player_id() or "LOCAL")
 	for index, card in ipairs(playing_cards) do
 		team_card_sync.mark_card_ready_for_team_sync(card, prefix .. "_" .. (index - 1))

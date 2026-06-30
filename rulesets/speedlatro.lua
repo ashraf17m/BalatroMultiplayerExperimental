@@ -6,8 +6,10 @@ local STARTED_NON_PVP_TIMER_MULTIPLIER = 2
 local HUD_TIMER_SENTINEL = 999
 local DISPLAY_DECIMAL_PADDING_SECONDS = 100
 local DISPLAY_DECIMAL_SCALE = 100
+local PVP_ENTRY_WAIT_SECONDS = 4
 
 local trace_runtime_event = (MP.UTILS and MP.UTILS.trace_runtime_event) or function() end
+local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
 MP.inject_custom_standard_ruleset(RULESET_KEY, 6, "k_speedlatro_description", {
 	forced_gamemode = "gamemode_mp_attrition",
@@ -96,8 +98,63 @@ local function is_pvp_blind_entry_locked()
 	return G.CONTROLLER.locks.enter_pvp or is_readying_pvp_blind()
 end
 
-local function should_tick_speedlatro_timer()
-	return not is_waiting_for_last_pvp_hand_resolution() and not is_pvp_blind_entry_locked()
+local function normalize_score_text(value)
+	local score_value = value or 0
+	if type(to_big) == "function" then
+		score_value = to_big(score_value)
+	end
+	local score_text = tostring(score_value)
+	if string.match(score_text, "[eE]") == nil and string.match(score_text, "[.]") then
+		score_text = string.sub(string.gsub(score_text, "%.", ","), 1, -3)
+	end
+	return string.gsub(score_text, ",", "")
+end
+
+local function get_local_pvp_score()
+	if not (G and G.GAME and MP.INSANE_INT and MP.INSANE_INT.from_string) then
+		return nil
+	end
+	local ok, score = pcall(MP.INSANE_INT.from_string, normalize_score_text(G.GAME.chips))
+	return ok and score or nil
+end
+
+local function get_speedlatro_enemy_state()
+	local opponents = MP.OPPONENTS or {}
+	if opponents.get_nemesis_enemy_state then
+		local enemy = opponents.get_nemesis_enemy_state()
+		if enemy then
+			return enemy
+		end
+	end
+	return MP.GAME and MP.GAME.enemy or nil
+end
+
+local function should_tick_for_pvp_score()
+	if not MP.is_pvp_boss() then
+		return true
+	end
+
+	local enemy = get_speedlatro_enemy_state()
+	local enemy_score = enemy and (enemy.score or enemy.synced_score) or nil
+	local local_score = get_local_pvp_score()
+	if not (enemy_score and local_score and MP.INSANE_INT and MP.INSANE_INT.greater_than) then
+		return false
+	end
+
+	local ok, enemy_ahead = pcall(MP.INSANE_INT.greater_than, enemy_score, local_score)
+	return ok and enemy_ahead
+end
+
+local function is_speedlatro_timer_paused_for_transition(timer)
+	return is_pvp_blind_entry_locked()
+		or (MP.GAME and MP.GAME.ready_blind)
+		or (timer and timer.wait)
+end
+
+local function should_tick_speedlatro_timer(timer)
+	return not is_waiting_for_last_pvp_hand_resolution()
+		and not is_speedlatro_timer_paused_for_transition(timer)
+		and should_tick_for_pvp_score()
 end
 
 local function get_speedlatro_timer_multiplier()
@@ -141,7 +198,7 @@ end
 
 local function tick_speedlatro_timer(dt)
 	local timer = ensure_speedlatro_timer(true)
-	if should_tick_speedlatro_timer() then
+	if should_tick_speedlatro_timer(timer) then
 		timer.real = timer.real - dt * get_speedlatro_timer_multiplier()
 	end
 
@@ -155,6 +212,8 @@ end
 local function reset_speedlatro_timer(seconds, reset_failed, reason)
 	local timer = ensure_speedlatro_timer(false)
 	timer.real = seconds
+	timer.wait = false
+	timer.wait_generation = (timer.wait_generation or 0) + 1
 	if reset_failed then
 		timer.failed = false
 	end
@@ -163,6 +222,35 @@ local function reset_speedlatro_timer(seconds, reset_failed, reason)
 		reason = reason,
 		reset_failed = reset_failed == true,
 		seconds = seconds,
+	})
+	return timer
+end
+
+local function queue_speedlatro_event(event)
+	if BALATRO.queue_event then
+		BALATRO.queue_event(event)
+	elseif G and G.E_MANAGER and Event then
+		G.E_MANAGER:add_event(Event(event))
+	end
+end
+
+local function start_speedlatro_pvp_entry_wait(timer)
+	timer = timer or ensure_speedlatro_timer(false)
+	timer.wait_generation = (timer.wait_generation or 0) + 1
+	local wait_generation = timer.wait_generation
+	timer.wait = true
+
+	queue_speedlatro_event({
+		blockable = false,
+		blocking = false,
+		trigger = "after",
+		delay = PVP_ENTRY_WAIT_SECONDS,
+		func = function()
+			if MP.speedlatro_timer == timer and timer.wait_generation == wait_generation then
+				timer.wait = false
+			end
+			return true
+		end,
 	})
 end
 
@@ -173,7 +261,8 @@ local function reset_speedlatro_timer_for_new_round()
 
 	if MP.LOBBY.code then
 		if G.GAME.round_resets.blind == G.P_BLINDS["bl_mp_nemesis"] then
-			reset_speedlatro_timer(PVP_BLIND_TIMER_SECONDS, true, "new_round_nemesis")
+			local timer = reset_speedlatro_timer(PVP_BLIND_TIMER_SECONDS, true, "new_round_nemesis")
+			start_speedlatro_pvp_entry_wait(timer)
 		end
 	elseif G.GAME.round_resets.blind ~= G.P_BLINDS["bl_small"]
 	and G.GAME.round_resets.blind ~= G.P_BLINDS["bl_big"] then

@@ -44,6 +44,10 @@ local function uses_global_coop_blind()
 	return MP.is_coop_blind and MP.is_coop_blind()
 end
 
+local function uses_cooperative_score_context()
+	return TEAMS_DOMAIN.is_cooperative_blind() or uses_global_coop_blind()
+end
+
 local function get_blind_choice_internal()
 	return MP.BLIND_CHOICE_INTERNAL or nil
 end
@@ -152,8 +156,62 @@ end
 
 function TEAMS_DOMAIN.get_local_score_text()
 	local chips = BALATRO.get_game_value and BALATRO.get_game_value("chips") or nil
-	local is_cooperative_blind = TEAMS_DOMAIN.is_cooperative_blind() or uses_global_coop_blind()
+	local is_cooperative_blind = uses_cooperative_score_context()
 	return get_local_score_text_from_context(is_cooperative_blind, chips)
+end
+
+local function get_relevant_shared_score(is_global_coop, team_id)
+	local total_score = MP.INSANE_INT.from_string(TEAMS_DOMAIN.get_local_score_text())
+
+	for _, enemy in pairs(MP.GAME and MP.GAME.enemies or {}) do
+		if enemy and enemy.in_match ~= false and (is_global_coop or (team_id and enemy.team == team_id)) then
+			local enemy_score = enemy.synced_score or enemy.score or MP.INSANE_INT.empty()
+			total_score = MP.INSANE_INT.add(total_score, enemy_score)
+		end
+	end
+
+	return total_score
+end
+
+function TEAMS_DOMAIN.get_cooperative_blind_score()
+	if not MP.GAME then
+		return nil
+	end
+
+	local is_global_coop = uses_global_coop_blind()
+	if is_global_coop then
+		return get_relevant_shared_score(true)
+	end
+
+	if not TEAMS_DOMAIN.is_cooperative_blind() then
+		return nil
+	end
+
+	local team_id = MP.get_self_team_id and MP.get_self_team_id() or nil
+	if not team_id then
+		return MP.INSANE_INT.from_string(TEAMS_DOMAIN.get_local_score_text())
+	end
+
+	return get_relevant_shared_score(false, team_id)
+end
+
+function TEAMS_DOMAIN.get_cooperative_blind_target()
+	if not (MP.GAME and uses_cooperative_score_context()) then
+		return nil
+	end
+
+	if MP.GAME.coop_blind_target_chips ~= nil then
+		return MP.GAME.coop_blind_target_chips
+	end
+	if MP.GAME.coop_blind_server_target_chips ~= nil then
+		return MP.GAME.coop_blind_server_target_chips
+	end
+
+	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	if blind and blind.mp_coop_scaled_chips ~= nil then
+		return blind.mp_coop_scaled_chips
+	end
+	return blind and blind.chips or nil
 end
 
 function TEAMS_DOMAIN.reset_round_score_state()
@@ -192,7 +250,7 @@ function TEAMS_DOMAIN.refresh_live_score()
 		return
 	end
 
-	local is_cooperative_blind = TEAMS_DOMAIN.is_cooperative_blind() or uses_global_coop_blind()
+	local is_cooperative_blind = uses_cooperative_score_context()
 	if not is_cooperative_blind then
 		MP.GAME.live_team_local_score_cache = nil
 		return
@@ -224,14 +282,7 @@ function TEAMS_DOMAIN.recalculate_state()
 	local previous_team_lives = MP.GAME.team_lives
 
 	if uses_global_coop_blind() then
-		local total_score = MP.INSANE_INT.from_string(TEAMS_DOMAIN.get_local_score_text())
-
-		for _, enemy in pairs(MP.GAME.enemies or {}) do
-			if enemy and enemy.in_match ~= false then
-				local enemy_score = enemy.synced_score or enemy.score or MP.INSANE_INT.empty()
-				total_score = MP.INSANE_INT.add(total_score, enemy_score)
-			end
-		end
+		local total_score = TEAMS_DOMAIN.get_cooperative_blind_score() or MP.INSANE_INT.empty()
 
 		MP.GAME.team_score = total_score
 		MP.GAME.team_score_text = MP.INSANE_INT.to_string(total_score)
@@ -250,13 +301,11 @@ function TEAMS_DOMAIN.recalculate_state()
 		return
 	end
 
-	local total_score = MP.INSANE_INT.from_string(TEAMS_DOMAIN.get_local_score_text())
+	local total_score = get_relevant_shared_score(false, team_id)
 	local shared_lives = MP.GAME.lives or MP.LOBBY.config.starting_lives or 0
 
-	for _, enemy in pairs(MP.GAME.enemies or {}) do
+	for _, enemy in pairs(MP.GAME and MP.GAME.enemies or {}) do
 		if enemy and enemy.in_match ~= false and enemy.team == team_id then
-			local enemy_score = enemy.synced_score or enemy.score or MP.INSANE_INT.empty()
-			total_score = MP.INSANE_INT.add(total_score, enemy_score)
 			if enemy.team_lives ~= nil then
 				shared_lives = enemy.team_lives
 			elseif enemy.lives ~= nil then

@@ -327,6 +327,7 @@ return {
 			k_connected = "Połaczono z usługą",
 			k_warn_service = "UWAGA: Nie można znaleść usługi Multiplayer",
 			k_set_name = "Stwórź swoją nazwę w menu głownym! (Mods > Multiplayer > Config)",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			k_lobby_options = "Opcje gry",
 			k_connect_player = "Gracze w Lobby:",
 			k_opts_only_host = "Tylko Gospodarz Gry może zmieniać te ustawienia",

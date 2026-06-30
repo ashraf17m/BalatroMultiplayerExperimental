@@ -606,6 +606,7 @@ return {
 			k_warn_service = "CHÚ Ý: Không thể tìm thấy Máy chủ Multiplayer",
 			k_set_name = "Đặt tên của bạn trong menu chính! (Mod > Multiplayer > Tuỳ Chọn)",
 			k_steamodded_warning = "Người chơi đang có phiên bản Steamodded khác nhau. Có thể gây chênh lệch giống.",
+			k_mp_version_warning = "Players are on different Multiplayer versions! Seeds and jokers will desync - update so you both match.",
 			k_warning_unlock_profile = "Hồ sơ bạn đang chơi chưa được mở khoá toàn bộ. Nếu đây là trận xếp hạng/giải đấu, hãy tạo hồ sơ mới và nhấn mở khoá toàn bộ trong cài đặt hồ sơ",
 			k_warning_nemesis_unlock = "Đối thủ của bạn đang chơi trên hồ sơ chưa được mở khoá toàn bộ. Hãy hướng dẫn họ tạo hồ sơ mới và nhấn mở khoá toàn bộ trong cài đặt hồ sơ",
 			k_warning_no_order = "Một người chơi đang bật tích hợo The Order trong khi người kia thì không. Điều nãy sẽ khiến cùng một giống bị khác nhau.",

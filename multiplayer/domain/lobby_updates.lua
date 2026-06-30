@@ -25,6 +25,10 @@ local function normalize_lobby_option_value(option_key, option_value)
 		return LOBBY_DOMAIN.normalize_gamemode(option_value)
 	end
 
+	if option_key == "modifier_layers" then
+		return tostring(option_value or "")
+	end
+
 	local normalized_value = option_value
 	if normalized_value == "true" then
 		normalized_value = true
@@ -56,6 +60,9 @@ function LOBBY_DOMAIN.apply_option_update(options, state)
 
 	for option_key, option_value in pairs(normalized_options) do
 		config[option_key] = option_value
+		if option_key == "modifier_layers" and MP.modifiers_parse then
+			MP.modifiers_parse(option_value or "")
+		end
 		if MP.SHARED_LOBBY_DECK_OPTION_KEYS and MP.SHARED_LOBBY_DECK_OPTION_KEYS[option_key] then
 			shared_deck_changed = true
 		end
@@ -64,7 +71,7 @@ function LOBBY_DOMAIN.apply_option_update(options, state)
 		end
 	end
 
-	if (not config.different_decks) and (shared_deck_changed or different_decks_before ~= config.different_decks) then
+	if different_decks_before ~= config.different_decks or ((not config.different_decks) and shared_deck_changed) then
 		if LOBBY_DOMAIN.sync_run_deck_from_config then
 			LOBBY_DOMAIN.sync_run_deck_from_config(state)
 		end

@@ -70,6 +70,87 @@ local function request_match_lobby_info_refresh()
 	return false
 end
 
+local function get_local_score_int()
+	if MP.GAME and MP.GAME.score_display then
+		return MP.GAME.score_display
+	end
+	if MP.INSANE_INT and MP.INSANE_INT.from_string then
+		return MP.INSANE_INT.from_string(tostring(MP.GAME and MP.GAME.score_text or "0"))
+	end
+	return nil
+end
+
+local function apply_pvp_timer_score_gate(enemy_score)
+	if not (
+		MP.GAME
+		and enemy_score
+		and MP.is_pvp_boss
+		and MP.is_pvp_boss()
+		and MP.is_layer_active
+		and MP.is_layer_active("pvp_timer")
+		and MP.INSANE_INT
+	) then
+		return
+	end
+
+	local local_score = get_local_score_int()
+	if not local_score then
+		return
+	end
+
+	if MP.INSANE_INT.greater_than(local_score, enemy_score) then
+		MP.GAME.nemesis_timer_started = false
+	elseif MP.INSANE_INT.equal and MP.INSANE_INT.equal(local_score, enemy_score) and MP.GAME.pvp_reached_first then
+		MP.GAME.nemesis_timer_started = false
+	else
+		MP.GAME.timer_started = false
+	end
+end
+
+local function restore_skip_timer_bonus_once(skip_delta, total_skips, increment)
+	if not (MP.GAME and MP.UI and MP.UI.restore_timer) then
+		return
+	end
+
+	local normalized_delta = math.max(0, math.floor(tonumber(skip_delta) or 0))
+	local normalized_total = math.floor(tonumber(total_skips) or 0)
+	if normalized_delta <= 0 or normalized_total <= 0 then
+		return
+	end
+
+	MP.GAME.timer_skip_bonus_applied_for_skips = MP.GAME.timer_skip_bonus_applied_for_skips or {}
+	local seen = MP.GAME.timer_skip_bonus_applied_for_skips
+	local first_skip = math.max(1, normalized_total - normalized_delta + 1)
+
+	for skip_count = first_skip, normalized_total do
+		if not seen[skip_count] then
+			seen[skip_count] = true
+			MP.UI.restore_timer(increment)
+		end
+	end
+end
+
+local function apply_enemy_skip_timer_bonus(skip_delta, total_skips)
+	if
+		(skip_delta or 0) <= 0
+		or not (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.timer)
+		or not (MP.GAME and MP.GAME.timer)
+		or MP.GAME.timer_started
+		or MP.GAME.nemesis_timer_started
+		or MP.GAME.timer_consumed
+		or not (MP.is_any_layer_active and MP.is_any_layer_active({ "no_animation_timer", "pressure_timer" }))
+	then
+		return
+	end
+
+	local increment = tonumber(MP.LOBBY.config.timer_increment_seconds) or 0
+	if increment <= 0 then
+		return
+	end
+
+	restore_skip_timer_bonus_once(skip_delta, total_skips, increment)
+end
+
 local function request_group_options_overlay_refresh()
 	if MP.UI and MP.UI.request_group_options_overlay_refresh then
 		return MP.UI.request_group_options_overlay_refresh()
@@ -237,6 +318,9 @@ function STATE_APPLY_RUNTIME.handle_enemy_info(update_result)
 	local enemy = update_result.enemy
 	local score = update_result.score
 
+	apply_enemy_skip_timer_bonus(update_result.skip_delta, update_result.skips)
+	apply_pvp_timer_score_gate(score)
+
 	call_state_effect("ease_enemy_score", enemy, score)
 
 	if update_result.life_lost then
@@ -254,6 +338,9 @@ end
 
 function STATE_APPLY_RUNTIME.handle_enemy_location(enemy)
 	refresh_primary_enemy_view(enemy)
+	if MP.UI and MP.UI.refresh_enemy_location_ui then
+		MP.UI.refresh_enemy_location_ui()
+	end
 	request_match_lobby_info_refresh()
 end
 

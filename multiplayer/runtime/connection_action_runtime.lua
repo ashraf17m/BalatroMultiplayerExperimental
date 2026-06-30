@@ -8,6 +8,7 @@ local load_required_service = MP.UTILS.load_required_service
 local CONNECTION_IDENTITY_METHODS = {
 	"set_username",
 	"set_blind_col",
+	"sync_blind_target_scale",
 }
 
 local function send_payload(payload)
@@ -34,7 +35,7 @@ end
 
 local function get_identity_payload_values()
 	local client = MP.LOBBY and MP.LOBBY.client or {}
-	return client.username, client.blind_col, MP.MOD_STRING
+	return client.username, client.blind_col, MP.MOD_STRING, client.blind_target_scale
 end
 
 function connection_action_runtime.connect()
@@ -42,8 +43,8 @@ function connection_action_runtime.connect()
 end
 
 function connection_action_runtime.send_identity()
-	local username, blind_col, mod_hash = get_identity_payload_values()
-	send_payload(MP.CONNECTION_WIRE.build_identity_payload(username, blind_col, mod_hash))
+	local username, blind_col, mod_hash, blind_target_scale = get_identity_payload_values()
+	send_payload(MP.CONNECTION_WIRE.build_identity_payload(username, blind_col, mod_hash, blind_target_scale))
 end
 
 function connection_action_runtime.send_rejoin(code, reconnect_token)
@@ -70,9 +71,18 @@ function connection_action_runtime.set_blind_col(num)
 	return MP.CONNECTION_IDENTITY.set_blind_col(num)
 end
 
+function connection_action_runtime.sync_blind_target_scale(scale)
+	if not ensure_connection_identity() then
+		return nil
+	end
+
+	return MP.CONNECTION_IDENTITY.sync_blind_target_scale(scale)
+end
+
 MP.ACTIONS.connect = connection_action_runtime.connect
 MP.ACTIONS.set_username = connection_action_runtime.set_username
 MP.ACTIONS.set_blind_col = connection_action_runtime.set_blind_col
+MP.ACTIONS.sync_blind_target_scale = connection_action_runtime.sync_blind_target_scale
 
 MP.NETWORKING_INTERNAL.send_connection_identity = connection_action_runtime.send_identity
 MP.NETWORKING_INTERNAL.send_connection_rejoin = connection_action_runtime.send_rejoin

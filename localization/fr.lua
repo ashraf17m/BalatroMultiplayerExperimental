@@ -239,6 +239,7 @@ return {
 			k_warning_unlock_profile = "Le profil actuel n'a pas tout le contenu débloqué. Si cette partie est classée/un tournoi, veuillez créer un nouveau profil et cliquer sur 'tout débloquer' dans les paramètres du profil.",
 			k_warning_nemesis_unlock = "Votre adversaire joue sur un profil qui n'a pas tout débloqué. Indiquez lui d'appuyer sur 'tout débloquer' dans les paramètres de son profil.",
 			k_warning_no_order = "Un joueur a activé l'intégration de The Order mais l'autre non. Les graines seront peut-être différentes.",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			k_warning_cheating1 = "Si vous lisez ceci, il se peut que votre adversaire triche.",
 			k_warning_cheating2 = "Si cette partie est classée, envoyez le message '%s' et ouvrez un ticket de support dans #support.",
 			k_message1 = "Attends, ma mère a fait des mini-pizzas",

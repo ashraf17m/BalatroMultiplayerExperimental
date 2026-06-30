@@ -20,6 +20,11 @@ local function set_multiplayer_location(location)
 	show_enemy_location()
 end
 
+local function get_current_location_type()
+	local location = tostring((MP.GAME and MP.GAME.location) or "")
+	return location:match("^([^-]+)") or location
+end
+
 local function suppress_original_result(ctx)
 	ctx.results = { n = 0 }
 end
@@ -31,7 +36,7 @@ MP.HOOKS.register_method_hook(Game, "Game", "update_shop", "mp.run_runtime.locat
 		end
 
 		if MP.LOBBY.code and not G.STATE_COMPLETE and not G.GAME.USING_RUN then
-			if MP.GAME.location ~= "loc_shop" then
+			if get_current_location_type() ~= "loc_shop" then
 				if match_domain.set_spent_before_shop then
 					match_domain.set_spent_before_shop(to_big(MP.GAME.spent_total) + to_big(0))
 				end
@@ -58,7 +63,10 @@ MP.HOOKS.register_method_hook(Game, "Game", "update_blind_select", "mp.run_runti
 
 MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.run_runtime.start_run", {
 	before = function()
-		MP.LoadReworks(MP.LOBBY.code and MP.LOBBY.config.ruleset or nil)
+		local active_ruleset = MP.get_active_ruleset and MP.get_active_ruleset()
+			or (MP.LOBBY.code and MP.LOBBY.config.ruleset)
+			or nil
+		MP.LoadReworks(active_ruleset)
 	end,
 	after = function(ctx)
 		if MP.sync_local_money_state then
@@ -67,10 +75,12 @@ MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.run_runtime.start_r
 
 		suppress_original_result(ctx)
 
-		if not MP.LOBBY.client.connected or not MP.LOBBY.code or MP.LOBBY.config.disable_live_and_timer_hud then return end
+		local ghost_active = MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
+		if not ghost_active and (not MP.LOBBY.client.connected or not MP.LOBBY.code) then return end
+		if MP.LOBBY.config.disable_live_and_timer_hud then return end
 
 		if MP.UI and MP.UI.refresh_lives_hud_binding then
-			MP.UI.refresh_lives_hud_binding()
+			MP.UI.refresh_lives_hud_binding({ force = ghost_active })
 		end
 	end,
 })

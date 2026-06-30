@@ -11,12 +11,13 @@ SMODS.Consumable({
 	key = "ouija_standard",
 	set = "Spectral",
 	atlas = "ouija_2",
+	cost = 4,
 	pos = { x = 0, y = 0 },
 	unlocked = true,
 	discovered = true,
 	config = { extra = { destroy = 3 }, mp_sticker_balanced = true },
 	in_pool = function(self)
-		return content_runtime.is_ruleset_active("sandbox") or content_runtime.include_standard_ruleset()
+		return content_runtime.is_layer_active("sandbox") or content_runtime.include_standard_ruleset()
 	end,
 	loc_vars = function(self, info_queue, card)
 		return { vars = { card.ability.extra.destroy } }
@@ -25,7 +26,7 @@ SMODS.Consumable({
 		local used_tarot = copier or card
 		G.E_MANAGER:add_event(Event({
 			trigger = "after",
-			delay = 0.2,
+			delay = 0.4,
 			func = function()
 				play_sound("tarot1")
 				used_tarot:juice_up(0.3, 0.5)
@@ -34,110 +35,67 @@ SMODS.Consumable({
 		}))
 
 		local cards_to_destroy = {}
-		for i = 1, math.min(card.ability.extra.destroy, #G.hand.cards) do
-			local remaining_cards = {}
-			for j, hand_card in ipairs(G.hand.cards) do
-				local already_marked = false
-				for k, marked_card in ipairs(cards_to_destroy) do
-					if marked_card == hand_card then
-						already_marked = true
-						break
-					end
-				end
-				if not already_marked then table.insert(remaining_cards, hand_card) end
-			end
-			if #remaining_cards > 0 then
-				local card_to_destroy = pseudorandom_element(remaining_cards, "ouija_destroy")
-				table.insert(cards_to_destroy, card_to_destroy)
-			end
+		local temp_hand = {}
+		for _, hand_card in ipairs(G.hand.cards) do
+			temp_hand[#temp_hand + 1] = hand_card
+		end
+		table.sort(temp_hand, function(a, b)
+			return not a.playing_card or not b.playing_card or a.playing_card < b.playing_card
+		end)
+		pseudoshuffle(temp_hand, pseudoseed("ouija_destroy"))
+
+		for i = 1, card.ability.extra.destroy do
+			cards_to_destroy[#cards_to_destroy + 1] = temp_hand[i]
+			temp_hand[i].ouija_queue_destroy = true
 		end
 
-		-- Destroy the selected cards
-		for i, destroy_card in ipairs(cards_to_destroy) do
+		for i = 1, #G.hand.cards do
+			local _card = G.hand.cards[i]
+			local percent = 1.15 - (i - 0.999) / (#G.hand.cards - 0.998) * 0.3
 			G.E_MANAGER:add_event(Event({
 				trigger = "after",
-				delay = 0.1,
+				delay = 0.15,
 				func = function()
-					destroy_card.T.r = -0.2
-					destroy_card:juice_up(0.3, 0.4)
+					_card:flip()
+					play_sound("card1", percent)
+					_card:juice_up(0.3, 0.3)
 					return true
 				end,
 			}))
-			SMODS.destroy_cards(destroy_card)
+		end
+		delay(0.2)
+		SMODS.destroy_cards(cards_to_destroy)
+		delay(0.3)
+
+		local _rank = pseudorandom_element(SMODS.Ranks, "ouija")
+		for i = 1, #G.hand.cards do
+			local _card = G.hand.cards[i]
+			if not _card.ouija_queue_destroy then
+				G.E_MANAGER:add_event(Event({
+					func = function()
+						if _card and not _card.destroyed then assert(SMODS.change_base(_card, nil, _rank.key)) end
+						return true
+					end,
+				}))
+			end
 		end
 
-		-- Wait for destruction, then flip remaining cards
-		G.E_MANAGER:add_event(Event({
-			trigger = "after",
-			delay = 1,
-			func = function()
-				for i = 1, #G.hand.cards do
-					local percent = 1.15 - (i - 0.999) / (#G.hand.cards - 0.998) * 0.3
-					G.E_MANAGER:add_event(Event({
-						trigger = "after",
-						delay = 0.15,
-						func = function()
-							if G.hand.cards[i] and not G.hand.cards[i].destroyed then
-								G.hand.cards[i]:flip()
-								play_sound("card1", percent)
-								G.hand.cards[i]:juice_up(0.3, 0.3)
-							end
-							return true
-						end,
-					}))
-				end
-				return true
-			end,
-		}))
-
-		-- Convert remaining cards to same rank
-		local _rank = pseudorandom_element(SMODS.Ranks, "ouija")
-		G.E_MANAGER:add_event(Event({
-			trigger = "after",
-			delay = 0.8,
-			func = function()
-				for i = 1, #G.hand.cards do
-					if G.hand.cards[i] and not G.hand.cards[i].destroyed then
-						G.E_MANAGER:add_event(Event({
-							func = function()
-								local _card = G.hand.cards[i]
-								if _card and not _card.destroyed then
-									assert(SMODS.change_base(_card, nil, _rank.key))
-								end
-								return true
-							end,
-						}))
-					end
-				end
-				return true
-			end,
-		}))
-
-		-- Flip cards back
-		G.E_MANAGER:add_event(Event({
-			trigger = "after",
-			delay = 1.2,
-			func = function()
-				for i = 1, #G.hand.cards do
-					if G.hand.cards[i] and not G.hand.cards[i].destroyed then
-						local percent = 0.85 + (i - 0.999) / (#G.hand.cards - 0.998) * 0.3
-						G.E_MANAGER:add_event(Event({
-							trigger = "after",
-							delay = 0.15,
-							func = function()
-								if G.hand.cards[i] and not G.hand.cards[i].destroyed then
-									G.hand.cards[i]:flip()
-									play_sound("tarot2", percent, 0.6)
-									G.hand.cards[i]:juice_up(0.3, 0.3)
-								end
-								return true
-							end,
-						}))
-					end
-				end
-				return true
-			end,
-		}))
+		for i = 1, #G.hand.cards do
+			local _card = G.hand.cards[i]
+			if not _card.ouija_queue_destroy then
+				local percent = 0.85 + (i - 0.999) / (#G.hand.cards - 0.998) * 0.3
+				G.E_MANAGER:add_event(Event({
+					trigger = "after",
+					delay = 0.15,
+					func = function()
+						_card:flip()
+						play_sound("tarot2", percent, 0.6)
+						_card:juice_up(0.3, 0.3)
+						return true
+					end,
+				}))
+			end
+		end
 		delay(0.5)
 	end,
 	can_use = function(self, card)

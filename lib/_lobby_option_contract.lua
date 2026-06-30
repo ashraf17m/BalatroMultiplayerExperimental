@@ -12,6 +12,7 @@ MP.LOBBY_OPTION_BOOLEAN_KEYS = {
 	multiplayer_jokers = true,
 	normal_bosses = true,
 	preview_disabled = true,
+	random_loadout = true,
 	team_card_sync = true,
 	team_hand_level_sync = true,
 	team_money_sync = true,
@@ -37,7 +38,9 @@ MP.LOBBY_OPTION_STRING_KEYS = {
 	back = true,
 	challenge = true,
 	cocktail = true,
+	custom_bans = true,
 	custom_seed = true,
+	modifier_layers = true,
 	pvp_score_rule = true,
 	ruleset = true,
 	sleeve = true,
@@ -56,6 +59,7 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	back = "Red Deck",
 	challenge = "",
 	cocktail = "",
+	custom_bans = "",
 	custom_seed = "random",
 	coop_blind_scaling_per_player = 1,
 	death_on_round_loss = true,
@@ -65,13 +69,15 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	forced_config = false,
 	gold_on_life_loss = true,
 	legacy_smallworld = false,
+	modifier_layers = "",
 	multiplayer_jokers = true,
 	no_gold_on_round_loss = false,
 	normal_bosses = false,
 	preview_disabled = false,
+	random_loadout = false,
 	pvp_custom_winners = 1,
 	pvp_score_rule = "highest",
-	team_card_sync = true,
+	team_card_sync = false,
 	team_hand_level_sync = true,
 	team_money_sync = true,
 	pvp_countdown_seconds = 3,
@@ -93,6 +99,12 @@ local GROUP_LOBBY_OPTION_DEFAULT_VALUES = {
 	pvp_custom_winners = 8,
 }
 
+local function get_lobby_type_default_option_overrides(lobby_type)
+	return {
+		team_card_sync = lobby_type == MP.LOBBY_TYPES.TEAMS or lobby_type == MP.LOBBY_TYPES.COOP,
+	}
+end
+
 function MP.build_lobby_option_defaults(lobby_type)
 	local defaults = {}
 	for key, value in pairs(BASE_DEFAULT_LOBBY_OPTION_VALUES) do
@@ -104,6 +116,10 @@ function MP.build_lobby_option_defaults(lobby_type)
 		for key, value in pairs(GROUP_LOBBY_OPTION_DEFAULT_VALUES) do
 			defaults[key] = value
 		end
+	end
+
+	for key, value in pairs(get_lobby_type_default_option_overrides(effective_lobby_type)) do
+		defaults[key] = value
 	end
 
 	return defaults

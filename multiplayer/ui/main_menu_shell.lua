@@ -55,6 +55,9 @@ MP.HOOKS.register_method_hook(Game, "Game", "main_menu", "mp.ui.main_menu_shell"
 			main_menu.add_custom_title_card(change_context)
 		end
 		main_menu.add_version_display()
+		if main_menu.show_dev_build_warning then
+			main_menu.show_dev_build_warning()
+		end
 	end,
 })
 

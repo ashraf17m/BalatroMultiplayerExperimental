@@ -5,7 +5,11 @@ local mainThreadMessageQueue = function()
 		for _ = 1, requestsPerCycle do
 			local msg = uiToNetworkChannel:pop()
 			if msg then
-				if msg == "{\"action\":\"connect\"}" then
+				if msg == TESTING_STALL_READS_ON then
+					testingStallServerReads = true
+				elseif msg == TESTING_STALL_READS_OFF then
+					testingStallServerReads = false
+				elseif msg == "{\"action\":\"connect\"}" then
 					Networking.connect()
 				else
 					sendToServer(msg .. "\n")
@@ -23,7 +27,9 @@ local mainThreadCoroutine = coroutine.create(mainThreadMessageQueue)
 local networkPacketQueue = function()
 	local packetsPerCycle = 25
 	while true do
-		if Networking.Client and not isSocketClosed then
+		if testingStallServerReads then
+			coroutine.yield()
+		elseif Networking.Client and not isSocketClosed then
 			for _ = 1, packetsPerCycle do
 				local data, error, partial = Networking.Client:receive("*a")
 

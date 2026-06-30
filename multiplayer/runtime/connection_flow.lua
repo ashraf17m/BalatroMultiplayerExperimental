@@ -15,9 +15,26 @@ local function resume_error_invalidates_saved_match(message)
 		or string.find(message, "Lobby no longer exists", 1, true) ~= nil
 end
 
+local function flush_requested_ui_refreshes()
+	if MP.UI and MP.UI.flush_requested_refreshes then
+		MP.UI.flush_requested_refreshes()
+	end
+end
+
+local function request_overlay_close_if_open()
+	if BALATRO and BALATRO.get_overlay_menu and BALATRO.get_overlay_menu() then
+		MP.CONNECTION_SESSION.request_overlay_menu_close()
+	end
+end
+
+local function show_notice_after_ui_settles(message)
+	flush_requested_ui_refreshes()
+	MP.CONNECTION_FEEDBACK.show_notice(message)
+end
+
 local function queue_notice_after_main_menu(message)
 	if not (BALATRO and BALATRO.queue_event) then
-		MP.CONNECTION_FEEDBACK.show_notice(message)
+		show_notice_after_ui_settles(message)
 		return
 	end
 
@@ -31,14 +48,14 @@ local function queue_notice_after_main_menu(message)
 				return
 			end
 
-			MP.CONNECTION_FEEDBACK.show_notice(message)
+			show_notice_after_ui_settles(message)
 			return true
 		end,
 	})
 end
 
 local function transition_to_main_menu_with_notice(message)
-	MP.CONNECTION_SESSION.request_overlay_menu_close()
+	request_overlay_close_if_open()
 
 	local root = BALATRO and BALATRO.get_root and BALATRO.get_root() or nil
 	if not (root and root.STAGE ~= root.STAGES.MAIN_MENU) then
@@ -68,12 +85,13 @@ local function clear_failed_rejoin_state()
 		MP.CONNECTION_FEEDBACK.clear_self_reconnect_countdown()
 	end
 
-	MP.CONNECTION_SESSION.set_client_connected(false)
-	return MP.CONNECTION_SESSION.clear_local_lobby_session({
+	local session_result = MP.CONNECTION_SESSION.clear_local_lobby_session({
 		clear_reconnect = true,
 		clear_feedback = true,
 		refresh_status = false,
 	})
+	MP.CONNECTION_SESSION.set_client_connected(true)
+	return session_result
 end
 
 local function handle_failed_rejoin(message)
@@ -90,7 +108,7 @@ local function handle_failed_rejoin(message)
 	end
 
 	MP.CONNECTION_SESSION.refresh_connection_status_ui()
-	MP.CONNECTION_FEEDBACK.show_notice(notice_message)
+	queue_notice_after_main_menu(notice_message)
 	return true
 end
 

@@ -1,7 +1,8 @@
 local teams_domain = MP.DOMAIN and MP.DOMAIN.TEAMS or {}
 
 function MP.should_use_the_order()
-	return MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.the_order and MP.LOBBY.code
+	return (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.the_order and MP.LOBBY.code)
+		or (MP.is_practice_mode and MP.is_practice_mode())
 end
 
 function MP.is_major_league_ruleset()
@@ -70,12 +71,25 @@ local function is_lobby_config_enabled(option_key)
 	return not (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config[option_key] == false)
 end
 
+local function get_active_gamemode_key()
+	if MP.get_active_gamemode then
+		local active_gamemode = MP.get_active_gamemode()
+		if active_gamemode then return active_gamemode end
+	end
+	return MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gamemode
+end
+
 function MP.is_coop_gamemode()
-	return MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gamemode == "gamemode_mp_coop"
+	return get_active_gamemode_key() == "gamemode_mp_coop"
+end
+
+function MP.is_coop_run()
+	return (MP.is_coop_gamemode and MP.is_coop_gamemode())
+		and (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
 end
 
 function MP.is_survival_gamemode()
-	return MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gamemode == "gamemode_mp_survival"
+	return get_active_gamemode_key() == "gamemode_mp_survival"
 end
 
 function MP.get_lobby_capabilities()
@@ -83,6 +97,7 @@ function MP.get_lobby_capabilities()
 	local is_coop_gamemode = not not (MP.is_coop_gamemode and MP.is_coop_gamemode())
 	local is_coop_lobby_type = not not (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
 	local uses_shared_sync_group = is_teams_mode or is_coop_lobby_type
+	local can_show_shared_progress_options = not not MP.LOBBY
 	local card_sync_option_enabled = is_lobby_config_enabled("team_card_sync")
 	local hand_level_sync_option_enabled = is_lobby_config_enabled("team_hand_level_sync")
 	local money_sync_option_enabled = is_lobby_config_enabled("team_money_sync")
@@ -94,8 +109,9 @@ function MP.get_lobby_capabilities()
 		uses_shared_sync_group = uses_shared_sync_group,
 		shows_team_identity = is_teams_mode,
 		uses_team_colours = is_teams_mode,
-		can_show_team_options = uses_shared_sync_group,
-		shared_card_sync_enabled = uses_shared_sync_group and card_sync_option_enabled,
+		can_show_shared_progress_options = can_show_shared_progress_options,
+		can_show_team_options = is_teams_mode,
+		shared_card_sync_enabled = can_show_shared_progress_options and card_sync_option_enabled,
 		shared_hand_level_sync_enabled = uses_shared_sync_group and hand_level_sync_option_enabled,
 		shared_money_sync_enabled = uses_shared_sync_group and money_sync_option_enabled,
 		can_show_shared_money_actions = uses_shared_sync_group and money_sync_option_enabled,
@@ -212,7 +228,7 @@ local function max_score_amount(left, right)
 end
 
 function MP.scale_coop_blind_amount(amount)
-	if not (MP.is_coop_gamemode and MP.is_coop_gamemode()) then return amount end
+	if not (MP.is_coop_run and MP.is_coop_run()) then return amount end
 
 	if not is_scalable_score_amount(amount) then return amount end
 
@@ -221,8 +237,7 @@ function MP.scale_coop_blind_amount(amount)
 end
 
 function MP.is_coop_blind()
-	return (MP.is_coop_gamemode and MP.is_coop_gamemode())
-		and (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
+	return (MP.is_coop_run and MP.is_coop_run())
 		and not (MP.is_pvp_boss and MP.is_pvp_boss())
 end
 
@@ -233,5 +248,5 @@ function MP.is_server_resolved_blind()
 
 	return MP.is_pvp_boss()
 		or (teams_domain.is_cooperative_blind and teams_domain.is_cooperative_blind())
-		or (MP.is_coop_blind and MP.is_coop_blind())
+		or (MP.is_coop_run and MP.is_coop_run())
 end

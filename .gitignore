@@ -5,8 +5,16 @@
 .DS_Store
 Thumbs.db
 
-# Local environment overrides and runtime output
-.env
-.env.*
+# Local runtime output
 *.log
 logs/
+
+# Local developer override
+developer.env
+
+# Player-generated replay data
+replays/*
+!replays/.gitkeep
+
+# Dev-only tooling 
+testing_tools/

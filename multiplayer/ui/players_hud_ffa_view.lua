@@ -58,6 +58,7 @@ local function create_ffa_compact_entry(player, pvp_col)
 		rank_colour = accent,
 		title = player.username or "Unknown",
 		title_colour = player.is_self and G.C.GOLD or G.C.UI.TEXT_LIGHT,
+		title_outline_colour = player.is_duels_nemesis and G.C.RED or nil,
 		palette_colour = blind_main,
 		body_colour = pvp_col,
 		far_right_colour = pvp_col,

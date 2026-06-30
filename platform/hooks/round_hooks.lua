@@ -9,6 +9,10 @@ local function get_teams_domain()
 	return MP.DOMAIN and MP.DOMAIN.TEAMS or {}
 end
 
+local function is_ghost_replay_active()
+	return MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
+end
+
 local function has_round_ui()
 	return G
 		and G.hand_text_area
@@ -42,11 +46,12 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 
 	local ease_ante_ref = ease_ante
 	function ease_ante(mod)
-		if MP.LOBBY.code and not MP.LOBBY.config.disable_live_and_timer_hud then
+		local lobby_config = MP.LOBBY and MP.LOBBY.config or {}
+		if (MP.LOBBY.code or is_ghost_replay_active()) and not lobby_config.disable_live_and_timer_hud then
 			if MP.GAME.antes_keyed[MP.GAME.ante_key] then return end
 
 			local match_domain = get_match_domain()
-			if MP.GAME.pizza_discards > 0 then
+			if (MP.GAME.pizza_discards or 0) > 0 then
 				local pizza_discards = match_domain.consume_pizza_discards and match_domain.consume_pizza_discards() or MP.GAME.pizza_discards
 				G.GAME.round_resets.discards = G.GAME.round_resets.discards - pizza_discards
 				ease_discard(-pizza_discards)
@@ -55,7 +60,9 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 			if match_domain.mark_ante_key_processed then
 				match_domain.mark_ante_key_processed()
 			end
-			MP.ACTIONS.set_ante(G.GAME.round_resets.ante + mod)
+			if not is_ghost_replay_active() then
+				MP.ACTIONS.set_ante(G.GAME.round_resets.ante + mod)
+			end
 			G.E_MANAGER:add_event(Event({
 				trigger = "immediate",
 				func = function()
@@ -114,6 +121,18 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 				G.GAME.round_resets.blind_choices.Small = mp_small_choice or G.GAME.round_resets.blind_choices.Small
 				G.GAME.round_resets.blind_choices.Big = mp_big_choice or G.GAME.round_resets.blind_choices.Big
 				G.GAME.round_resets.blind_choices.Boss = mp_boss_choice or G.GAME.round_resets.blind_choices.Boss
+			end
+		elseif is_ghost_replay_active() then
+			local gamemode_key = MP.get_active_gamemode and MP.get_active_gamemode() or nil
+			local gamemode = gamemode_key and MP.Gamemodes and MP.Gamemodes[gamemode_key] or nil
+			if gamemode and gamemode.get_blinds_by_ante then
+				local mp_small_choice, mp_big_choice, mp_boss_choice = gamemode:get_blinds_by_ante(G.GAME.round_resets.ante)
+				G.GAME.round_resets.blind_choices.Small = mp_small_choice or G.GAME.round_resets.blind_choices.Small
+				G.GAME.round_resets.blind_choices.Big = mp_big_choice or G.GAME.round_resets.blind_choices.Big
+				G.GAME.round_resets.blind_choices.Boss = mp_boss_choice or G.GAME.round_resets.blind_choices.Boss
+			end
+			if MP.GHOST.init_playback then
+				MP.GHOST.init_playback(G.GAME.round_resets.ante)
 			end
 		end
 	end

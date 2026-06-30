@@ -1,20 +1,20 @@
-local function rework_glass(rulesets, extra)
+local function rework_glass(layers, extra)
 	MP.ReworkCenter("m_glass", {
-		rulesets = rulesets,
+		layers = layers,
 		config = { Xmult = 1.5, extra = extra },
 	})
 end
 
-rework_glass(MP.UTILS.get_standard_rulesets(), 4)
+rework_glass("standard", 4)
 rework_glass("sandbox", 3)
-rework_glass("legacy_ranked", 4)
+rework_glass("classic", 4)
 
 local function register_display_glass(key, extra)
 	SMODS.Enhancement({
 		key = key,
 		config = { extra = { Xmult = 1.5, extra = extra }, mp_sticker_balanced = true },
 		pos = { x = 5, y = 1 },
-		no_collection = true,
+		no_collection = MP.should_hide_collection_item(),
 		shatters = true,
 		loc_vars = function(self, info_queue, card)
 			local num, denom = SMODS.get_probability_vars(card, 1, card.ability.extra.extra, "glass")

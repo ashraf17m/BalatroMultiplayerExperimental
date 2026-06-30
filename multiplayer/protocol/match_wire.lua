@@ -49,13 +49,52 @@ function MP.MATCH_WIRE.build_ready_blind_payload(blind_row, blind_kind, options)
 	return build_match_payload("readyBlind", payload)
 end
 
+local function normalize_blind_preview_targets(targets)
+	local normalized_targets = {}
+	for _, row in ipairs({ "Small", "Big", "Boss" }) do
+		local target = targets and targets[row] or nil
+		if target ~= nil then
+			normalized_targets[row] = normalize_big_number(target)
+		end
+	end
+	return normalized_targets
+end
+
+function MP.MATCH_WIRE.build_blind_preview_payload(preview_key, targets)
+	if preview_key == nil or preview_key == "" then
+		return nil
+	end
+
+	return build_match_payload("blindPreview", {
+		previewKey = tostring(preview_key),
+		targets = normalize_blind_preview_targets(targets),
+	})
+end
+
+function MP.MATCH_WIRE.build_coop_boss_blind_payload(phase, ante, boss_key)
+	if phase ~= "start" and phase ~= "result" then
+		return nil
+	end
+
+	local payload = {
+		phase = phase,
+		ante = trunc_number(ante),
+	}
+	if boss_key ~= nil then
+		payload.bossKey = tostring(boss_key)
+	end
+
+	return build_match_payload("coopBossBlind", payload)
+end
+
 function MP.MATCH_WIRE.build_unready_blind_payload()
 	return build_match_payload("unreadyBlind")
 end
 
-function MP.MATCH_WIRE.build_ready_skip_blind_payload(blind_row)
+function MP.MATCH_WIRE.build_ready_skip_blind_payload(blind_row, ante)
 	return build_match_payload("readySkipBlind", {
 		blindRow = blind_row,
+		ante = ante ~= nil and trunc_number(ante) or nil,
 	})
 end
 
@@ -117,19 +156,29 @@ function MP.MATCH_WIRE.build_skip_payload(skips)
 	})
 end
 
-function MP.MATCH_WIRE.build_timer_payload(action_name, time)
-	local payload = nil
+function MP.MATCH_WIRE.build_timer_payload(action_name, time, local_timer)
+	local payload = {}
+	local has_payload = false
 	if time ~= nil then
-		payload = {
-			time = normalize_non_negative_integer(time),
-		}
+		payload.time = normalize_non_negative_integer(time)
+		has_payload = true
 	end
+	if local_timer ~= nil then
+		payload.localTimer = not not local_timer
+		has_payload = true
+	end
+
+	if not has_payload then payload = nil end
 
 	return build_match_payload(action_name, payload)
 end
 
 function MP.MATCH_WIRE.build_fail_timer_payload()
 	return build_match_payload("failTimer")
+end
+
+function MP.MATCH_WIRE.build_fail_pvp_timer_payload()
+	return build_match_payload("failPvPTimer")
 end
 
 function MP.MATCH_WIRE.build_sync_client_payload(is_cached)

@@ -153,6 +153,57 @@ return {
 			},
 		},
 		Other = {
+			mp_sticker_balanced = {
+				name = "Сбалансировано",
+				text = {
+					"Эта карта была перебалансирована",
+				},
+			},
+			mp_sticker_balanced_j_mp_hanging_chad = {
+				name = "Сбалансировано",
+				text = {
+					"Повторно активирует первые {C:attention}2{} карты",
+					"вместо первой карты дважды",
+				},
+			},
+			mp_sticker_balanced_j_mp_ticket = {
+				name = "Сбалансировано",
+				text = {
+					"Зарабатывает {C:money}$4{} вместо {C:money}$3{}",
+					"Теперь {C:green}Необычный{}",
+					"Без требования {C:attention}Золотой{} карты",
+				},
+			},
+			mp_sticker_balanced_j_mp_seltzer = {
+				name = "Сбалансировано",
+				text = {
+					"Длится {C:attention}8{} рук",
+					"вместо {C:attention}10{}",
+				},
+			},
+			mp_sticker_balanced_j_mp_turtle_bean = {
+				name = "Сбалансировано",
+				text = {
+					"{C:attention}+4{} размер руки",
+					"вместо {C:attention}+5{}",
+				},
+			},
+			mp_sticker_balanced_j_mp_todo_list = {
+				name = "Сбалансировано",
+				text = {
+					"Зарабатывает {C:money}$5{} вместо {C:money}$4{}",
+					"Выбирает из {C:attention}всех{} покерных рук,",
+					"не только открытых",
+				},
+			},
+			mp_sticker_balanced_c_mp_ouija_standard = {
+				name = "Сбалансировано",
+				text = {
+					"Уничтожает {C:attention}3{} карты вместо",
+					"превращения всех карт и потери",
+					"{C:attention}-1{} размер руки",
+				},
+			},
 			current_nemesis = {
 				name = "Соперник",
 				text = {
@@ -225,6 +276,7 @@ return {
 			k_connected = "Подключено к сервисам",
 			k_warn_service = "ПРЕДУПРЕЖДЕНИЕ: Не удалось найти сервисы",
 			k_set_name = "Введите своё имя в главном меню! (Mods > Multiplayer > Config)",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			k_lobby_options = "Параметры лобби",
 			k_connect_player = "Игроки в лобби:",
 			k_opts_only_host = "Только ведущий может менять эти настройки",

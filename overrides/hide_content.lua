@@ -8,6 +8,8 @@ local unpack_packed = MP.UTILS.unpack_packed
 local build_traceback = MP.UTILS.build_traceback
 
 local function should_hide_mp_content()
+	if MP.show_hidden_collection_content and MP.show_hidden_collection_content() then return false end
+
 	local lobby = MP.LOBBY or {}
 	local rulesets = MP.Rulesets or {}
 	local active_ruleset = rulesets[lobby.config and lobby.config.ruleset]

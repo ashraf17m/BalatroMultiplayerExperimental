@@ -6,6 +6,10 @@ local content_runtime = MP.CONTENT.RUNTIME
 
 MP.EC = MP.EC or {}
 
+local function is_sandbox_layer_active()
+	return MP.is_layer_active and MP.is_layer_active("sandbox")
+end
+
 local function copy_shallow(source)
 	local copy = {}
 	for key, value in pairs(source or {}) do
@@ -79,8 +83,8 @@ local original_reset_game_globals = reset_game_globals
 function reset_game_globals(run_start)
 	if original_reset_game_globals then original_reset_game_globals(run_start) end
 
-	-- Only initialize EC state when sandbox ruleset is active
-	if content_runtime.is_ruleset_active("sandbox") then
+	-- Only initialize EC state when the sandbox layer is active
+	if is_sandbox_layer_active() then
 		reset_tuxedo_card()
 		reset_farmer_card()
 		reset_fish_rank()
@@ -92,7 +96,7 @@ local original_ease_dollars = ease_dollars
 function ease_dollars(mod, x)
 	original_ease_dollars(mod, x)
 
-	if content_runtime.is_ruleset_active("sandbox") and to_big(mod) > to_big(0) and G.jokers and G.jokers.cards then
+	if is_sandbox_layer_active() and to_big(mod) > to_big(0) and G.jokers and G.jokers.cards then
 		for i = 1, #G.jokers.cards do
 			local card = G.jokers.cards[i]
 			if card.config.center.key == "j_mp_hoarder_sandbox" and not card.debuffed then

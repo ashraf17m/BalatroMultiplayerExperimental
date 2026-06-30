@@ -3,6 +3,7 @@ local content_runtime = MP.CONTENT.RUNTIME
 SMODS.Consumable({
 	key = "ectoplasm_sandbox",
 	set = "Spectral",
+	cost = 4,
 	pos = { x = 8, y = 4 },
 	config = { mp_sticker_balanced = true },
 	loc_vars = function(self, info_queue, card)
@@ -10,7 +11,7 @@ SMODS.Consumable({
 		return { vars = { G.GAME.ecto_minus or 1 } }
 	end,
 	in_pool = function(self)
-		return content_runtime.is_ruleset_active("sandbox")
+		return content_runtime.is_layer_active("sandbox")
 	end,
 	use = function(self, card, area, copier)
 		local editionless_jokers = SMODS.Edition:get_edition_cards(G.jokers, true)
@@ -32,7 +33,7 @@ SMODS.Consumable({
 				end
 
 				-- positive effect: negative joker
-				if #editionless_jokers then
+				if #editionless_jokers > 0 then
 					local eligible_card = pseudorandom_element(editionless_jokers, "ectoplasm")
 					eligible_card:set_edition({ negative = true })
 				end
@@ -43,6 +44,6 @@ SMODS.Consumable({
 		}))
 	end,
 	can_use = function(self, card)
-		return true
+		return next(SMODS.Edition:get_edition_cards(G.jokers, true))
 	end,
 })

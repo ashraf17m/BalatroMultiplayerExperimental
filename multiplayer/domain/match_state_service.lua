@@ -87,12 +87,16 @@ local function build_initial_round_state(starting_lives)
 		duel_bye_waiting = false,
 		skip_ready_blind_row = nil,
 		start_blind_skip_pvp_countdown = false,
+		pvp_reached = false,
+		pvp_reached_first = false,
 		ante_key = tostring(math.random()),
 		antes_keyed = {},
 		prevent_eval = false,
 		round_failed = false,
 		round_ended = false,
 		duplicate_end = false,
+		coop_deck_out_waiting = false,
+		coop_deck_out_resolved = false,
 		highest_score = MP.INSANE_INT.empty(),
 		furthest_blind = 0,
 	}
@@ -120,8 +124,11 @@ end
 
 local function build_initial_timer_state()
 	return {
-		timer = MP.LOBBY.config.timer_base_seconds,
+		timer = MP.UTILS and MP.UTILS.timer_base and MP.UTILS.timer_base() or MP.LOBBY.config.timer_base_seconds,
 		timer_started = false,
+		nemesis_timer_started = false,
+		timer_consumed = false,
+		timers_forgiven = 0,
 		timer_locked_for_ante = false,
 		timer_skip_count_for_ante = 0,
 		timer_runtime_active = false,
@@ -141,6 +148,8 @@ local function build_initial_meta_state()
 		stats = {
 			reroll_count = 0,
 			reroll_cost_total = 0,
+			total_money_spent = 0,
+			vouchers_bought = {},
 		},
 		ffa_display = {
 			text = "Loading...",

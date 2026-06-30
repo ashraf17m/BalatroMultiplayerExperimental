@@ -44,6 +44,128 @@ MP.HOOKS.register_method_hook(Game, "Game", "update", "mp.matchmaking.generate_h
 	end,
 })
 
+function MP.UTILS.resolve_mod_name_and_version(mod_name, mod_version)
+	local fullname = mod_name .. "-" .. (mod_version or "")
+	local new_mod_name, new_mod_version = fullname:match("^(.*)%-([^~]+~.*)$")
+	mod_name = new_mod_name or mod_name
+	mod_version = new_mod_version or mod_version
+	return mod_name, mod_version
+end
+
+function MP.UTILS.version_prefix(version)
+	if type(version) ~= "string" then return nil end
+	return version:match("^(%d+%.%d+%.%d+)") or version:match("^(%d+%.%d+)")
+end
+
+function MP.UTILS.player_mod_version(player, mod_name)
+	if not player then return nil end
+
+	local hash_str = player.hash_str or (player.config and player.config.hash_str)
+	if type(hash_str) == "string" then
+		local version = (";" .. hash_str):match(";" .. mod_name .. "%-([^;]+)")
+		if version then return version end
+	end
+
+	local mods = player.config and player.config.Mods
+	return mods and mods[mod_name] or nil
+end
+
+local function player_mod_version_for_ids(player, mod_ids)
+	for _, mod_id in ipairs(mod_ids or {}) do
+		local version = MP.UTILS.player_mod_version(player, mod_id)
+		if version then return version end
+	end
+	return nil
+end
+
+local function lobby_owner(players)
+	for _, player in ipairs(players or {}) do
+		if player.is_owner then
+			return player
+		end
+	end
+	return players and players[1] or nil
+end
+
+local function version_check_mismatch(prefix, host_version, guest_version)
+	if prefix then
+		local host_prefix = MP.UTILS.version_prefix(host_version)
+		local guest_prefix = MP.UTILS.version_prefix(guest_version)
+		return host_prefix and guest_prefix and host_prefix ~= guest_prefix
+	end
+
+	return host_version ~= guest_version
+end
+
+local VERSION_CHECKS = {
+	{ name = "Multiplayer", mod_ids = { "MultiplayerExperimental", "Multiplayer" }, prefix = true },
+	{ name = "Steamodded", mod_ids = { "Steamodded" }, prefix = false },
+}
+
+function MP.UTILS.version_mismatches(players)
+	players = players or (MP.LOBBY and MP.LOBBY.players) or {}
+	local host = lobby_owner(players)
+	if not host then return {} end
+
+	local results = {}
+	for _, guest in ipairs(players) do
+		if guest ~= host and guest.id ~= host.id then
+			for _, check in ipairs(VERSION_CHECKS) do
+				local host_version = player_mod_version_for_ids(host, check.mod_ids)
+				local guest_version = player_mod_version_for_ids(guest, check.mod_ids)
+				if host_version and guest_version and version_check_mismatch(check.prefix, host_version, guest_version) then
+					results[#results + 1] = {
+						mod = check.name,
+						our = host_version,
+						their = guest_version,
+						player = guest,
+					}
+				end
+			end
+		end
+	end
+
+	return results
+end
+
+function MP.UTILS.mp_version_mismatch(players)
+	for _, mismatch in ipairs(MP.UTILS.version_mismatches(players)) do
+		if mismatch.mod == "Multiplayer" then
+			return true, mismatch.our, mismatch.their, mismatch.player
+		end
+	end
+
+	return false
+end
+
+function MP.UTILS.get_banned_mods(mods)
+	local banned_mods = {}
+	if not mods then return banned_mods end
+
+	for mod_name, mod_version in pairs(mods) do
+		local ban_info = MP.BANNED_MODS and MP.BANNED_MODS[mod_name]
+		local is_banned = false
+
+		if type(ban_info) == "boolean" then
+			is_banned = ban_info
+		elseif type(ban_info) == "string" then
+			is_banned = mod_version == ban_info
+		elseif type(ban_info) == "table" then
+			for _, banned_version in ipairs(ban_info) do
+				if mod_version == banned_version then
+					is_banned = true
+					break
+				end
+			end
+		end
+
+		if is_banned then banned_mods[#banned_mods + 1] = mod_name end
+	end
+
+	table.sort(banned_mods)
+	return banned_mods
+end
+
 function MP.UTILS.unlock_check()
 	local notFullyUnlocked = false
 

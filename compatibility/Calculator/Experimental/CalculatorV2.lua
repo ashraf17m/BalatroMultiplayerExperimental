@@ -211,6 +211,7 @@ function CALC.request()
 	signature = signature or CALC.current_signature()
 	show_calculating_result(signature, request_guard_signature)
 
+	local request_is_pvp_blind = is_current_pvp_blind()
 	local function finish_for_signature(result, reason)
 		if CALC.active_request_signature ~= signature then
 			return
@@ -224,6 +225,9 @@ function CALC.request()
 
 		if result ~= nil and not result.unsupported then
 			store_cached_result(current_signature, request_guard_signature, result)
+			if MP and MP.CALCULATOR and type(MP.CALCULATOR.consume_calculation_timer_cost) == "function" then
+				MP.CALCULATOR.consume_calculation_timer_cost(request_is_pvp_blind, result)
+			end
 			CALC.finish(true, result)
 			return
 		end

@@ -37,6 +37,7 @@ local NETWORK_SENDER_FILES = {
 local OBJECT_DIRECTORIES = {
 	"objects/editions",
 	"objects/enhancements",
+	"objects/seals",
 	"objects/stickers",
 	"objects/blinds",
 	"objects/decks",
@@ -44,6 +45,7 @@ local OBJECT_DIRECTORIES = {
 	"objects/jokers/sandbox",
 	"objects/jokers/sandbox/extra-credit",
 	"objects/jokers/standard",
+	"objects/jokers/experimental",
 	"objects/stakes",
 	"objects/tags",
 	"objects/consumables",
@@ -56,8 +58,10 @@ local CORE_RUNTIME_FILES = {
 	"platform/hooks/local_feature_hooks.lua",
 	"multiplayer/runtime/runtime_policy.lua",
 	"multiplayer/runtime/game_update_cycle.lua",
+	"multiplayer/runtime/coop_boss_blind_runtime.lua",
 	"multiplayer/runtime/deck_registry.lua",
 	"multiplayer/runtime/ante_timer_runtime.lua",
+	"multiplayer/runtime/local_timer_runtime.lua",
 	"multiplayer/runtime/connection_feedback.lua",
 	"multiplayer/runtime/network_client_state.lua",
 	"multiplayer/runtime/connection_resume.lua",
@@ -67,6 +71,15 @@ local CORE_RUNTIME_FILES = {
 	"multiplayer/runtime/network_state_apply.lua",
 	"multiplayer/runtime/resume_runtime.lua",
 	"multiplayer/coop_save_persistence.lua",
+}
+
+local RULESET_LAYER_DIRECTORIES = {
+	"layers",
+}
+
+local RULESET_DIRECTORIES = {
+	"rulesets",
+	"rulesets/experimental",
 }
 
 local TEAM_SYNC_FEATURE_FILES = {
@@ -99,6 +112,7 @@ local PROTOCOL_BOUNDARY_FILES = {
 local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/runtime_api.lua",
 	"multiplayer/ui/ui_utils.lua",
+	"multiplayer/ui/main_menu_dev_warning.lua",
 	"multiplayer/ui/ui_background_grouping.lua",
 	"multiplayer/ui/ui_disableable_button.lua",
 	"multiplayer/ui/ui_disableable_option_cycle.lua",
@@ -109,6 +123,7 @@ local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/lobby_main_button_state.lua",
 	"multiplayer/ui/lobby_deck_stake_button.lua",
 	"multiplayer/ui/lobby_actions.lua",
+	"multiplayer/ui/shortcuts_menu.lua",
 	"multiplayer/ui/lobby_overlays.lua",
 	"multiplayer/ui/lobby_menu.lua",
 	"multiplayer/ui/players_hud_shared_score_view.lua",
@@ -123,6 +138,7 @@ local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/lobby_start_ready_button.lua",
 	"multiplayer/ui/lobby_group_options.lua",
 	"multiplayer/ui/lobby_warning_state.lua",
+	"multiplayer/ui/version_mismatch_warning.lua",
 	"multiplayer/ui/lobby_options_main.lua",
 	"multiplayer/ui/lobby_options_advanced_tab.lua",
 	"multiplayer/ui/end_game_view_model.lua",
@@ -138,9 +154,14 @@ local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/main_menu_play_controller.lua",
 	"multiplayer/ui/main_menu_selection_option_view.lua",
 	"multiplayer/ui/main_menu_selection_info_view.lua",
+	"multiplayer/ui/main_menu_modifiers_overlay.lua",
+	"multiplayer/ui/main_menu_mutators_wall.lua",
+	"multiplayer/ui/main_menu_custom_ruleset_editor.lua",
 	"multiplayer/ui/main_menu_selection_cardarea_view.lua",
 	"multiplayer/ui/main_menu_selection_view_model.lua",
 	"multiplayer/ui/main_menu_selection_controller.lua",
+	"multiplayer/ui/ghost_replay_picker.lua",
+	"multiplayer/ui/main_menu_practice_controller.lua",
 	"multiplayer/ui/main_menu_title_card.lua",
 	"multiplayer/ui/main_menu_shell.lua",
 	"multiplayer/ui/players_hud_shared_teammate_view.lua",
@@ -189,6 +210,8 @@ bootstrap_map.NETWORK_DISPATCH_FILES = NETWORK_DISPATCH_FILES
 bootstrap_map.NETWORK_SENDER_FILES = NETWORK_SENDER_FILES
 bootstrap_map.OBJECT_DIRECTORIES = OBJECT_DIRECTORIES
 bootstrap_map.CORE_RUNTIME_FILES = CORE_RUNTIME_FILES
+bootstrap_map.RULESET_LAYER_DIRECTORIES = RULESET_LAYER_DIRECTORIES
+bootstrap_map.RULESET_DIRECTORIES = RULESET_DIRECTORIES
 bootstrap_map.TEAM_SYNC_FEATURE_FILES = TEAM_SYNC_FEATURE_FILES
 bootstrap_map.TEAM_SYNC_DIAGNOSTIC_FILES = TEAM_SYNC_DIAGNOSTIC_FILES
 bootstrap_map.PROTOCOL_BOUNDARY_FILES = PROTOCOL_BOUNDARY_FILES

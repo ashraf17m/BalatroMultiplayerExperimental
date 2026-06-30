@@ -83,6 +83,20 @@ function feature_action_runtime.get_nemesis_deck(target_player_id)
 	return queued
 end
 
+function feature_action_runtime.get_end_game_summary(target_player_id, options)
+	local queued = Client.queue_send(MP.FEATURE_WIRE.build_get_end_game_summary_payload(target_player_id, options))
+	trace_runtime_event("end_game.summary_request_send", {
+		target_player_id = target_player_id,
+		fresh = options and options.fresh == true,
+		queued = queued,
+	})
+	return queued
+end
+
+function feature_action_runtime.send_end_game_summary(summary)
+	return Client.queue_send(MP.FEATURE_WIRE.build_receive_end_game_summary_payload(summary))
+end
+
 function feature_action_runtime.cache_end_game_state()
 	MP.NETWORKING_INTERNAL.cache_local_end_game_state()
 end
@@ -101,4 +115,6 @@ MP.ACTIONS.magnet = feature_action_runtime.magnet
 MP.ACTIONS.magnet_response = feature_action_runtime.magnet_response
 MP.ACTIONS.get_end_game_jokers = feature_action_runtime.get_end_game_jokers
 MP.ACTIONS.get_nemesis_deck = feature_action_runtime.get_nemesis_deck
+MP.ACTIONS.get_end_game_summary = feature_action_runtime.get_end_game_summary
+MP.ACTIONS.send_end_game_summary = feature_action_runtime.send_end_game_summary
 MP.ACTIONS.cache_end_game_state = feature_action_runtime.cache_end_game_state

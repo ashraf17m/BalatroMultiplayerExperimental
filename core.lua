@@ -1,4 +1,15 @@
 MP = MP or {}
+MP.BANNED_MODS = MP.BANNED_MODS or {
+	["Incantation"] = true,
+	["Brainstorm"] = true,
+	["DVPreview"] = true,
+	["Aura"] = true,
+	["NotJustYet"] = true,
+	["Showman"] = true,
+	["TagPreview"] = true,
+	["FantomsPreview"] = true,
+}
+
 if MP.MULTIPLAYER_EXPERIMENTAL_BOOTED then
 	if sendWarnMessage then
 		sendWarnMessage("Duplicate Multiplayer Experimental boot skipped.", "MULTIPLAYER")

@@ -3,6 +3,228 @@ MP.UI.BLIND_CHOICE_STATE = MP.UI.BLIND_CHOICE_STATE or {}
 
 local blind_choice_state = MP.UI.BLIND_CHOICE_STATE
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
+local PREVIEW_BLIND_ROWS = { "Small", "Big", "Boss" }
+
+local function can_sync_coop_blind_preview()
+	return MP.LOBBY
+		and MP.LOBBY.code
+		and MP.ACTIONS
+		and MP.ACTIONS.blind_preview
+		and MP.is_coop_gamemode
+		and MP.is_coop_gamemode()
+		and MP.uses_shared_sync_group
+		and MP.uses_shared_sync_group()
+end
+
+local function normalize_preview_key_part(value)
+	if value == nil then
+		return ""
+	end
+
+	return tostring(value)
+end
+
+function blind_choice_state.get_preview_key()
+	local ante = BALATRO.get_round_reset_value and BALATRO.get_round_reset_value("blind_ante", nil) or nil
+	if ante == nil then
+		ante = BALATRO.get_ante and BALATRO.get_ante() or nil
+	end
+
+	local parts = {
+		"ante:" .. normalize_preview_key_part(ante),
+		"deck:" .. normalize_preview_key_part(BALATRO.get_blind_on_deck and BALATRO.get_blind_on_deck() or nil),
+	}
+	for _, row in ipairs(PREVIEW_BLIND_ROWS) do
+		local blind_key = BALATRO.get_blind_choice and BALATRO.get_blind_choice(row) or nil
+		local pvp_flag = BALATRO.get_pvp_blind_choice and BALATRO.get_pvp_blind_choice(row) and "pvp" or "coop"
+		parts[#parts + 1] = row .. ":" .. normalize_preview_key_part(blind_key) .. ":" .. pvp_flag
+	end
+
+	return table.concat(parts, "|")
+end
+
+local function parse_preview_target(value)
+	if value == nil then
+		return nil
+	end
+	if BALATRO.to_score_number then
+		local numeric_value = BALATRO.to_score_number(value)
+		if numeric_value ~= nil then
+			return numeric_value
+		end
+	elseif type(value) == "number" then
+		return value
+	end
+
+	if type(to_big) == "function" then
+		local ok, parsed = pcall(to_big, value)
+		if ok and parsed ~= nil then
+			local numeric_value = BALATRO.to_score_number and BALATRO.to_score_number(parsed) or nil
+			if numeric_value ~= nil then
+				return numeric_value
+			end
+			if type(parsed) ~= "string" then
+				return parsed
+			end
+		end
+	end
+
+	return tonumber(value)
+end
+
+local function get_server_preview_target(row)
+	if not (MP.GAME and row) then
+		return nil
+	end
+
+	local preview_key = blind_choice_state.get_preview_key and blind_choice_state.get_preview_key() or nil
+	if MP.GAME.coop_blind_preview_key ~= preview_key then
+		return nil
+	end
+
+	local targets = MP.GAME.coop_blind_preview_targets
+	return targets and targets[row] or nil
+end
+
+local function send_debounced_coop_blind_preview()
+	if not (can_sync_coop_blind_preview() and BALATRO.queue_event) then
+		return
+	end
+	if MP.GAME.coop_blind_preview_send_scheduled then
+		return
+	end
+
+	MP.GAME.coop_blind_preview_send_scheduled = true
+	BALATRO.queue_event({
+		trigger = "after",
+		delay = 0.05,
+		func = function()
+			if MP.GAME then
+				MP.GAME.coop_blind_preview_send_scheduled = false
+			end
+			if can_sync_coop_blind_preview() and MP.GAME then
+				MP.ACTIONS.blind_preview(
+					MP.GAME.local_coop_blind_preview_key,
+					MP.GAME.local_coop_blind_preview_targets or {}
+				)
+			end
+			return true
+		end,
+	})
+end
+
+local function record_local_coop_blind_preview(row, target)
+	if not (MP.GAME and row and target ~= nil and can_sync_coop_blind_preview()) then
+		return
+	end
+
+	local preview_key = blind_choice_state.get_preview_key()
+	if MP.GAME.local_coop_blind_preview_key ~= preview_key then
+		MP.GAME.local_coop_blind_preview_key = preview_key
+		MP.GAME.local_coop_blind_preview_targets = {}
+	end
+	MP.GAME.local_coop_blind_preview_targets[row] = target
+
+	send_debounced_coop_blind_preview()
+end
+
+local function is_active_lobby_player(player)
+	return player and player.is_in_match ~= false and player.is_disconnected ~= true
+end
+
+local function get_self_lobby_player()
+	local self_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	for _, player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
+		if player and player.id == self_id then
+			return player
+		end
+	end
+	return nil
+end
+
+local function get_active_preview_group_players()
+	local players = {}
+	if not (MP.LOBBY and MP.LOBBY.players) then
+		return players
+	end
+
+	if MP.is_coop_lobby_type and MP.is_coop_lobby_type() then
+		for _, player in ipairs(MP.LOBBY.players) do
+			if is_active_lobby_player(player) then
+				players[#players + 1] = player
+			end
+		end
+		return players
+	end
+
+	local self_player = get_self_lobby_player()
+	for _, player in ipairs(MP.LOBBY.players) do
+		if
+			is_active_lobby_player(player)
+			and MP.lobby_players_share_sync_group
+			and MP.lobby_players_share_sync_group(self_player, player)
+		then
+			players[#players + 1] = player
+		end
+	end
+	return players
+end
+
+local function get_current_blind_target_scale()
+	local scale = BALATRO.get_starting_ante_scaling and BALATRO.get_starting_ante_scaling() or 1
+	local paperback = BALATRO.get_game_value and BALATRO.get_game_value("paperback", nil) or nil
+	if paperback and paperback.blind_multiplier ~= nil then
+		scale = scale * paperback.blind_multiplier
+	end
+	return scale
+end
+
+local function sync_local_blind_target_scale(scale)
+	if MP.ACTIONS and MP.ACTIONS.sync_blind_target_scale then
+		MP.ACTIONS.sync_blind_target_scale(scale)
+	end
+end
+
+local function get_player_blind_target_scale(player, local_scale)
+	if player and player.is_self then
+		return local_scale
+	end
+	local scale = tonumber(player and player.blind_target_scale)
+	if scale ~= nil then
+		return scale
+	end
+	return nil
+end
+
+local function get_locally_predicted_shared_target(base_blind_amt, local_scale)
+	if not can_sync_coop_blind_preview() then
+		return nil
+	end
+
+	local players = get_active_preview_group_players()
+	if #players <= 1 then
+		return nil
+	end
+
+	local total = nil
+	for _, player in ipairs(players) do
+		local player_scale = get_player_blind_target_scale(player, local_scale)
+		if player_scale == nil then
+			return nil
+		end
+
+		local player_target = base_blind_amt * player_scale
+		if MP.scale_coop_blind_amount then
+			player_target = MP.scale_coop_blind_amount(player_target)
+		end
+		total = total and (total + player_target) or player_target
+	end
+
+	if not total then
+		return nil
+	end
+	return total / #players
+end
 
 local function get_blind_choice_poker_hands()
 	local poker_hands = {}
@@ -54,6 +276,9 @@ end
 
 local function build_blind_name(blind_choice_config, is_pvp_blind)
 	if is_pvp_blind then
+		if MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active() and MP.GHOST.get_nemesis_name then
+			return MP.GHOST.get_nemesis_name()
+		end
 		local opponents = MP.OPPONENTS or {}
 		return ((opponents.get_nemesis_lobby_player and opponents.get_nemesis_lobby_player() or {}).username or localize("k_nemesis"))
 	end
@@ -80,30 +305,77 @@ local function build_blind_text_table(blind_choice_config, type)
 	return loc_target
 end
 
-local function apply_runtime_blind_amount_modifiers(blind_amt)
-	local paperback = BALATRO.get_game_value and BALATRO.get_game_value("paperback", nil) or nil
-	if paperback and paperback.blind_multiplier ~= nil then
-		blind_amt = blind_amt * paperback.blind_multiplier
-	end
-
-	return blind_amt
-end
-
 local function build_blind_amount(blind_choice_config, type, is_pvp_blind)
-	local blind_amt = BALATRO.get_blind_amount(BALATRO.get_round_reset_value("blind_ante", nil))
+	local base_blind_amt = BALATRO.get_blind_amount(BALATRO.get_round_reset_value("blind_ante", nil))
 		* blind_choice_config.mult
-		* (BALATRO.get_starting_ante_scaling and BALATRO.get_starting_ante_scaling() or 1)
-	blind_amt = apply_runtime_blind_amount_modifiers(blind_amt)
+	local local_blind_target_scale = get_current_blind_target_scale()
+	sync_local_blind_target_scale(local_blind_target_scale)
+	local blind_amt = base_blind_amt * local_blind_target_scale
 
 	if is_pvp_blind or (BALATRO.get_pvp_blind_choice and BALATRO.get_pvp_blind_choice(type)) then
 		return "????"
 	end
 
-	if MP.is_coop_gamemode and MP.is_coop_gamemode() then
-		blind_amt = MP.scale_coop_blind_amount(blind_amt)
+	if can_sync_coop_blind_preview() then
+		if MP.is_coop_run and MP.is_coop_run() and MP.scale_coop_blind_amount then
+			blind_amt = MP.scale_coop_blind_amount(blind_amt)
+		end
+		record_local_coop_blind_preview(type, blind_amt)
+		local preview_target = get_server_preview_target(type)
+		if preview_target ~= nil then
+			return preview_target
+		end
+		local predicted_target = get_locally_predicted_shared_target(base_blind_amt, local_blind_target_scale)
+		if predicted_target ~= nil then
+			return predicted_target
+		end
 	end
 
 	return blind_amt
+end
+
+local function get_preview_score_node(row)
+	local box = BALATRO.get_blind_select_option_box and BALATRO.get_blind_select_option_box(row) or nil
+	if not (box and box.get_UIE_by_ID) then
+		return nil, nil
+	end
+
+	return box:get_UIE_by_ID("mp_blind_preview_score_" .. tostring(row)), box
+end
+
+function blind_choice_state.refresh_coop_blind_preview_scores()
+	for _, row in ipairs(PREVIEW_BLIND_ROWS) do
+		local target = get_server_preview_target(row)
+		if target ~= nil then
+			local score_node, box = get_preview_score_node(row)
+			if score_node and score_node.config then
+				score_node.config.text = number_format(target)
+				score_node.config.scale = score_number_scale(0.9, target)
+				BALATRO.recalculate_ui(score_node)
+				BALATRO.recalculate_ui(box)
+			end
+		end
+	end
+end
+
+function blind_choice_state.handle_coop_blind_preview(preview_key, targets)
+	if not MP.GAME then
+		return
+	end
+
+	local parsed_targets = {}
+	if type(targets) == "table" then
+		for _, row in ipairs(PREVIEW_BLIND_ROWS) do
+			local parsed = parse_preview_target(targets[row])
+			if parsed ~= nil then
+				parsed_targets[row] = parsed
+			end
+		end
+	end
+
+	MP.GAME.coop_blind_preview_key = tostring(preview_key or "")
+	MP.GAME.coop_blind_preview_targets = parsed_targets
+	blind_choice_state.refresh_coop_blind_preview_scores()
 end
 
 local function get_run_info_colour(run_info, blind_state)
@@ -146,6 +418,7 @@ function blind_choice_state.build_context(type, run_info)
 	end
 
 	return {
+		row = type,
 		blind_choice = blind_choice,
 		blind_col = BALATRO.get_blind_main_colour and BALATRO.get_blind_main_colour(type) or nil,
 		blind_amt = build_blind_amount(blind_choice.config, type, is_pvp_blind),

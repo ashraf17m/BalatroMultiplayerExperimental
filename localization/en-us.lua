@@ -52,11 +52,36 @@ return {
 					"{s:0.8}Card changes every round",
 				},
 			},
+			j_mp_idol_rare = {
+				name = "The Idol",
+				text = {
+					"Each played {C:attention}#2#",
+					"of {V:1}#3#{} gives",
+					"{X:mult,C:white} X#1# {} Mult when scored",
+					"{s:0.8}Card changes every round",
+				},
+			},
 			j_mp_ticket = {
 				name = "Golden Ticket",
 				text = {
 					"Played {C:attention}Gold{} cards",
 					"earn {C:money}$#1#{} when scored",
+				},
+			},
+			j_mp_ticket_experimental = {
+				name = "Golden Ticket",
+				text = {
+					"Played {C:attention}Gold{} cards",
+					"earn {C:money}$#1#{} when scored",
+				},
+			},
+			j_mp_todo_list = {
+				name = "To Do List",
+				text = {
+					"Earn {C:money}$#1#{} if {C:attention}poker hand",
+					"played is a {C:attention}#2#{},",
+					"poker hand changes",
+					"at end of round",
 				},
 			},
 			j_broken = {
@@ -744,6 +769,103 @@ return {
 			},
 		},
 		Other = {
+			mp_sticker_balanced = {
+				name = "Balanced",
+				text = {
+					"This card has been",
+					"rebalanced for {C:attention}Multiplayer{}",
+				},
+			},
+			mp_sticker_balanced_j_mp_hanging_chad = {
+				name = "Balanced",
+				text = {
+					"Retriggers first {C:attention}2{} cards",
+					"instead of first card twice",
+				},
+			},
+			mp_sticker_balanced_j_mp_ticket = {
+				name = "Balanced",
+				text = {
+					"Earns {C:money}$3{} instead of {C:money}$4{}",
+					"Now {C:green}Uncommon{}",
+					"No {C:attention}Gold{} card requirement",
+				},
+			},
+			mp_sticker_balanced_j_mp_ticket_experimental = {
+				name = "Balanced",
+				text = {
+					"Earns {C:money}$4{} instead of {C:money}$3{}",
+					"Now {C:green}Uncommon{}",
+					"No {C:attention}Gold{} card requirement",
+				},
+			},
+			mp_sticker_balanced_j_mp_seltzer = {
+				name = "Balanced",
+				text = {
+					"Lasts {C:attention}8{} hands",
+					"instead of {C:attention}10{}",
+				},
+			},
+			mp_sticker_balanced_j_mp_turtle_bean = {
+				name = "Balanced",
+				text = {
+					"{C:attention}+4{} hand size",
+					"instead of {C:attention}+5{}",
+				},
+			},
+			mp_sticker_balanced_j_mp_bloodstone = {
+				name = "Balanced",
+				text = {
+					"In {C:attention}PvP{}, the {C:green}1 in 2{} rolls",
+					"come from a {C:attention}fixed sequence{}",
+					"shared between both players and",
+					"{C:attention}reused{} every hand of the round",
+				},
+			},
+			mp_sticker_balanced_j_mp_idol_rare = {
+				name = "Balanced",
+				text = {
+					"Now {C:red}Rare{}",
+					"instead of {C:green}Uncommon{}",
+				},
+			},
+			mp_sticker_balanced_m_glass = {
+				name = "Balanced",
+				text = {
+					"{X:mult,C:white}X1.5{} Mult instead of {X:mult,C:white}X2{}",
+					"Has a {C:green}1 in 4{} shatter chance",
+				},
+			},
+			mp_sticker_balanced_m_mp_display_glass = {
+				name = "Balanced",
+				text = {
+					"{X:mult,C:white}X1.5{} Mult instead of {X:mult,C:white}X2{}",
+					"Has a {C:green}1 in 4{} shatter chance",
+				},
+			},
+			mp_sticker_balanced_m_mp_sandbox_display_glass = {
+				name = "Balanced",
+				text = {
+					"{X:mult,C:white}X1.5{} Mult instead of {X:mult,C:white}X2{}",
+					"Has a {C:green}1 in 3{} shatter chance",
+				},
+			},
+			mp_sticker_balanced_j_mp_todo_list = {
+				name = "Balanced",
+				text = {
+					"Earns {C:money}$5{} instead of {C:money}$4{}",
+					"Picks from {C:attention}all{} poker hands,",
+					"not just discovered ones",
+				},
+			},
+			mp_sticker_balanced_c_mp_ouija_standard = {
+				name = "Balanced",
+				text = {
+					"Destroys {C:attention}3{} cards instead of",
+					"converting all cards and losing",
+					"{C:attention}-1{} hand size",
+				},
+			},
 			mp_sticker_extra_credit = {
 				name = "Extra Credit",
 				text = {
@@ -910,6 +1032,7 @@ return {
 	misc = {
 		labels = {
 			mp_phantom = "Phantom",
+			mp_sticker_balanced = "Balanced",
 			mp_sticker_extra_credit = "Extra Credit",
 			mp_sticker_persistent = "Persistent",
 			mp_sticker_unreliable = "Unreliable",
@@ -917,6 +1040,8 @@ return {
 		},
 		dictionary = {
 			b_singleplayer = "Singleplayer",
+			b_sp_with_ruleset = "Practice Mode",
+			b_practice = "Practice",
 			b_join_lobby = "Join Lobby",
 			b_join_lobby_clipboard = "Join From Clipboard",
 			b_return_lobby = "Return to Lobby",
@@ -950,6 +1075,22 @@ return {
 			b_copy_clipboard = "Copy to clipboard",
 			b_view_code = "VIEW CODE",
 			b_copy_code = "COPY CODE",
+			k_sc_title = "SHORTCUTS",
+			k_sc_hint = "Press key or release TAB to close",
+			b_sc_choose_deck = "Choose Deck/Stake",
+			k_practice_collection_hint = "Click a card and it joins your run.",
+			k_unlimited_slots = "Unlimited Slots",
+			k_edition_cycling = "Edition Cycling (Q)",
+			k_practice_options = "Practice Options...",
+			k_active = "Active",
+			k_ghost = "Ghost",
+			k_ghost_replays = "Match Replays",
+			k_no_ghost_replays = "No match replays found",
+			k_ghost_replay_hint = "Play a match, or place .log/.json in replays/",
+			k_select_match_replay = "Select a match",
+			k_unsupported_replay_ruleset = "Unsupported ruleset - cannot play this replay",
+			b_play_match = "Play Match",
+			b_clear_replay = "Clear Replay",
 			b_leave = "LEAVE",
 			b_opts_cb_money = "Give comeback $ on life loss",
 			b_opts_no_gold_on_loss = "Don't get blind rewards on round loss",
@@ -960,6 +1101,7 @@ return {
 			k_opts_coop_blind_scaling = "Co-op Blind Scale",
 			b_opts_multiplayer_jokers = "Enable Multiplayer Cards",
 			b_opts_player_diff_deck = "Players have different decks",
+			b_opts_random_loadout = "Randomize deck & stake",
 			b_opts_normal_bosses = "Enable Boss Blind effects",
 			b_opts_timer = "Enable Timer",
 			b_opts_disable_preview = "Disable Score Preview",
@@ -970,7 +1112,11 @@ return {
 			b_opts_team_money_sync = "Money-Send",
 			b_reset = "Reset",
 			b_set_custom_seed = "Set Custom Seed",
-			b_mp_kofi_button = "Supporting me on Ko-fi",
+			b_mp_kofi_button = "support the original creator on Ko-fi",
+			k_mp_end_reroll_spend = "Reroll Spend",
+			k_mp_end_total_spend = "Total Spend",
+			k_mp_end_vouchers_bought = "Vouchers Bought",
+			k_mp_end_no_vouchers_bought = "No vouchers bought",
 			b_unstuck = "Unstuck",
 			b_unstuck_blind = "Stuck Outside PvP",
 			b_misprint_display = "Display the next card in the deck",
@@ -1008,6 +1154,9 @@ return {
 			k_values_are_modifiable = "* Values are modifiable",
 			k_rulesets = "Rulesets",
 			k_gamemodes = "Gamemodes",
+			k_mp_ruleset_tab_general = "General",
+			k_mp_ruleset_tab_tournaments = "Tournaments",
+			k_mp_ruleset_tab_experimental = "Experimental",
 			k_matchmaking = "Matchmaking",
 			k_tournament = "Tournament",
 			k_custom = "Custom",
@@ -1042,6 +1191,7 @@ return {
 			k_warn_service = "WARN: Cannot Find Multiplayer Service",
 			k_set_name = "Set your username in the main menu! (Mods > Multiplayer > Config)",
 			k_steamodded_warning = "Players have different versions of Steamodded installed. This may cause the seeds to differ.",
+			k_mp_version_warning = "Players are on different Multiplayer versions! Seeds and jokers will desync - update so you both match.",
 			k_warning_extra_credit_mismatch = "%s mismatch detected. Players may see different jokers.",
 			k_warning_extra_credit_mismatch_short = "%s mismatch detected.",
 			k_warning_extra_credit_active = "%s active. Curated jokers replaced with full pool.",
@@ -1072,6 +1222,35 @@ return {
 			k_opts_showdown_starting_antes = "Showdown Starts at Ante",
 			k_opts_pvp_timer_increment = "Timer Increment",
 			k_opts_pvp_countdown_seconds = "PvP Countdown Seconds",
+			k_opts_modifier_timer = "Timer Implementation",
+			ml_mp_modifier_timer_opt = {
+				"Default",
+				"No Animations",
+				"Pressure",
+				"Pressure+",
+			},
+			b_opts_modifier_smallworld = "Small World",
+			b_opts_modifier_pvp_timer = "PvP Timer",
+			k_experimental_modifiers_smallworld = {
+				"- {C:attention}75%{} of jokers, consumables, vouchers and tags",
+				"  are randomly banned each game.",
+				"- {C:attention}Showman{} effect always active.",
+			},
+			k_experimental_modifiers_timers = {
+				"- Default: regular {C:chips}150{} {C:inactive}(1x){} seconds timer",
+				" ",
+				"- No Animations: {C:chips}100{} {C:inactive}(0.67x){} seconds timer {C:attention}minus animations{}",
+				" ",
+				"- Pressure: {C:chips}300{} {C:inactive}(2x){} seconds timer {C:attention}minus animations{}",
+				"  which starts {C:attention}immediately{}",
+				" ",
+				"- Pressure+: Same as {C:attention}Pressure{} plus {C:chips}15{} seconds per hand played",
+			},
+			k_experimental_modifiers_pvp_timer = {
+				"- Timer which available during {C:mult}PvP{} rounds.",
+				"  {C:chips}90{} seconds plus {C:chips}15{} seconds per hand played {C:attention}minus animations{}.",
+				"  Can \"timer\" opponent only when you have {C:attention}higher{} score",
+			},
 			k_bl_life = "Life",
 			k_bl_or = "or",
 			k_bl_death = "Death",
@@ -1085,6 +1264,11 @@ return {
 			k_vanilla_description = "The original Balatro experience.\n\nNo Multiplayer jokers, no balance changes.\nJust the base game as it was designed.\n\nMultiplayer features like the timer are still available\nbut can be disabled in Lobby Options.",
 			k_blitz = "Standard",
 			k_blitz_description = "The balanced Multiplayer ruleset.\n\nIncludes Multiplayer jokers and balance changes\nwith full control over your lobby settings.\n\n(See bans and reworks tabs for details)",
+			k_experimental = "Experimental",
+			k_experimental_standard = "Experimental (Standard)",
+			k_experimental_description = "Standard's bleeding edge.\n\nHeavier balance changes being trialed\nfor a future Standard ruleset.\n\n(See bans and reworks tabs for details)",
+			k_experimental_legacy = "Experimental (Classic)",
+			k_experimental_legacy_description = "An opinionated take on Legacy Ranked.\n\nGlass nerfed, Hanging Chad reworked, Justice banned,\nLet's Go Gambling.",
 			k_traditional = "Traditional",
 			k_traditional_description = "Multiplayer content without time pressure.\n\nIncludes Multiplayer jokers and balance changes,\nbut removes time-based mechanics for methodical play.\n\nTime-based jokers are banned.\nTimer is disabled.\n\n(See bans and reworks tabs for details)",
 			k_majorleague = "Major League",
@@ -1092,11 +1276,11 @@ return {
 			k_minorleague = "Minor League",
 			k_minorleague_description = "Official Minor League Balatro ruleset.\n\nVanilla cards with competitive settings:\n- 210 second timer\n- The Order enabled\n- First timeout forgiven\n- Attrition gamemode",
 			k_standard_ranked = "Standard Ranked",
-k_standard_ranked_description = "The official competitive ruleset.\n\nStandard ruleset with locked settings:\n- Attrition gamemode\n- The Order enabled",
+			k_standard_ranked_description = "The official competitive ruleset.\n\nStandard ruleset with locked settings:\n- Attrition gamemode\n- The Order enabled",
 			k_testing = "Testing",
 			k_testing_description = "A ruleset for testing purposes. PvP starts at Ante 1.",
 			k_legacy_ranked = "Legacy Ranked",
-k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer cards or balance changes\nexcept Glass. Has locked settings:\n- Attrition gamemode\n- The Order enabled",
+			k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer cards or balance changes\nexcept Glass. Has locked settings:\n- Attrition gamemode\n- The Order enabled",
 			k_badlatro = "Badlatro",
 			k_badlatro_description = "A weekly ruleset designed by @dr_monty_the_snek on the discord server\nthat has been added to the mod permanently.\n\nThis ruleset bans 48 jokers, consumables, tags, etc.",
 			k_attrition = "Attrition",
@@ -1111,6 +1295,8 @@ k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer 
 			k_weekly_description = "A special ruleset that changes weekly or bi-weekly. I guess you'll have to find out what it is! Currently: ",
 			k_smallworld = "Small World",
 			k_smallworld_description = "It's a small world after all.\n\n75% of jokers, consumables, vouchers, and tags\nare randomly banned each game.\n\nBanned items get replaced with what's available.\nDuplicates allowed.",
+			k_chaos = "Chaos",
+			k_chaos_description = "Everything, everywhere, all at once.\n\nCombines Standard, Small World, and Sandbox\ninto one ruleset. Good luck.",
 			k_speedlatro = "Speedlatro",
 			k_speedlatro_description = "Up the pace with an uncomfortably fast 147 second timer between\neach PvP blind. Good luck using Vagabond",
 			k_cost_up = "Cost Up",
@@ -1180,12 +1366,12 @@ k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer 
 			loc_ready = "Ready for PvP",
 			loc_ready_teams = "Ready with team",
 			loc_ready_for_team_row = "Ready for ",
-			loc_ready_to_skip_for_team_row = "wants to skip ",
+			loc_ready_to_skip_for_team_row = "ready to skip ",
 			k_mp_team_ready_row_Small = "Small Blind",
 			k_mp_team_ready_row_Big = "Big Blind",
 			k_mp_team_ready_row_Boss = "Boss Blind",
 			loc_selecting = "Selecting a Blind",
-			loc_shop = "Shopping",
+			loc_shop = "Shopping before ",
 			loc_playing = "Playing ",
 		},
 		v_dictionary = {
@@ -1211,7 +1397,8 @@ k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer 
 			k_no_banned_objs = "No Banned #1#",
 			k_reworked_objs = "Reworked #1#",
 			k_no_reworked_objs = "No Reworked #1#",
-			k_ruleset_disabled_smods_version = "SMODS Version #1# Required",
+			k_ruleset_disabled_smods_version = "Recommended SMODS: #1#",
+			k_ruleset_recommended_smods_version = "Recommended SMODS: #1#",
 			k_ruleset_disabled_lovely_version = "Lovely #1# Required",
 			k_failed_to_join_lobby = "Failed to join lobby: #1#",
 			k_ante_number = "Ante #1#",
@@ -1265,6 +1452,24 @@ k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer 
 			ch_c_mp_vantablack_CREDITS = {
 				"{C:inactive}(Art by {C:attention}aura!{C:inactive})",
 			},
+			ch_c_mp_indigo = {
+				"Played on {C:attention}Indigo Deck{}",
+			},
+			ch_c_mp_shop_planets = {
+				"{C:planet}Planet{} cards appear",
+			},
+			ch_c_mp_shop_planets_EXTENDED = {
+				"{C:attention}40X{} more frequently in the shop",
+			},
+			ch_c_mp_planet_tycoon_CREDITS = {
+				"{C:inactive}(Idea by {C:attention}BlockAttack{C:inactive})",
+			},
+			ch_c_mp_eeeee = {
+				"Some randomly selected RNG queues are {C:attention}bugged{} each Ante",
+			},
+			ch_c_mp_shared_pockets = {
+				"{C:attention}Hand size{}, {C:attention}Joker Slots{}, and {C:attention}Consumable Slots{} are shared",
+			},
 		},
 		challenge_names = {
 			c_mp_standard = "Standard",
@@ -1292,6 +1497,10 @@ k_legacy_ranked_description = "A minimal competitive ruleset.\n\nNo Multiplayer 
 			c_mp_polymorph_spam = "Polymorph Spam",
 			c_mp_all_must_go = "All Must Go",
 			c_mp_vantablack = "Vantablack",
+			c_mp_planet_tycoon = "Planet Tycoon",
+			c_mp_bacon = "Blue Ice",
+			c_mp_eeeee = "EEEEE",
+			c_mp_shared_pockets = "Shared Pockets",
 		},
 	},
 }

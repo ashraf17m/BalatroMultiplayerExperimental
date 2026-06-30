@@ -14,8 +14,13 @@ local function get_card_key_append(_type, area, _rarity, key_append)
 		return key_append
 	end
 
-	if key_append == "jud" and G.GAME.stake >= 7 then
-		return key_append
+	if
+		key_append == "jud"
+		and G.GAME
+		and G.GAME.modifiers
+		and G.GAME.modifiers.enable_eternals_in_shop
+	then
+		return pseudorandom("order_jud_rarity")
 	end
 
 	-- _rarity replacing key_append can be entirely removed to normalize rarity-specific

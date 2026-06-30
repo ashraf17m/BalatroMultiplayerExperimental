@@ -57,11 +57,12 @@ local function build_self_standings_player()
 	}
 end
 
-local function build_enemy_standings_player(player_id, enemy)
+local function build_enemy_standings_player(player_id, enemy, opts)
 	if not enemy or enemy.in_match == false then
 		return nil
 	end
 
+	local options = opts or {}
 	local lobby_player = get_lobby_player(player_id)
 	return {
 		id = player_id,
@@ -74,15 +75,16 @@ local function build_enemy_standings_player(player_id, enemy)
 		team = enemy.team or (lobby_player and lobby_player.team),
 		blind_col = (lobby_player and lobby_player.blind_col) or 1,
 		config = lobby_player and lobby_player.config or nil,
+		is_duels_nemesis = not not options.is_duels_nemesis,
 	}
 end
 
-local function add_enemy_standings_player(players, included_ids, player_id, enemy)
+local function add_enemy_standings_player(players, included_ids, player_id, enemy, opts)
 	if player_id == nil or included_ids[player_id] then
 		return
 	end
 
-	local row = build_enemy_standings_player(player_id, enemy)
+	local row = build_enemy_standings_player(player_id, enemy, opts)
 	if not row then
 		return
 	end
@@ -122,7 +124,9 @@ local function add_duels_opponent_standings_player(players, included_ids, enemie
 		return
 	end
 
-	add_enemy_standings_player(players, included_ids, nemesis.id, enemies[nemesis.id])
+	add_enemy_standings_player(players, included_ids, nemesis.id, enemies[nemesis.id], {
+		is_duels_nemesis = true,
+	})
 end
 
 function MP.UI.get_live_match_standings_players()
@@ -199,6 +203,7 @@ function MP.UI.get_sorted_players()
 				hands = standings_player.hands or 0,
 				lives = standings_player.lives or 0,
 				is_self = not not standings_player.is_self,
+				is_duels_nemesis = not not standings_player.is_duels_nemesis,
 				team = standings_player.team,
 				blind_col = standings_player.blind_col or 1,
 				config = standings_player.config,

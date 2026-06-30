@@ -70,6 +70,9 @@ end
 
 local function finalize_lobby_leave()
 	G.FUNCS.exit_overlay_menu()
+	if MP.UI and MP.UI.reset_version_mismatch_warning then
+		MP.UI.reset_version_mismatch_warning()
+	end
 	if MP.COOP_SAVE and MP.COOP_SAVE.consume_active_resumed_save then
 		MP.COOP_SAVE.consume_active_resumed_save()
 	end
@@ -126,10 +129,147 @@ local function update_coop_save_button_label(e)
 	return false
 end
 
+local function can_choose_lobby_deck()
+	if not MP.LOBBY or MP.LOBBY.is_saved_coop_restore then
+		return false
+	end
+
+	return MP.LOBBY.is_host or (MP.LOBBY.config and MP.LOBBY.config.different_decks)
+end
+
+local function get_center(key)
+	return BALATRO.get_center and BALATRO.get_center(key) or G and G.P_CENTERS and G.P_CENTERS[key] or nil
+end
+
+local function append_back_name(names, seen, center)
+	local name = center and center.name or nil
+	if name and name ~= "" and not seen[name] then
+		seen[name] = true
+		names[#names + 1] = name
+	end
+end
+
+local function get_cocktail_deck_keys()
+	local content_runtime = MP.CONTENT and MP.CONTENT.RUNTIME or {}
+	if content_runtime.get_cocktail_decks then
+		local deck_keys = content_runtime.get_cocktail_decks(false)
+		if type(deck_keys) == "table" then
+			return deck_keys
+		end
+	end
+
+	if MP.get_cocktail_decks then
+		local deck_keys = MP.get_cocktail_decks(false)
+		if type(deck_keys) == "table" then
+			return deck_keys
+		end
+	end
+
+	return nil
+end
+
+local function get_random_back_pool()
+	local names, seen = {}, {}
+	local cocktail_deck_keys = get_cocktail_deck_keys()
+
+	for _, key in ipairs(cocktail_deck_keys or {}) do
+		append_back_name(names, seen, get_center(key))
+	end
+	append_back_name(names, seen, get_center("b_mp_cocktail"))
+
+	if #names == 0 and G and G.P_CENTER_POOLS and G.P_CENTER_POOLS.Back then
+		for _, center in ipairs(G.P_CENTER_POOLS.Back) do
+			if center.unlocked and center.name ~= "Challenge Deck" and center.name ~= "Random Deck" then
+				append_back_name(names, seen, center)
+			end
+		end
+	end
+
+	return names
+end
+
+local function scoped_random(seed, salt, max)
+	max = math.max(1, math.floor(tonumber(max) or 1))
+	if seed and seed ~= "" and pseudohash then
+		math.randomseed(pseudohash(seed .. "_mp_random_" .. tostring(salt or "")))
+	end
+	return math.random(1, max)
+end
+
+local function roll_random_back_name(seed, salt)
+	local names = get_random_back_pool()
+	if #names == 0 then
+		return "Red Deck"
+	end
+	return names[scoped_random(seed, "deck_" .. tostring(salt or ""), #names)]
+end
+
+local function roll_random_stake(seed, salt)
+	local max_stake = MP.DECK and tonumber(MP.DECK.MAX_STAKE) or 0
+	local cap = max_stake > 0 and max_stake or 8
+	return scoped_random(seed, "stake_" .. tostring(salt or ""), cap)
+end
+
+local function get_random_loadout_salt()
+	local client = MP.LOBBY and MP.LOBBY.client or nil
+	if client and client.username then
+		return client.username
+	end
+	if MP.LOBBY and MP.LOBBY.username then
+		return MP.LOBBY.username
+	end
+	return BALATRO.get_player_id and BALATRO.get_player_id() or ""
+end
+
+local function build_random_loadout(seed, salt)
+	local config = MP.LOBBY and MP.LOBBY.config or {}
+	local run_deck = lobby_domain.get_run_deck and lobby_domain.get_run_deck() or MP.LOBBY and MP.LOBBY.run_deck or {}
+
+	return {
+		back = roll_random_back_name(seed, salt),
+		challenge = "",
+		stake = roll_random_stake(seed, salt),
+		sleeve = run_deck.sleeve or config.sleeve or "sleeve_casl_none",
+		cocktail = run_deck.cocktail or config.cocktail or "",
+	}
+end
+
+local function apply_random_loadout_to_run_deck(loadout)
+	if lobby_domain.update_run_deck then
+		return lobby_domain.update_run_deck(loadout)
+	end
+	if MP.LOBBY then
+		MP.LOBBY.run_deck = loadout
+	end
+	return loadout
+end
+
+local function apply_shared_random_loadout()
+	local loadout = build_random_loadout()
+	local config = MP.LOBBY and MP.LOBBY.config or nil
+	if config then
+		for key, value in pairs(loadout) do
+			config[key] = value
+		end
+	end
+	apply_random_loadout_to_run_deck(loadout)
+
+	if MP.ACTIONS and MP.ACTIONS.lobby_options then
+		MP.ACTIONS.lobby_options(loadout)
+	end
+	request_lobby_main_menu_refresh()
+	return loadout
+end
+
 ---@type fun(e: table | nil, args: { deck: string, stake: number | nil, seed: string | nil })
 function G.FUNCS.lobby_start_run(e, args)
-	if MP.LOBBY.config.different_decks == false and lobby_domain.sync_run_deck_from_config then
+	args = args or {}
+	local config = MP.LOBBY and MP.LOBBY.config or {}
+
+	if config.different_decks == false and lobby_domain.sync_run_deck_from_config then
 		lobby_domain.sync_run_deck_from_config()
+	elseif config.different_decks and config.random_loadout then
+		apply_random_loadout_to_run_deck(build_random_loadout(args.seed, get_random_loadout_salt()))
 	end
 
 	local run_deck = lobby_domain.get_run_deck and lobby_domain.get_run_deck() or MP.LOBBY.run_deck
@@ -180,10 +320,28 @@ MP.HOOKS.register_method_hook(Back, "Back", "generate_UI", "mp.lobby_actions.cha
 })
 
 function G.FUNCS.lobby_start_game(e)
+	if MP.UI and MP.UI.show_version_mismatch_if_needed and MP.UI.show_version_mismatch_if_needed() then
+		return
+	end
+
+	if
+		MP.LOBBY
+		and MP.LOBBY.is_host
+		and MP.LOBBY.config
+		and MP.LOBBY.config.random_loadout
+		and not MP.LOBBY.config.different_decks
+	then
+		apply_shared_random_loadout()
+	end
+
 	MP.ACTIONS.start_game()
 end
 
 function G.FUNCS.lobby_ready_up(e)
+	if MP.UI and MP.UI.show_version_mismatch_if_needed and MP.UI.show_version_mismatch_if_needed() then
+		return
+	end
+
 	toggle_lobby_ready()
 end
 
@@ -219,7 +377,7 @@ end
 MP.UI.process_pending_lobby_option_failure = process_pending_lobby_option_failure
 
 function G.FUNCS.lobby_choose_deck(e)
-	if MP.LOBBY and MP.LOBBY.is_saved_coop_restore then
+	if not can_choose_lobby_deck() then
 		return
 	end
 
@@ -281,7 +439,7 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "start_run", "mp.lobby_actions
 				cocktail = selected_cocktail,
 			}
 
-			if MP.LOBBY.is_host then
+			if MP.LOBBY.is_host and not MP.LOBBY.config.different_decks then
 				MP.ACTIONS.lobby_options(selected_run_deck)
 			end
 

@@ -101,6 +101,16 @@ function MP.FEATURE_WIRE.build_magnet_response_payload(key)
 	})
 end
 
+local function build_target_snapshot_request(action_name, target_player_id, options)
+	local payload = {
+		targetPlayerId = target_player_id,
+	}
+	if options and options.fresh == true then
+		payload.fresh = true
+	end
+	return build_endgame_state(action_name, payload)
+end
+
 function MP.FEATURE_WIRE.build_get_end_game_jokers_payload(target_player_id)
 	return build_endgame_state("getEndGameJokers", {
 		targetPlayerId = target_player_id,
@@ -111,6 +121,10 @@ function MP.FEATURE_WIRE.build_get_nemesis_deck_payload(target_player_id)
 	return build_endgame_state("getNemesisDeck", {
 		targetPlayerId = target_player_id,
 	})
+end
+
+function MP.FEATURE_WIRE.build_get_end_game_summary_payload(target_player_id, options)
+	return build_target_snapshot_request("getEndGameSummary", target_player_id, options)
 end
 
 function MP.FEATURE_WIRE.build_receive_end_game_jokers_payload(keys, source_player_id, requester_player_id)
@@ -124,6 +138,14 @@ end
 function MP.FEATURE_WIRE.build_receive_nemesis_deck_payload(cards, source_player_id, requester_player_id)
 	return build_endgame_state("receiveNemesisDeck", {
 		cards = cards,
+		sourcePlayerId = source_player_id,
+		requesterPlayerId = requester_player_id,
+	})
+end
+
+function MP.FEATURE_WIRE.build_receive_end_game_summary_payload(summary, source_player_id, requester_player_id)
+	return build_endgame_state("receiveEndGameSummary", {
+		summary = summary,
 		sourcePlayerId = source_player_id,
 		requesterPlayerId = requester_player_id,
 	})

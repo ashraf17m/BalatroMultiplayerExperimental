@@ -226,6 +226,7 @@ return {
 			k_connected = "Kua hono ki te Ipurangi",
 			k_warn_service = "KIA TŪPATO: Kāore e hono ana ki a Balatro Multiplayer",
 			k_set_name = "Kōwhiria tō Ingoa ki te Tahua Matua! (Mūrere > Multiplayer > Config)",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			k_lobby_options = "Kōwhiringa",
 			k_connect_player = "Ngā Kaitākaro:",
 			k_opts_only_host = "Kei te Kaiwhakahaere anake te tikanga",

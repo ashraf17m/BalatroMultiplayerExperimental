@@ -116,46 +116,18 @@ local function get_score_display(score_text, score_int, options)
 end
 
 local function ease_standings_score_number(score_number, target_score, options)
-	if not (score_number and target_score and BALATRO.queue_event) then
+	if not (MP.INSANE_INT and MP.INSANE_INT.ease_display_score) then
 		return false
 	end
 	local delay = options and options.delay or shared.PVP_SCORE_EASE_DELAY or PVP_SCORE_EASE_DELAY
-	local score_e_count = tonumber(score_number.e_count) or 0
-	local score_exponent = tonumber(score_number.exponent) or 0
-	local target_e_count = tonumber(target_score.e_count) or 0
-	local target_exponent = tonumber(target_score.exponent) or 0
-
-	if score_e_count ~= target_e_count or score_exponent ~= target_exponent then
-		score_number.e_count = target_e_count
-		score_number.coefficient = tonumber(target_score.coefficient) or 0
-		score_number.exponent = target_exponent
-		return true
-	end
-
-	local function queue_score_field(ref_value, ease_to)
-		BALATRO.queue_event({
-			blockable = false,
-			blocking = false,
-			trigger = "ease",
-			delay = delay,
-			ref_table = score_number,
-			ref_value = ref_value,
-			ease_to = tonumber(ease_to) or 0,
-			func = function(t)
-				return t
-			end,
-		})
-	end
-
-	queue_score_field("coefficient", target_score.coefficient)
-	return true
+	return MP.INSANE_INT.ease_display_score(score_number, target_score, { delay = delay })
 end
 
 local function copy_insane_int(value)
-	if not value then
-		return MP.INSANE_INT.empty()
+	if MP.INSANE_INT and MP.INSANE_INT.copy then
+		return MP.INSANE_INT.copy(value)
 	end
-	return MP.INSANE_INT.create(value.coefficient, value.exponent, value.e_count)
+	return value or MP.INSANE_INT.empty()
 end
 
 local function should_snap_score_display(display_score, target_score)
@@ -248,7 +220,110 @@ G.FUNCS.mp_players_hud_rank_label_colour = function(e)
 	end
 end
 
-local function create_text_label(text, scale, colour, shadow)
+local TEXT_OUTLINE_OFFSETS = {
+	{ -1, 0 },
+	{ 1, 0 },
+	{ 0, -1 },
+	{ 0, 1 },
+	{ -1, -1 },
+	{ 1, -1 },
+	{ -1, 1 },
+	{ 1, 1 },
+}
+
+local function draw_dynatext_layer(text_object, colour, offset_x, offset_y)
+	if not (
+		text_object
+		and text_object.strings
+		and text_object.focused_string
+		and text_object.strings[text_object.focused_string]
+		and love
+		and love.graphics
+	) then
+		return
+	end
+
+	local string_state = text_object.strings[text_object.focused_string]
+	local shadow_parrallax = text_object.shadow_parrallax or { x = 0, y = 0 }
+	prep_draw(text_object, 1)
+	love.graphics.translate(
+		string_state.W_offset + text_object.text_offset.x * text_object.font.FONTSCALE / G.TILESIZE + (offset_x or 0),
+		string_state.H_offset + text_object.text_offset.y * text_object.font.FONTSCALE / G.TILESIZE + (offset_y or 0)
+	)
+	if text_object.config.spacing then
+		love.graphics.translate(text_object.config.spacing * text_object.font.FONTSCALE / G.TILESIZE, 0)
+	end
+
+	local shadow_norm_x = 0
+	local shadow_norm_y = 0
+	local shadow_dist = math.sqrt(shadow_parrallax.y * shadow_parrallax.y + shadow_parrallax.x * shadow_parrallax.x)
+	if shadow_dist > 0 then
+		shadow_norm_x = shadow_parrallax.x / shadow_dist * text_object.font.FONTSCALE / G.TILESIZE
+		shadow_norm_y = shadow_parrallax.y / shadow_dist * text_object.font.FONTSCALE / G.TILESIZE
+	end
+
+	for _, letter in ipairs(string_state.letters or {}) do
+		local real_pop_in = text_object.config.min_cycle_time == 0 and 1 or (letter.pop_in or 1)
+		love.graphics.setColor(colour)
+		love.graphics.draw(
+			letter.letter,
+			0.5 * (letter.dims.x - letter.offset.x) * text_object.font.FONTSCALE / G.TILESIZE + shadow_norm_x,
+			0.5 * (letter.dims.y - letter.offset.y) * text_object.font.FONTSCALE / G.TILESIZE + shadow_norm_y,
+			letter.r or 0,
+			real_pop_in * letter.scale * text_object.scale * text_object.font.FONTSCALE / G.TILESIZE,
+			real_pop_in * letter.scale * text_object.scale * text_object.font.FONTSCALE / G.TILESIZE,
+			0.5 * letter.dims.x / text_object.scale,
+			0.5 * letter.dims.y / text_object.scale
+		)
+		love.graphics.translate(letter.dims.x * text_object.font.FONTSCALE / G.TILESIZE, 0)
+	end
+	love.graphics.pop()
+end
+
+local function draw_dynatext_outline(text_object, colour, offset)
+	for _, delta in ipairs(TEXT_OUTLINE_OFFSETS) do
+		draw_dynatext_layer(text_object, colour, delta[1] * offset, delta[2] * offset)
+	end
+end
+
+local function create_outlined_text_label(text, scale, colour, options)
+	local opts = options or {}
+	local text_colour = colour or G.C.WHITE
+	local text_object = DynaText({
+		string = { tostring(text or "") },
+		colours = { text_colour },
+		shadow = false,
+		scale = scale,
+		maxw = opts.maxw,
+	})
+	local outline_colour = opts.outline_colour or G.C.RED
+	local outline_offset = opts.outline_offset or 0.028
+	text_object.draw = function(self)
+		if self.children and self.children.particle_effect then
+			self.children.particle_effect:draw()
+		end
+
+		draw_dynatext_outline(self, outline_colour, outline_offset)
+		draw_dynatext_layer(self, text_colour, 0, 0)
+
+		add_to_drawhash(self)
+		self:draw_boundingrect()
+	end
+
+	return {
+		n = G.UIT.O,
+		config = {
+			object = text_object,
+			can_collide = false,
+		},
+	}
+end
+
+local function create_text_label(text, scale, colour, shadow, options)
+	if options and options.outline_colour and DynaText then
+		return create_outlined_text_label(text, scale, colour, options)
+	end
+
 	return {
 		n = G.UIT.T,
 		config = {

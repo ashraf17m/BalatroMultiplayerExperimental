@@ -248,9 +248,11 @@ end
 
 function MP.PLATFORM.SMODS.get_connection_settings(mod)
 	local config = load_default_mod_config(mod)
+	local env = MP.ENV or {}
+	local env_port = tonumber(env.server_port)
 	return {
-		server_url = config and config.server_url or nil,
-		server_port = config and config.server_port or nil,
+		server_url = env.server_url or (config and config.server_url) or nil,
+		server_port = env_port or (config and config.server_port) or nil,
 	}
 end
 

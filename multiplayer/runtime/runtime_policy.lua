@@ -5,6 +5,9 @@ MP.RUNTIME_POLICY = {
 	lovely = {
 		minimum_version = "0.9",
 	},
+	smods = {
+		recommended_version = "1.0.0-beta-1814a",
+	},
 }
 
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or nil

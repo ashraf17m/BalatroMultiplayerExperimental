@@ -78,6 +78,33 @@ function content_runtime.is_phantom_card(card)
 	return not not (card and card.edition and card.edition.type == "mp_phantom")
 end
 
+function content_runtime.is_phantom_sync_suppressed()
+	return (tonumber(content_runtime.phantom_sync_suppression_depth) or 0) > 0
+end
+
+function content_runtime.with_phantom_sync_suppressed(callback)
+	if type(callback) ~= "function" then
+		return nil
+	end
+
+	content_runtime.phantom_sync_suppression_depth =
+		(tonumber(content_runtime.phantom_sync_suppression_depth) or 0) + 1
+	local results = { pcall(callback) }
+	content_runtime.phantom_sync_suppression_depth = math.max(
+		(tonumber(content_runtime.phantom_sync_suppression_depth) or 1) - 1,
+		0
+	)
+	if not results[1] then
+		error(results[2], 0)
+	end
+	local unpack_results = unpack or table.unpack
+	return unpack_results(results, 2)
+end
+
+function content_runtime.is_preview_only_card(card)
+	return not not (card and (card.mp_end_game_preview or (card.area and card.area.mp_end_game_preview)))
+end
+
 function content_runtime.sync_phantom(key, should_exist)
 	if not key then
 		return false
@@ -87,7 +114,12 @@ function content_runtime.sync_phantom(key, should_exist)
 end
 
 function content_runtime.sync_phantom_for_card(card, from_debuff, key, should_exist)
-	if from_debuff or content_runtime.is_phantom_card(card) then
+	if
+		from_debuff
+		or content_runtime.is_phantom_card(card)
+		or content_runtime.is_phantom_sync_suppressed()
+		or content_runtime.is_preview_only_card(card)
+	then
 		return false
 	end
 
@@ -134,6 +166,10 @@ end
 
 function content_runtime.is_ruleset_active(ruleset)
 	return not not (MP.is_ruleset_active and MP.is_ruleset_active(ruleset))
+end
+
+function content_runtime.is_layer_active(layer)
+	return not not (MP.is_layer_active and MP.is_layer_active(layer))
 end
 
 function content_runtime.create_buffered_dollars_reward(dollars)

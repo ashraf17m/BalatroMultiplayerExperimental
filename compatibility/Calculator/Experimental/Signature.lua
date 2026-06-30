@@ -81,6 +81,21 @@ local function area_cards(area)
 	return area and area.cards or nil
 end
 
+local function current_round_signature(round)
+	if type(round) ~= "table" then return "{}" end
+	return stable_value({
+		hands_left = round.hands_left,
+		hands_played = round.hands_played,
+		discards_left = round.discards_left,
+		discards_used = round.discards_used,
+		most_played_poker_hand = round.most_played_poker_hand,
+		idol_card = round.idol_card,
+		mail_card = round.mail_card,
+		ancient_card = round.ancient_card,
+		castle_card = round.castle_card,
+	}, 3)
+end
+
 local function card_identity(card)
 	if not card then return "nil" end
 	return tostring(card.sort_id or card.unique_val or card.ID or card)
@@ -126,9 +141,11 @@ end
 
 function CALC.current_request_guard_signature()
 	local hand = G and G.hand or nil
+	local game = G and G.GAME or {}
 	return table.concat({
 		"rev=" .. tostring(CALC.cache_revision or 0),
 		"state=" .. tostring(G and G.STATE or ""),
+		"round=" .. current_round_signature(game.current_round),
 		card_identity_list_signature("highlighted", hand and hand.highlighted),
 		card_identity_list_signature("hand", area_cards(hand)),
 		card_identity_list_signature("jokers", area_cards(G and G.jokers)),
@@ -149,6 +166,7 @@ function CALC.current_signature()
 		"blind=key=" .. tostring(blind_config.key or blind.name or "")
 			.. ";chips=" .. score_signature_value(blind.chips)
 			.. ";disabled=" .. tostring(blind.disabled),
+		"round=" .. current_round_signature(game.current_round),
 		"hands=" .. stable_value(game.hands, 2),
 		card_list_signature("highlighted", hand and hand.highlighted),
 		card_list_signature("hand", area_cards(hand)),

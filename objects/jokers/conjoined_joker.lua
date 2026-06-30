@@ -23,7 +23,7 @@ SMODS.Joker(content_runtime.with_phantom_sync_hooks({
 		return { vars = { card.ability.extra.x_mult_gain, card.ability.extra.max_x_mult, card.ability.extra.x_mult } }
 	end,
 	mp_include = function(self)
-		return content_runtime.include_multiplayer_jokers() and not content_runtime.is_ruleset_active("sandbox")
+		return content_runtime.include_multiplayer_jokers() and not content_runtime.is_layer_active("sandbox")
 	end,
 	update = function(self, card, dt)
 		if not content_runtime.has_active_lobby() then

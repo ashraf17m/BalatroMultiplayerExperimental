@@ -29,6 +29,13 @@ local function get_current_blind()
 end
 
 local function get_current_blind_target()
+	if teams_domain.get_cooperative_blind_target then
+		local cooperative_target = teams_domain.get_cooperative_blind_target()
+		if cooperative_target ~= nil then
+			return cooperative_target
+		end
+	end
+
 	local blind = get_current_blind()
 	if blind and blind.mp_coop_scaled_chips ~= nil then
 		return blind.mp_coop_scaled_chips
@@ -45,10 +52,87 @@ local function get_current_blind_target()
 		return blind.chips
 	end
 
-	if MP.is_coop_blind and MP.is_coop_blind() and MP.GAME then
-		return MP.GAME.coop_blind_target_chips
-	end
 	return nil
+end
+
+local function send_end_game_summary_update()
+	if not (MP.LOBBY and MP.LOBBY.code and MP.GAME) then
+		return false
+	end
+	if MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL.send_end_game_summary_update then
+		return MP.NETWORKING_INTERNAL.send_end_game_summary_update()
+	end
+	return false
+end
+
+local function send_end_game_summary_update_after_state_settles()
+	if G and G.E_MANAGER and Event then
+		G.E_MANAGER:add_event(Event({
+			trigger = "after",
+			delay = 0,
+			func = function()
+				send_end_game_summary_update()
+				return true
+			end,
+		}))
+		return true
+	end
+	return send_end_game_summary_update()
+end
+
+local function get_current_ante()
+	return BALATRO.get_ante and BALATRO.get_ante() or nil
+end
+
+local function apply_local_pvp_timer_score_gate(local_score)
+	if not (
+		MP.GAME
+		and MP.is_pvp_boss
+		and MP.is_pvp_boss()
+		and MP.is_layer_active
+		and MP.is_layer_active("pvp_timer")
+		and MP.INSANE_INT
+	) then
+		return
+	end
+
+	local enemy_score = MP.GAME.enemy and MP.GAME.enemy.score or nil
+	if not enemy_score then
+		return
+	end
+
+	if MP.INSANE_INT.greater_than(local_score, enemy_score) then
+		MP.GAME.nemesis_timer_started = false
+	elseif MP.INSANE_INT.equal and MP.INSANE_INT.equal(local_score, enemy_score) and MP.GAME.pvp_reached_first then
+		MP.GAME.nemesis_timer_started = false
+	else
+		MP.GAME.timer_started = false
+	end
+end
+
+local function split_location(location)
+	local location_text = tostring(location or "loc_selecting")
+	local location_type, location_blind = location_text:match("^([^-]+)%-(.*)$")
+	if location_type then
+		return location_type, location_blind
+	end
+	return location_text, nil
+end
+
+local function normalize_location(location, blind)
+	local location_type, location_blind = split_location(location)
+	if
+		location_blind == nil
+		and (blind ~= nil or location_type == "loc_selecting" or location_type == "loc_playing" or location_type == "loc_shop")
+	then
+		local get_blind_to_display = MP.UTILS and MP.UTILS.get_blind_to_display or nil
+		location_blind = get_blind_to_display and get_blind_to_display(blind) or blind
+	end
+
+	if location_blind ~= nil and location_blind ~= "" then
+		return tostring(location_type) .. "-" .. tostring(location_blind)
+	end
+	return tostring(location_type)
 end
 
 local function get_starting_hands_for_ready_blind()
@@ -100,7 +184,7 @@ local function get_ready_blind_target(blind_row, blind_kind)
 
 	local ante_scaling = BALATRO.get_starting_ante_scaling and BALATRO.get_starting_ante_scaling() or 1
 	local target = apply_ready_blind_runtime_modifiers(blind_amount * blind_def.mult * ante_scaling)
-	if MP.is_coop_gamemode and MP.is_coop_gamemode() and MP.scale_coop_blind_amount then
+	if MP.is_coop_run and MP.is_coop_run() and MP.scale_coop_blind_amount then
 		target = MP.scale_coop_blind_amount(target)
 	end
 	return target
@@ -136,6 +220,20 @@ function match_action_runtime.ready_blind(e)
 	Client.queue_send(payload)
 end
 
+function match_action_runtime.blind_preview(preview_key, targets)
+	local payload = MP.MATCH_WIRE.build_blind_preview_payload(preview_key, targets)
+	if payload then
+		Client.queue_send(payload)
+	end
+end
+
+function match_action_runtime.coop_boss_blind(phase, ante, boss_key)
+	local payload = MP.MATCH_WIRE.build_coop_boss_blind_payload(phase, ante, boss_key)
+	if payload then
+		Client.queue_send(payload)
+	end
+end
+
 function match_action_runtime.unready_blind()
 	if match_domain.clear_next_blind_context then
 		match_domain.clear_next_blind_context()
@@ -144,7 +242,7 @@ function match_action_runtime.unready_blind()
 end
 
 function match_action_runtime.ready_skip_blind(blind_row)
-	Client.queue_send(MP.MATCH_WIRE.build_ready_skip_blind_payload(blind_row))
+	Client.queue_send(MP.MATCH_WIRE.build_ready_skip_blind_payload(blind_row, get_current_ante()))
 end
 
 function match_action_runtime.unready_skip_blind()
@@ -166,7 +264,8 @@ function match_action_runtime.version()
 	Client.queue_send(MP.MATCH_WIRE.build_version_payload(client_version))
 end
 
-function match_action_runtime.set_location(location)
+function match_action_runtime.set_location(location, blind)
+	location = normalize_location(location, blind)
 	if match_domain.set_location and not match_domain.set_location(location) then
 		return
 	end
@@ -187,6 +286,8 @@ function match_action_runtime.play_hand(score, hands_left, options)
 	if match_domain.apply_local_hand_score then
 		match_domain.apply_local_hand_score(fixed_score, insane_int_score)
 	end
+	send_end_game_summary_update_after_state_settles()
+	apply_local_pvp_timer_score_gate(insane_int_score)
 	local score_shared = MP.UI and MP.UI.PLAYERS_HUD_SHARED or nil
 	if MP.GAME and MP.GAME.score_display and score_shared and score_shared.ease_standings_score_number then
 		score_shared.ease_standings_score_number(MP.GAME.score_display, insane_int_score, {
@@ -204,6 +305,7 @@ function match_action_runtime.play_hand(score, hands_left, options)
 end
 
 function match_action_runtime.set_ante(ante)
+	send_end_game_summary_update_after_state_settles()
 	Client.queue_send(MP.MATCH_WIRE.build_set_ante_payload(ante))
 end
 
@@ -227,7 +329,11 @@ function match_action_runtime.start_ante_timer()
 		ready_blind_kind = MP.GAME and MP.GAME.ready_blind_kind,
 		time = MP.GAME and MP.GAME.timer,
 	})
-	Client.queue_send(MP.MATCH_WIRE.build_timer_payload("startAnteTimer"))
+	local is_local_timer = MP.timer_is_local and MP.timer_is_local() or false
+	if is_local_timer and MP.ANTE_TIMER_RUNTIME and MP.ANTE_TIMER_RUNTIME.apply_local_signal then
+		MP.ANTE_TIMER_RUNTIME.apply_local_signal(true, true, true)
+	end
+	Client.queue_send(MP.MATCH_WIRE.build_timer_payload("startAnteTimer", MP.GAME and MP.GAME.timer, is_local_timer))
 end
 
 function match_action_runtime.pause_ante_timer()
@@ -235,7 +341,11 @@ function match_action_runtime.pause_ante_timer()
 		ready_blind_kind = MP.GAME and MP.GAME.ready_blind_kind,
 		time = MP.GAME and MP.GAME.timer,
 	})
-	Client.queue_send(MP.MATCH_WIRE.build_timer_payload("pauseAnteTimer"))
+	local is_local_timer = MP.timer_is_local and MP.timer_is_local() or false
+	if is_local_timer and MP.ANTE_TIMER_RUNTIME and MP.ANTE_TIMER_RUNTIME.apply_local_signal then
+		MP.ANTE_TIMER_RUNTIME.apply_local_signal(false, true, false)
+	end
+	Client.queue_send(MP.MATCH_WIRE.build_timer_payload("pauseAnteTimer", MP.GAME and MP.GAME.timer, is_local_timer))
 end
 
 function match_action_runtime.fail_timer()
@@ -244,6 +354,14 @@ function match_action_runtime.fail_timer()
 		time = MP.GAME and MP.GAME.timer,
 	})
 	Client.queue_send(MP.MATCH_WIRE.build_fail_timer_payload())
+end
+
+function match_action_runtime.fail_pvp_timer()
+	trace_runtime_event("pvp_timer.fail_requested", {
+		ruleset = MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.ruleset,
+		time = MP.GAME and MP.GAME.timer,
+	})
+	Client.queue_send(MP.MATCH_WIRE.build_fail_pvp_timer_payload())
 end
 
 function match_action_runtime.sync_client()
@@ -357,6 +475,8 @@ end
 
 MP.ACTIONS.start_game = match_action_runtime.start_game
 MP.ACTIONS.ready_blind = match_action_runtime.ready_blind
+MP.ACTIONS.blind_preview = match_action_runtime.blind_preview
+MP.ACTIONS.coop_boss_blind = match_action_runtime.coop_boss_blind
 MP.ACTIONS.unready_blind = match_action_runtime.unready_blind
 MP.ACTIONS.ready_skip_blind = match_action_runtime.ready_skip_blind
 MP.ACTIONS.unready_skip_blind = match_action_runtime.unready_skip_blind
@@ -371,6 +491,7 @@ MP.ACTIONS.skip = match_action_runtime.skip
 MP.ACTIONS.start_ante_timer = match_action_runtime.start_ante_timer
 MP.ACTIONS.pause_ante_timer = match_action_runtime.pause_ante_timer
 MP.ACTIONS.fail_timer = match_action_runtime.fail_timer
+MP.ACTIONS.fail_pvp_timer = match_action_runtime.fail_pvp_timer
 MP.ACTIONS.sync_client = match_action_runtime.sync_client
 MP.ACTIONS.sync_money = match_action_runtime.sync_money
 MP.ACTIONS.send_team_money = match_action_runtime.send_team_money

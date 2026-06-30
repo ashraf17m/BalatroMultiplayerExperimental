@@ -105,7 +105,19 @@ function LOBBY_DOMAIN.prepare_config_for_creation(state)
 	LOBBY_DOMAIN.set_creation_gamemode(config.gamemode, state)
 	config.multiplayer_jokers = ruleset.multiplayer_content
 	config.forced_config = ruleset.force_lobby_options()
+	config.modifier_layers = MP.modifiers_serialize and MP.modifiers_serialize() or ""
 	config.cocktail = MP.PLATFORM.SMODS.get_config_value("cocktail")
+	local pending_custom_options = MP.CUSTOM
+		and MP.CUSTOM.get_pending_lobby_options
+		and MP.CUSTOM.get_pending_lobby_options()
+		or nil
+	if pending_custom_options then
+		for key, value in pairs(pending_custom_options) do
+			config[key] = value
+		end
+	else
+		config.custom_bans = ""
+	end
 
 	local hides_lives_hud = config.gamemode == "gamemode_mp_coop"
 

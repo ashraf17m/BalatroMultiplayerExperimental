@@ -55,6 +55,7 @@ return {
 			connected = "服務已連接",
 			warn_service = "警告：無法找到多人伺服器",
 			set_name = "可以在主選單設置自己的名字（Mods > Multiplayer）",
+			k_warning_banned_mods = "One or more players have banned mods installed. These mods are not allowed in ranked games.",
 			start = "開始",
 			wait_for = "等待",
 			host_start = "大廳主開始",

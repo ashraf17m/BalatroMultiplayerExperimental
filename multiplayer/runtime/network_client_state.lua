@@ -52,6 +52,31 @@ function connection_identity.set_blind_col(num)
 	return blind_col
 end
 
+function connection_identity.sync_blind_target_scale(scale)
+	if not (MP.LOBBY and MP.LOBBY.client) then
+		return nil
+	end
+
+	local numeric_scale = tonumber(scale)
+	if
+		not numeric_scale
+		or numeric_scale ~= numeric_scale
+		or numeric_scale == math.huge
+		or numeric_scale == -math.huge
+	then
+		return nil
+	end
+
+	numeric_scale = math.max(0, numeric_scale)
+	if MP.LOBBY.client.blind_target_scale == numeric_scale then
+		return numeric_scale
+	end
+
+	MP.LOBBY.client.blind_target_scale = numeric_scale
+	resend_identity_if_connected()
+	return numeric_scale
+end
+
 function network_client_state.clear_reconnect_lobby_state()
 	local connection_session = ensure_connection_session()
 	if connection_session and connection_session.clear_reconnect_lobby_state then

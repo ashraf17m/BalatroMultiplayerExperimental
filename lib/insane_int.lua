@@ -6,6 +6,14 @@
 
 MP.INSANE_INT = {}
 
+local function is_finite_number(value)
+	return type(value) == "number" and value == value and value ~= math.huge and value ~= -math.huge
+end
+
+local function get_coefficient(value)
+	return value and (value.coefficient or value.coeffiocient) or 0
+end
+
 local function normalize_parts(coefficient, exponent, e_count)
 	coefficient = tonumber(coefficient) or 0
 	exponent = tonumber(exponent) or 0
@@ -66,7 +74,7 @@ local function normalize_insane_int(value)
 		return MP.INSANE_INT.empty()
 	end
 
-	return MP.INSANE_INT.create(value.coefficient, value.exponent, value.e_count)
+	return MP.INSANE_INT.create(get_coefficient(value), value.exponent, value.e_count)
 end
 
 MP.INSANE_INT.empty = function()
@@ -78,6 +86,25 @@ MP.INSANE_INT.create = function(coefficient, exponent, e_count)
 end
 
 MP.INSANE_INT.normalize = normalize_insane_int
+
+MP.INSANE_INT.copy = function(value)
+	if not value then
+		return MP.INSANE_INT.empty()
+	end
+	return MP.INSANE_INT.create(get_coefficient(value), value.exponent, value.e_count)
+end
+
+MP.INSANE_INT.copy_into = function(target, source)
+	if not (target and source) then
+		return false
+	end
+
+	local normalized = normalize_insane_int(source)
+	target.e_count = tonumber(normalized.e_count) or 0
+	target.coefficient = tonumber(normalized.coefficient) or 0
+	target.exponent = tonumber(normalized.exponent) or 0
+	return true
+end
 
 MP.INSANE_INT.from_string = function(str)
 	str = tostring(str or "0"):gsub(",", "")
@@ -129,6 +156,115 @@ MP.INSANE_INT.to_safe_number = function(insane_int_display)
 	end
 
 	return safe_number
+end
+
+MP.INSANE_INT.set_from_safe_number = function(insane_int_display, value)
+	if not (insane_int_display and is_finite_number(value)) then
+		return false
+	end
+
+	local rounded_value = math.max(0, math.floor(value + 0.5))
+	return MP.INSANE_INT.copy_into(insane_int_display, MP.INSANE_INT.create(rounded_value, 0, 0))
+end
+
+local function queue_ease_event(event_config)
+	local balatro = MP.PLATFORM and MP.PLATFORM.BALATRO or nil
+	if balatro and balatro.queue_event then
+		balatro.queue_event(event_config)
+		return true
+	end
+
+	if G and G.E_MANAGER and Event then
+		G.E_MANAGER:add_event(Event(event_config))
+		return true
+	end
+
+	return false
+end
+
+local function clamp_eased_score(value, start_value, target_value)
+	if not is_finite_number(value) then
+		return start_value
+	end
+
+	if target_value >= start_value then
+		return math.min(target_value, math.max(start_value, value))
+	end
+	return math.max(target_value, math.min(start_value, value))
+end
+
+local function ease_display_score_as_safe_value(score_display, target_score, delay)
+	local start_value = MP.INSANE_INT.to_safe_number(score_display)
+	local target_value = MP.INSANE_INT.to_safe_number(target_score)
+	if start_value == nil or target_value == nil then
+		return false
+	end
+
+	score_display._mp_score_ease_generation = (tonumber(score_display._mp_score_ease_generation) or 0) + 1
+	local generation = score_display._mp_score_ease_generation
+	if target_value <= start_value then
+		return MP.INSANE_INT.copy_into(score_display, target_score)
+	end
+
+	local proxy = score_display._mp_score_ease_proxy or {}
+	proxy.value = start_value
+	score_display._mp_score_ease_proxy = proxy
+
+	return queue_ease_event({
+		blockable = false,
+		blocking = false,
+		trigger = "ease",
+		delay = delay,
+		ref_table = proxy,
+		ref_value = "value",
+		ease_to = target_value,
+		func = function(value)
+			if score_display._mp_score_ease_generation ~= generation then
+				return proxy.value
+			end
+
+			local eased_value = clamp_eased_score(value, start_value, target_value)
+			MP.INSANE_INT.set_from_safe_number(score_display, eased_value)
+			return eased_value
+		end,
+	})
+end
+
+MP.INSANE_INT.ease_display_score = function(score_display, target_score, options)
+	if not (score_display and target_score) then
+		return false
+	end
+
+	local delay = options and options.delay or 1
+	if ease_display_score_as_safe_value(score_display, target_score, delay) then
+		return true
+	end
+
+	score_display._mp_score_ease_generation = (tonumber(score_display._mp_score_ease_generation) or 0) + 1
+	local generation = score_display._mp_score_ease_generation
+	local display_score = normalize_insane_int(score_display)
+	local target_display_score = normalize_insane_int(target_score)
+
+	if display_score.e_count ~= target_display_score.e_count or display_score.exponent ~= target_display_score.exponent then
+		MP.INSANE_INT.copy_into(score_display, target_display_score)
+		return true
+	end
+
+	return queue_ease_event({
+		blockable = false,
+		blocking = false,
+		trigger = "ease",
+		delay = delay,
+		ref_table = score_display,
+		ref_value = "coefficient",
+		ease_to = tonumber(target_display_score.coefficient) or 0,
+		func = function(value)
+			if score_display._mp_score_ease_generation ~= generation then
+				return score_display.coefficient
+			end
+			return value
+		end,
+	})
 end
 
 MP.INSANE_INT.reaches_e_switch_point = function(insane_int_display)

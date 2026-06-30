@@ -7,8 +7,16 @@ local function use_standings_hud()
 		or (MP.is_teams_mode and MP.is_teams_mode())
 end
 
+local function is_ghost_replay_active()
+	return MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
+end
+
+local function has_blind_hud_context()
+	return (MP and MP.LOBBY and MP.LOBBY.code) or is_ghost_replay_active()
+end
+
 function MP.UI.update_primary_opponent_blind_name(pop_in)
-	if not (MP and MP.LOBBY and MP.LOBBY.code and BALATRO.get_hud_blind and BALATRO.get_hud_blind() and MP.is_pvp_boss and MP.is_pvp_boss()) then
+	if not (has_blind_hud_context() and BALATRO.get_hud_blind and BALATRO.get_hud_blind() and MP.is_pvp_boss and MP.is_pvp_boss()) then
 		return false
 	end
 
@@ -21,6 +29,15 @@ function MP.UI.update_primary_opponent_blind_name(pop_in)
 		return false
 	end
 
+	if is_ghost_replay_active() then
+		return BALATRO.set_text_object_ref(
+			blind_name,
+			(OPPONENTS.get_primary_enemy_state and OPPONENTS.get_primary_enemy_state()) or {},
+			"username",
+			pop_in
+		)
+	end
+
 	return BALATRO.set_text_object_ref(
 		blind_name,
 		(OPPONENTS.get_primary_lobby_player and OPPONENTS.get_primary_lobby_player()) or {},
@@ -30,7 +47,7 @@ function MP.UI.update_primary_opponent_blind_name(pop_in)
 end
 
 function MP.UI.reapply_active_multiplayer_blind_ui()
-	if not (MP and MP.LOBBY and MP.LOBBY.code and BALATRO.is_run_stage and BALATRO.is_run_stage()
+	if not (has_blind_hud_context() and BALATRO.is_run_stage and BALATRO.is_run_stage()
 		and BALATRO.get_current_blind and BALATRO.get_current_blind() and BALATRO.get_hud_blind and BALATRO.get_hud_blind()) then
 		return false
 	end
@@ -65,7 +82,7 @@ function MP.UI.reapply_active_multiplayer_blind_ui()
 end
 
 function MP.UI.update_blind_HUD()
-	if MP.LOBBY.code then
+	if has_blind_hud_context() then
 		local standings_hud = use_standings_hud()
 		if standings_hud then
 			if MP.is_pvp_boss() then
@@ -119,7 +136,7 @@ function MP.UI.update_blind_HUD()
 end
 
 function MP.UI.reset_blind_HUD()
-	if MP.LOBBY.code then
+	if has_blind_hud_context() then
 		if MP.UI.remove_player_list then
 			MP.UI.remove_player_list(true)
 		end

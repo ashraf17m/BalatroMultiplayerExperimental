@@ -76,9 +76,13 @@ function INTERNAL.get_ready_blind_location(row)
 	return "loc_ready"
 end
 
-function INTERNAL.clear_skip_ready_state()
+function INTERNAL.clear_skip_ready_state(options)
+	local had_skip_ready = not not (MP.GAME and MP.GAME.skip_ready_blind_row)
 	if MP.GAME and match_domain.set_skip_ready_blind_row then
 		match_domain.set_skip_ready_blind_row(nil)
+	end
+	if had_skip_ready and options and options.notify_server and MP.ACTIONS and MP.ACTIONS.unready_skip_blind then
+		MP.ACTIONS.unready_skip_blind()
 	end
 end
 
@@ -96,8 +100,7 @@ function INTERNAL.clear_skip_ready_for_blind_toggle(reset_location)
 	if not MP.GAME.skip_ready_blind_row then
 		return
 	end
-	INTERNAL.clear_skip_ready_state()
-	MP.ACTIONS.unready_skip_blind()
+	INTERNAL.clear_skip_ready_state({ notify_server = true })
 	if reset_location then
 		INTERNAL.set_selecting_location()
 	end

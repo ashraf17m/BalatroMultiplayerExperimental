@@ -33,6 +33,6 @@ SMODS.Tag({
 	discovered = true,
 	no_collection = MP.sandbox_no_collection,
 	in_pool = function(self)
-		return content_runtime.is_ruleset_active("sandbox")
+		return content_runtime.is_layer_active("sandbox")
 	end,
 })

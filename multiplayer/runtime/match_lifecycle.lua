@@ -67,11 +67,11 @@ end
 
 function match_lifecycle.prepare_end_game_view()
 	match_lifecycle.suspend_team_card_sync()
+	if MP.UI and MP.UI.reset_end_game_view_runtime then
+		MP.UI.reset_end_game_view_runtime({ preserve_cache = true })
+	end
 	if MP.ACTIONS and MP.ACTIONS.cache_end_game_state then
 		MP.ACTIONS.cache_end_game_state()
-	end
-	if MP.UI and MP.UI.reset_end_game_view_runtime then
-		MP.UI.reset_end_game_view_runtime()
 	end
 	if MP.UI and MP.UI.capture_end_game_view_players then
 		MP.UI.capture_end_game_view_players()
@@ -82,6 +82,9 @@ function match_lifecycle.prepare_end_game_view()
 end
 
 local function begin_active_match_session()
+	if MP.clear_practice_mode then
+		MP.clear_practice_mode({ clear_modifiers = false })
+	end
 	match_lifecycle.resume_team_card_sync()
 	if lobby_domain.set_match_in_progress then
 		lobby_domain.set_match_in_progress(true)
@@ -92,7 +95,13 @@ end
 
 function match_lifecycle.begin_match_runtime()
 	begin_active_match_session()
+	if MP.COOP_BOSS_BLIND and MP.COOP_BOSS_BLIND.reset_runtime then
+		MP.COOP_BOSS_BLIND.reset_runtime()
+	end
 	match_domain.reset_state()
+	if MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL.reset_end_game_summary_updates then
+		MP.NETWORKING_INTERNAL.reset_end_game_summary_updates()
+	end
 	if MP.STATE_APPLY and MP.STATE_APPLY.seed_match_enemies_from_lobby then
 		MP.STATE_APPLY.seed_match_enemies_from_lobby()
 	end
@@ -103,6 +112,9 @@ end
 
 function match_lifecycle.prepare_resume_runtime()
 	begin_active_match_session()
+	if MP.COOP_BOSS_BLIND and MP.COOP_BOSS_BLIND.reset_runtime then
+		MP.COOP_BOSS_BLIND.reset_runtime()
+	end
 end
 
 local function resolve_connection_loss_message(message, resume_available, opts)

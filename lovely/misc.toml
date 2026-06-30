@@ -141,3 +141,39 @@ val.children.center.VT.x, val.children.center.VT.y = temp_x, temp_y
 '''
 match_indent = true
 times = 1
+
+# Cocktail deck - compatibility with Patchwork deck.
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = '''if (G.GAME.selected_back and G.GAME.selected_back.name == 'b_aij_patchwork') or (G.GAME.selected_sleeve and G.GAME.selected_sleeve == 'sleeve_aij_patchwork') then'''
+position = 'at'
+payload = '''
+if (G.GAME.selected_back and G.GAME.selected_back.name == 'b_aij_patchwork') or (G.GAME.selected_sleeve and G.GAME.selected_sleeve == 'sleeve_aij_patchwork') or G.GAME.modifiers.b_aij_patchwork then
+'''
+match_indent = true
+times = 1
+
+# Fix magic trick suit/rank desync.
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = "local flags = SMODS.calculate_context({create_shop_card = true, set = v.type, cardarea = area})"
+position = 'before'
+payload = '''
+args.front = false
+'''
+match_indent = true
+times = 1
+
+# Log panic collects for the memory debug overlay.
+[[patches]]
+[patches.pattern]
+target = "functions/misc_functions.lua"
+pattern = '''collectgarbage("collect")'''
+position = 'before'
+payload = '''
+MP._DEBUG_PANIC_COLLECTS = (MP._DEBUG_PANIC_COLLECTS or 0) + 1
+'''
+match_indent = true
+times = 1

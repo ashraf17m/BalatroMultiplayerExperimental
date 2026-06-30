@@ -72,6 +72,7 @@ function view_model.build_play_options_contents()
 
 	local contents = {
 		create_play_button("b_singleplayer", G.C.BLUE, "start_vanilla_sp"),
+		create_play_button("b_practice", G.C.ORANGE, "setup_practice_mode"),
 	}
 
 	append_resume_match_button(contents)

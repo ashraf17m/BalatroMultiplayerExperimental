@@ -13,12 +13,19 @@ local function is_duels_lobby_type(lobby_type)
 	return MP.LOBBY_TYPES and lobby_type == MP.LOBBY_TYPES.DUELS
 end
 
+local function is_teams_lobby_type(lobby_type)
+	local lobby_type_spec = MP.get_lobby_type_spec and MP.get_lobby_type_spec(lobby_type) or nil
+	return not not (lobby_type_spec and lobby_type_spec.uses_teams)
+end
+
 local function is_scoring_locked_lobby_type(lobby_type)
 	return is_head_to_head_lobby_type(lobby_type) or is_duels_lobby_type(lobby_type)
 end
 
 local function party_mode_change_requires_rebuild(previous_lobby_type, lobby_type)
-	return is_scoring_locked_lobby_type(previous_lobby_type) or is_scoring_locked_lobby_type(lobby_type)
+	return is_scoring_locked_lobby_type(previous_lobby_type)
+		or is_scoring_locked_lobby_type(lobby_type)
+		or is_teams_lobby_type(previous_lobby_type) ~= is_teams_lobby_type(lobby_type)
 end
 
 function MP.UI.party_mode_change_requires_group_options_rebuild(previous_lobby_type, lobby_type)
@@ -97,17 +104,21 @@ local function create_group_advanced_tab()
 	return MP.UI.create_lobby_option_specs_page(
 		MP.UI.PARTY_OPTION_TAB_SPECS and MP.UI.PARTY_OPTION_TAB_SPECS.general,
 		4,
-		{ center_controls = true }
+		{ center_controls = true, compact_empty_space = true }
 	)
 end
 
 local function create_team_options_tab()
-	return MP.UI.create_lobby_option_specs_page(MP.UI.LOBBY_OPTION_TAB_SPECS.team_options, 3)
+	return MP.UI.create_lobby_option_specs_page(
+		MP.UI.LOBBY_OPTION_TAB_SPECS.team_options,
+		3,
+		{ compact_empty_space = true }
+	)
 end
 
 local function is_group_options_tab_available(tab_id, lobby_context)
 	if tab_id == "shared_progress" then
-		return lobby_context.can_show_team_options
+		return lobby_context.can_show_shared_progress_options
 	end
 
 	return tab_id == "general"
@@ -137,7 +148,7 @@ local function create_group_options_tab()
 			create_group_advanced_tab
 		),
 	}
-	if lobby_context.can_show_team_options then
+	if lobby_context.can_show_shared_progress_options then
 		tabs[#tabs + 1] = create_group_options_tab_definition(
 			"shared_progress",
 			localize("k_team_options"),

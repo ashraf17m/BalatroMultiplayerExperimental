@@ -10,7 +10,8 @@ MP.STAKES.register_alt_stake({
 	colour = HEX("F2D955"),
 })
 
-if MP.EXPERIMENTAL.alt_stakes then
+if MP.EXPERIMENTAL.alt_stakes and not MP._extra_reroll_cost_patch_installed then
+	MP._extra_reroll_cost_patch_installed = true
 	local calculate_reroll_cost_ref = calculate_reroll_cost
 	function calculate_reroll_cost(skip_increment)
 		calculate_reroll_cost_ref(skip_increment)

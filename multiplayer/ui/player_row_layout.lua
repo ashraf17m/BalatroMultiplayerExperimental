@@ -4,6 +4,10 @@ MP.UI.ROW_LAYOUT = MP.UI.ROW_LAYOUT or {}
 local ROW_LAYOUT = MP.UI.ROW_LAYOUT
 local Disableable_Button = MP.UI and MP.UI.Disableable_Button
 
+local function get_hand_level_colour(level, fallback)
+	return G.C.HAND_LEVELS and G.C.HAND_LEVELS[level] or fallback
+end
+
 function ROW_LAYOUT.append_node(nodes, node)
 	if node then
 		table.insert(nodes, node)
@@ -33,6 +37,68 @@ function ROW_LAYOUT.create_row_chip(text, colour, minw, scale, text_colour, outl
 					shadow = true,
 				},
 			},
+		},
+	}
+end
+
+local function create_compact_row_chip(text, colour, minw, scale, text_colour)
+	return {
+		n = G.UIT.C,
+		config = {
+			align = "cm",
+			padding = 0.02,
+			r = 0.1,
+			colour = colour,
+			minw = minw,
+			maxw = minw,
+		},
+		nodes = {
+			{
+				n = G.UIT.T,
+				config = {
+					text = tostring(text or ""),
+					scale = scale or 0.45,
+					colour = text_colour or G.C.UI.TEXT_LIGHT,
+					shadow = true,
+					maxw = math.max(0.4, minw - 0.06),
+				},
+			},
+		},
+	}
+end
+
+function ROW_LAYOUT.create_lives_skips_lane(spec)
+	local minw = spec.minw or 1.95
+	local skip_minw = spec.skip_minw or 0.42
+	local gap = spec.skip_gap or 0.03
+	local lives_minw = math.max(0.8, minw - skip_minw - gap)
+
+	return {
+		n = G.UIT.C,
+		config = {
+			align = "cm",
+			padding = 0,
+			colour = G.C.CLEAR,
+			minw = minw,
+			maxw = minw,
+			no_fill = true,
+		},
+		nodes = {
+			create_compact_row_chip(
+				spec.lives_text or spec.text,
+				spec.colour or G.C.RED,
+				lives_minw,
+				spec.lives_scale or spec.scale or 0.45,
+				spec.text_colour
+			),
+			{ n = G.UIT.B, config = { w = gap, h = 0.01 } },
+			create_compact_row_chip(
+				spec.skip_text,
+				spec.skip_colour or G.C.PURPLE,
+				skip_minw,
+				spec.skip_scale or spec.scale or 0.45,
+				spec.text_colour
+			),
 		},
 	}
 end
@@ -94,20 +160,24 @@ end
 
 function ROW_LAYOUT.create_name_lane(model)
 	local name = tostring(model.username or model.player_name or "Guest")
-	if model.name_leading_space ~= false then
-		name = " " .. name
-	end
-	local name_colour = model.name_text_colour or (model.is_self and G.C.GOLD or G.C.UI.TEXT_LIGHT)
+	local lane_width = model.name_lane_minw or 4.0
+	local name_maxw = math.max(0.4, lane_width - 0.18)
+	local name_level = model.is_self and 5 or 1
+	local name_colour = model.is_duels_nemesis and G.C.RED
+		or get_hand_level_colour(name_level, model.is_self and G.C.ORANGE or G.C.BLUE)
 
 	return {
 		n = G.UIT.C,
 		config = {
 			align = "cm",
-			padding = 0.05,
-			colour = G.C.L_BLACK,
+			padding = 0.01,
 			r = 0.1,
-			minw = 4.0,
-			maxw = 4.0,
+			colour = name_colour,
+			minw = lane_width,
+			maxw = lane_width,
+			minh = model.name_lane_minh or 0.42,
+			outline = 0.8,
+			outline_colour = G.C.WHITE,
 		},
 		nodes = {
 			{
@@ -115,32 +185,49 @@ function ROW_LAYOUT.create_name_lane(model)
 				config = {
 					text = name,
 					scale = 0.45,
-					colour = name_colour,
-					shadow = true,
+					colour = model.name_text_colour or G.C.UI.TEXT_DARK,
+					maxw = name_maxw,
 				},
 			},
 		},
 	}
 end
 
+function ROW_LAYOUT.create_skip_chip(spec)
+	if not spec then
+		return nil
+	end
+
+	return ROW_LAYOUT.create_row_chip(
+		spec.text,
+		spec.colour or G.C.PURPLE,
+		spec.minw or 1.55,
+		spec.scale or 0.38,
+		spec.text_colour
+	)
+end
+
 function ROW_LAYOUT.create_row_badge(model)
+	local badge_colour = G.C.HAND_LEVELS and G.C.HAND_LEVELS[1] or G.C.BLUE
+
 	return {
 		n = G.UIT.C,
 		config = {
 			align = "cm",
-			padding = 0.05,
+			padding = 0.01,
 			r = 0.1,
-			colour = G.C.L_BLACK,
+			colour = badge_colour,
 			minw = 0.9,
+			outline = 0.8,
+			outline_colour = G.C.WHITE,
 		},
 		nodes = {
 			{
 				n = G.UIT.T,
 				config = {
 					text = tostring(model.index),
-					scale = 0.42,
-					colour = G.C.WHITE,
-					shadow = true,
+					scale = 0.5,
+					colour = G.C.UI.TEXT_DARK,
 				},
 			},
 		},
@@ -171,7 +258,7 @@ function ROW_LAYOUT.create_mod_lane(model)
 				config = {
 					text = tostring(model.mod_count),
 					scale = 0.42,
-					colour = G.C.FILTER,
+					colour = G.C.WHITE,
 					shadow = true,
 				},
 			},
@@ -207,6 +294,18 @@ end
 function ROW_LAYOUT.create_score_text_lane(spec)
 	local shared = MP.UI and MP.UI.PLAYERS_HUD_SHARED or {}
 	local minw = spec.minw
+	if spec.show_stake_icon and shared.create_stake_score_box then
+		return shared.create_stake_score_box(
+			spec.text,
+			minw,
+			spec.scale,
+			spec.text_colour,
+			spec.minh,
+			spec.stake_scale,
+			spec.score_display
+		)
+	end
+
 	local score_label = shared.create_score_text_label
 		and shared.create_score_text_label(
 			spec.score_display,
@@ -238,6 +337,94 @@ function ROW_LAYOUT.create_score_text_lane(spec)
 		},
 		nodes = {
 			score_label,
+		},
+	}
+end
+
+function ROW_LAYOUT.create_location_lane(spec)
+	local minw = spec.minw or 4.05
+	local display = spec.display
+		or (MP.UI and MP.UI.UTILS and MP.UI.UTILS.resolve_location_display
+			and MP.UI.UTILS.resolve_location_display(spec.raw_location, spec.text))
+		or {
+			text = spec.text,
+			full_text = spec.text,
+		}
+	local icon_size = spec.icon_size or 0.38
+	local icon_object = (display.icon_kind or display.blind_key)
+		and MP.UI
+		and MP.UI.UTILS
+		and MP.UI.UTILS.create_location_blind_icon_object
+		and MP.UI.UTILS.create_location_blind_icon_object(display, icon_size)
+		or nil
+	local has_icon = icon_object ~= nil
+	local text = has_icon and (display.text or "") or (display.full_text or display.text or spec.text or "")
+	local scale = spec.scale or 0.45
+
+	if not has_icon then
+		return ROW_LAYOUT.create_text_lane(text, minw, scale, spec.text_colour)
+	end
+
+	return {
+		n = G.UIT.C,
+		config = {
+			align = "cm",
+			padding = 0.05,
+			colour = G.C.L_BLACK,
+			r = 0.1,
+			minw = minw,
+			maxw = minw,
+		},
+		nodes = {
+			{
+				n = G.UIT.R,
+				config = {
+					align = "cm",
+					padding = 0,
+					colour = G.C.CLEAR,
+					minw = minw - 0.12,
+					maxw = minw - 0.12,
+					no_fill = true,
+				},
+				nodes = {
+					{
+						n = G.UIT.T,
+						config = {
+							text = tostring(text),
+							scale = scale,
+							colour = spec.text_colour or G.C.UI.TEXT_LIGHT,
+							shadow = true,
+							maxw = math.max(0.8, minw - icon_size - 0.3),
+						},
+					},
+					{ n = G.UIT.B, config = { w = spec.icon_gap or 0.05, h = 0.01 } },
+					{
+						n = G.UIT.C,
+						config = {
+							align = "cm",
+							padding = 0,
+							colour = G.C.CLEAR,
+							minw = icon_size,
+							maxw = icon_size,
+							minh = icon_size,
+							maxh = icon_size,
+							no_fill = true,
+						},
+						nodes = {
+							{
+								n = G.UIT.O,
+								config = {
+									object = icon_object,
+									w = icon_size,
+									h = icon_size,
+									focus_with_object = false,
+									can_collide = false,
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 end
@@ -317,8 +504,16 @@ function ROW_LAYOUT.create_surface_lane_from_spec(spec)
 		)
 	end
 
+	if spec.kind == "lives_skips_lane" then
+		return ROW_LAYOUT.create_lives_skips_lane(spec)
+	end
+
 	if spec.kind == "score_lane" then
 		return ROW_LAYOUT.create_score_text_lane(spec)
+	end
+
+	if spec.kind == "location_lane" then
+		return ROW_LAYOUT.create_location_lane(spec)
 	end
 
 	return ROW_LAYOUT.create_row_chip(

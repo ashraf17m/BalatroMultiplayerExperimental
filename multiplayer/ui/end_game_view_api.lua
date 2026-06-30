@@ -7,11 +7,13 @@ local END_GAME_VIEW_METHODS = {
 	"get_end_game_view_runtime",
 	"reset_end_game_view_runtime",
 	"get_viewable_players",
+	"get_end_game_self_player",
 	"get_end_game_standings_participants",
 	"capture_end_game_view_players",
 	"get_view_target_state",
 	"get_target_jokers_label",
 	"get_target_deck_label",
+	"apply_end_game_summary",
 	"get_end_game_view_cache",
 	"load_end_game_view_cache",
 	"clear_end_game_view_request_error",
@@ -21,6 +23,7 @@ local END_GAME_VIEW_METHODS = {
 	"clear_end_game_target_preview",
 	"prefetch_end_game_view_players",
 	"request_end_game_view_target",
+	"refresh_end_game_view_target_summary",
 }
 
 local end_game_view_runtime = load_required_service(

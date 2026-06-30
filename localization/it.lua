@@ -569,6 +569,7 @@ return {
 			k_warn_service = "AVVISO: Impossibile Trovare Servizio Multigiocatore",
 			k_set_name = "Imposta il tuo nome utente nel menu principale! (Mods > Multiplayer > Configurazione)",
 			k_steamodded_warning = "I giocatori hanno diverse versioni di Steamodded installate. Questo può causare ai semi di cambiare.",
+			k_mp_version_warning = "Players are on different Multiplayer versions! Seeds and jokers will desync - update so you both match.",
 			k_warning_unlock_profile = 'ATTENZIONE! Stai giocando con un profilo non totalmente sbloccato!\nSe questa partita è classificata/torneo, per favore crea un nuovo profilo e premi "Sblocca tutto" nelle impostazioni del profilo',
 			k_warning_nemesis_unlock = "ATTENZIONE! Il tuo avversario sta giocando con un profilo non totalmente sbloccato!\nPer favore se questa partita è classificata/torneo AVVISALO ADESSO!",
 			k_warning_no_order = "Un giocatore ha l'opzione (Abilita il Jolly \"L'ordine\") abilitata, mentre l'altro no. Questo renderà i vostri seed diversi.",

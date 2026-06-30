@@ -6,6 +6,8 @@ local NETWORK_DISPATCH_FILES = bootstrap_map and bootstrap_map.NETWORK_DISPATCH_
 local NETWORK_SENDER_FILES = bootstrap_map and bootstrap_map.NETWORK_SENDER_FILES or {}
 local OBJECT_DIRECTORIES = bootstrap_map and bootstrap_map.OBJECT_DIRECTORIES or {}
 local CORE_RUNTIME_FILES = bootstrap_map and bootstrap_map.CORE_RUNTIME_FILES or {}
+local RULESET_LAYER_DIRECTORIES = bootstrap_map and bootstrap_map.RULESET_LAYER_DIRECTORIES or {}
+local RULESET_DIRECTORIES = bootstrap_map and bootstrap_map.RULESET_DIRECTORIES or { "rulesets" }
 local TEAM_SYNC_FEATURE_FILES = bootstrap_map and bootstrap_map.TEAM_SYNC_FEATURE_FILES or {}
 local TEAM_SYNC_DIAGNOSTIC_FILES = bootstrap_map and bootstrap_map.TEAM_SYNC_DIAGNOSTIC_FILES or {}
 local PROTOCOL_BOUNDARY_FILES = bootstrap_map and bootstrap_map.PROTOCOL_BOUNDARY_FILES or {}
@@ -194,6 +196,10 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/notice.lua",
 	"testing_tools/temp_username_hotkey.lua",
 	"testing_tools/dummy_players_hotkey.lua",
+	"testing_tools/slow_consumer_hotkey.lua",
+	"testing_tools/stress_oversized_hotkey.lua",
+	"testing_tools/stress_spam_hotkey.lua",
+	"testing_tools/stress_info_hotkey.lua",
 }
 
 local DIAGNOSTIC_TOOL_FILES = {
@@ -353,11 +359,27 @@ local NETWORKING_DEFINITION_STEPS = {
 local CONTENT_BOOTSTRAP_STEPS = {
 	{
 		kind = "dirs",
-		paths = { "gamemodes", "rulesets" },
+		paths = { "gamemodes" },
 		recursive = false,
-		label = "Mode and ruleset registries",
+		label = "Gamemode registries",
 		options = { required = true },
-		failure_message = "Failed to load required multiplayer mode and ruleset registries.",
+		failure_message = "Failed to load required multiplayer gamemode registries.",
+	},
+	{
+		kind = "dirs",
+		paths = RULESET_LAYER_DIRECTORIES,
+		recursive = false,
+		label = "Ruleset layers",
+		options = { required = true },
+		failure_message = "Failed to load required multiplayer ruleset layers.",
+	},
+	{
+		kind = "dirs",
+		paths = RULESET_DIRECTORIES,
+		recursive = false,
+		label = "Ruleset registries",
+		options = { required = true },
+		failure_message = "Failed to load required multiplayer ruleset registries.",
 	},
 	{
 		kind = "files",

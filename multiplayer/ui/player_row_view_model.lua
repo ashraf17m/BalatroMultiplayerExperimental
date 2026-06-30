@@ -58,6 +58,17 @@ local function create_kick_action(row_model, suffix, button)
 end
 ROW_VIEW_MODEL.create_kick_action = create_kick_action
 
+local function is_current_duels_enemy(player, is_self)
+	if is_self or not player or not (MP.is_duels_mode and MP.is_duels_mode()) then
+		return false
+	end
+
+	local self_player = MP.get_self_lobby_player and MP.get_self_lobby_player() or nil
+	local nemesis_player_id = self_player and self_player.nemesis_player_id or nil
+	return nemesis_player_id ~= nil and player.id ~= nil and player.id == nemesis_player_id
+end
+ROW_VIEW_MODEL.is_current_duels_enemy = is_current_duels_enemy
+
 local build_lobby_player_row_model
 
 local function get_lobby_player_display_index(player_id, opts)
@@ -164,6 +175,7 @@ build_lobby_player_row_model = function(player, index, opts)
 		and (lobby_context.is_host or (is_self and not player.is_team_locked))
 	local row_colour = lobby_context.is_teams_mode and (MP.TEAM_COLORS[player.team or 1] or G.C.WHITE)
 		or darken(G.C.JOKER_GREY, 0.1)
+	local is_duels_nemesis = is_current_duels_enemy(player, is_self)
 
 	return {
 		id = player.id,
@@ -186,6 +198,7 @@ build_lobby_player_row_model = function(player, index, opts)
 		cached = not not player.cached,
 		badge_colour = badge_colour,
 		row_colour = row_colour,
+		is_duels_nemesis = is_duels_nemesis,
 		is_team_locked = not not player.is_team_locked,
 		can_change_team = not not can_change_team,
 	}

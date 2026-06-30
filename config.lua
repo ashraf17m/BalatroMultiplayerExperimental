@@ -1,8 +1,8 @@
 return {
 	["username"] = "Guest",
 	["blind_col"] = 1,
-	["server_url"] = "maglev.proxy.rlwy.net",
-	["server_port"] = 28871,
+	["server_url"] = "shuttle.proxy.rlwy.net",
+	["server_port"] = 36133,
 	["integrations"] = {
 		["TheOrder"] = true,
 		["Preview"] = true,

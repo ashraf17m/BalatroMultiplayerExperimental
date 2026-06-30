@@ -92,7 +92,7 @@ local function get_cocktail_sticker_sprite(runtime, deck_key, num)
 			G.CARD_W,
 			G.CARD_H,
 			G.ASSET_ATLAS["mp_cocktail_deck_stickers"],
-			{ x = runtime.sticker_x_pos[deck_key], y = num - 1 }
+			{ x = runtime.sticker_x_pos[deck_key] or 0, y = num - 1 }
 		))
 	end
 	return G.shared_stickers[key]
@@ -135,7 +135,7 @@ local function install_cocktail_sticker_draw_step(runtime)
 				return
 			end
 
-			if self.area and self.area.config.type == "deck" then
+			if self.area and G.deck and self.area == G.deck then
 				draw_cocktail_deck_stickers(runtime, self)
 			end
 		end,

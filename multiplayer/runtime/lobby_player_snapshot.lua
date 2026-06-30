@@ -27,6 +27,7 @@ local function parse_lobby_hash(hash)
 		preview = nil,
 		unlocked = nil,
 		Mods = {},
+		hash_str = hash or "",
 	}
 	local mod_entries = {}
 
@@ -148,14 +149,17 @@ function lobby_player_snapshot.normalize_player_payload(player_wire, is_host, us
 	local status_kind = uses_lobby_ready and (is_ready and "ready" or "waiting") or nil
 	local location = MP.UI and MP.UI.localize_location and MP.UI.localize_location(raw_location) or raw_location
 	local lives = tonumber(player_wire.lives)
+	local blind_target_scale = tonumber(player_wire.blindTargetScale)
 
 	return {
 		id = player_wire.id,
 		username = username,
 		blind_col = blind_col,
+		blind_target_scale = blind_target_scale,
 		nemesis_player_id = player_wire.nemesisPlayerId,
 		cached = player_wire.isCached,
 		config = config,
+		hash_str = player_wire.modHash or "",
 		is_owner = player_wire.isOwner,
 		is_ready = is_ready,
 		is_in_match = is_in_match,

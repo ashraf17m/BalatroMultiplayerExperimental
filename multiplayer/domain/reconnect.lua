@@ -13,6 +13,8 @@ local function build_runtime_match_sync_buffer()
 		team_hand_level_sync_by_hand = {},
 		timer_state = nil,
 		match_outcome_action = nil,
+		match_outcome_lost = nil,
+		match_outcome_pvp_timer_lost = nil,
 	}
 end
 

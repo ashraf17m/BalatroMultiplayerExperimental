@@ -31,6 +31,14 @@ local function get_end_game_view_runtime()
 	return MP.UI.get_end_game_view_runtime and MP.UI.get_end_game_view_runtime() or nil
 end
 
+local function with_phantom_sync_suppressed(callback)
+	local content_runtime = MP.CONTENT and MP.CONTENT.RUNTIME or nil
+	if content_runtime and content_runtime.with_phantom_sync_suppressed then
+		return content_runtime.with_phantom_sync_suppressed(callback)
+	end
+	return callback()
+end
+
 local function build_target_options(players)
 	local options = {}
 	for _, player in ipairs(players or {}) do
@@ -49,12 +57,27 @@ local function get_target_jokers_label(target)
 	return localize("k_enemy_jokers")
 end
 
+local function get_self_view_player()
+	local self_player = MP.UI.get_end_game_self_player and MP.UI.get_end_game_self_player() or nil
+	if self_player then return self_player end
+	self_player = MP.get_self_lobby_player and MP.get_self_lobby_player() or nil
+	if self_player then return self_player end
+
+	local player_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	if not player_id then return nil end
+	return {
+		id = player_id,
+		username = "You",
+	}
+end
+
 function view_model.prepare_screen_state()
 	local end_game_view = get_end_game_view_runtime()
 	if not end_game_view then
 		return {
 			runtime = nil,
 			players = {},
+			self_player = nil,
 			target = nil,
 			target_index = 1,
 			target_options = { "No Players" },
@@ -62,9 +85,12 @@ function view_model.prepare_screen_state()
 	end
 
 	if end_game_view.jokers_area then
-		end_game_view.jokers_area:remove()
+		with_phantom_sync_suppressed(function()
+			end_game_view.jokers_area:remove()
+		end)
 		end_game_view.jokers_area = nil
 	end
+	end_game_view.loaded_target_id = nil
 
 	end_game_view.jokers_area = CardArea(
 		0,
@@ -73,6 +99,7 @@ function view_model.prepare_screen_state()
 		G.CARD_H,
 		{ card_limit = BALATRO.get_starting_joker_slots and BALATRO.get_starting_joker_slots() or 5, type = "joker", highlight_limit = 1 }
 	)
+	end_game_view.jokers_area.mp_end_game_preview = true
 
 	if end_game_view.players == nil and MP.UI.capture_end_game_view_players then
 		MP.UI.capture_end_game_view_players()
@@ -82,6 +109,7 @@ function view_model.prepare_screen_state()
 	end
 
 	local players, target, target_index = MP.UI.get_view_target_state()
+	local self_player = get_self_view_player()
 
 	end_game_view.showing_own_jokers = false
 	end_game_view.jokers_text = get_target_jokers_label(target)
@@ -93,6 +121,7 @@ function view_model.prepare_screen_state()
 	return {
 		runtime = end_game_view,
 		players = players or {},
+		self_player = self_player,
 		target = target,
 		target_index = target_index or 1,
 		target_options = build_target_options(players),
@@ -116,44 +145,26 @@ function view_model.change_view_target(index)
 	return true
 end
 
-function view_model.toggle_players_jokers()
-	local end_game_view = get_end_game_view_runtime()
-	if not (end_game_view and G.jokers and end_game_view.jokers_area) then
+function view_model.view_self_profile()
+	local self_player = get_self_view_player()
+	if not self_player then
 		return false
 	end
 
-	if end_game_view.jokers_area.cards then
-		for _, card in pairs(end_game_view.jokers_area.cards) do
-			card.added_to_deck = false
-		end
-	end
-
-	if not end_game_view.showing_own_jokers then
-		local your_jokers_save = copy_table(G.jokers:save())
-		end_game_view.jokers_area:load(your_jokers_save)
-		end_game_view.showing_own_jokers = true
-		end_game_view.jokers_text = localize("k_your_jokers")
-		return true
-	end
-
-	if end_game_view.jokers_received then
-		G.FUNCS.load_end_game_jokers()
-	else
-		if end_game_view.jokers_area.cards then
-			remove_all(end_game_view.jokers_area.cards)
-		end
-		end_game_view.jokers_area.cards = {}
-		if end_game_view.end_game_jokers_error_message then
-			end_game_view.showing_own_jokers = false
-			end_game_view.jokers_text = get_target_jokers_label() .. " (Unavailable)"
-			MP.UI.UTILS.overlay_message(end_game_view.end_game_jokers_error_message)
-			return false
-		end
-	end
-
-	end_game_view.showing_own_jokers = false
-	end_game_view.jokers_text = get_target_jokers_label()
+	MP.UI.request_end_game_view_target(self_player)
 	return true
+end
+
+function view_model.return_to_compare_target()
+	local players = MP.UI.get_viewable_players()
+	if #players == 0 then
+		return false
+	end
+
+	local end_game_view = get_end_game_view_runtime()
+	local index = end_game_view and end_game_view.target_index or 1
+	index = math.min(math.max(tonumber(index) or 1, 1), #players)
+	return view_model.change_view_target(index)
 end
 
 function view_model.open_nemesis_deck_overlay()

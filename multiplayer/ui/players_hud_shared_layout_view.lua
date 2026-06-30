@@ -347,7 +347,10 @@ local function create_compact_standings_entry(entry, pvp_col)
 		},
 		header_center_align = "cm",
 		header_center_nodes = {
-			create_text_label(entry.title or "Unknown", 0.3, entry.title_colour or G.C.UI.TEXT_LIGHT),
+			create_text_label(entry.title or "Unknown", 0.3, entry.title_colour or G.C.UI.TEXT_LIGHT, nil, {
+				outline_colour = entry.title_outline_colour,
+				outline_offset = entry.title_outline_offset,
+			}),
 		},
 		left_nodes = create_compact_blind_icon_nodes(entry.blind_player),
 		center_nodes = {

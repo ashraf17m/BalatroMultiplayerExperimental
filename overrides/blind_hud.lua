@@ -1,5 +1,10 @@
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
+local function has_blind_hud_context()
+	return (MP.LOBBY and MP.LOBBY.code)
+		or (MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active())
+end
+
 local function clear_coop_blind_base(self)
 	if self then
 		self.mp_coop_base_chips = nil
@@ -8,6 +13,23 @@ local function clear_coop_blind_base(self)
 	if MP.GAME then
 		MP.GAME.coop_blind_target_chips = nil
 	end
+end
+
+local function get_server_coop_blind_amount()
+	return MP.GAME and MP.GAME.coop_blind_server_target_chips or nil
+end
+
+local function to_score_number(value)
+	if BALATRO.to_score_number then
+		return BALATRO.to_score_number(value)
+	end
+	if type(value) == "number" then
+		return value
+	end
+	if value == nil then
+		return nil
+	end
+	return tonumber((string.gsub(tostring(value), ",", "")))
 end
 
 local function get_scaled_coop_blind_amount(self)
@@ -19,9 +41,19 @@ local function get_scaled_coop_blind_amount(self)
 		return nil
 	end
 
-	local base_amount = self.mp_coop_base_chips or self.chips
+	local server_amount = to_score_number(get_server_coop_blind_amount())
+	local base_amount = to_score_number(self.mp_coop_base_chips) or to_score_number(self.chips)
+	if base_amount == nil then
+		return nil
+	end
 	self.mp_coop_base_chips = base_amount
-	local scaled_amount = MP.scale_coop_blind_amount and MP.scale_coop_blind_amount(base_amount) or base_amount
+	local scaled_amount = server_amount ~= nil and server_amount
+		or MP.scale_coop_blind_amount and MP.scale_coop_blind_amount(base_amount)
+		or base_amount
+	scaled_amount = to_score_number(scaled_amount)
+	if scaled_amount == nil then
+		return nil
+	end
 	self.mp_coop_scaled_chips = scaled_amount
 	if MP.GAME then
 		MP.GAME.coop_blind_target_chips = scaled_amount
@@ -60,7 +92,7 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "defeat", "mp.blind_hud.reset_afte
 			trigger = "after",
 			delay = 0.5,
 			func = function()
-				if MP.LOBBY.code and MP.UI.reset_blind_HUD then
+				if has_blind_hud_context() and MP.UI.reset_blind_HUD then
 					MP.UI.reset_blind_HUD()
 				end
 				return true
@@ -118,7 +150,7 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis
 				clear_coop_blind_base(self)
 			end
 			self.hide_floating_icon = false
-			if MP.LOBBY.code and MP.UI.reset_blind_HUD then
+			if has_blind_hud_context() and MP.UI.reset_blind_HUD then
 				MP.UI.reset_blind_HUD()
 			end
 			ctx.results = { n = 0 }

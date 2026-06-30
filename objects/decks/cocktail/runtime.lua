@@ -27,8 +27,118 @@ local sticker_x_pos = {
 	b_mp_echodeck = 22,
 }
 
+local cocktail_deck_blacklist = {
+	b_challenge = true,
+	b_mp_cocktail = true,
+	b_cry_antimatter = true,
+	b_akyrs_hardcore_challenges = true,
+}
+
 local function get_cocktail_modifiers()
+	G.GAME.modifiers = G.GAME.modifiers or {}
 	return G.GAME.modifiers
+end
+
+local function get_starting_ante_scaling()
+	G.GAME.starting_params = G.GAME.starting_params or {}
+	return tonumber(G.GAME.starting_params.ante_scaling) or 1
+end
+
+local function set_starting_ante_scaling(value)
+	local numeric_value = tonumber(value)
+	if not numeric_value then
+		return
+	end
+
+	G.GAME.starting_params = G.GAME.starting_params or {}
+	G.GAME.starting_params.ante_scaling = numeric_value
+end
+
+local function sync_cocktail_config_ante_scaling(back, value)
+	local numeric_value = tonumber(value)
+	if not numeric_value or not (back and back.effect and back.effect.config) then
+		return
+	end
+
+	back.effect.config.ante_scaling = numeric_value
+end
+
+-- Cocktail merges selected deck configs after vanilla run setup, so score scaling needs its own combine pass.
+local function get_cocktail_ante_scaling_state()
+	local modifiers = get_cocktail_modifiers()
+	if modifiers.mp_cocktail_base_ante_scaling == nil then
+		modifiers.mp_cocktail_base_ante_scaling = get_starting_ante_scaling()
+	end
+	modifiers.mp_cocktail_config_ante_scaling_multiplier = modifiers.mp_cocktail_config_ante_scaling_multiplier or 1
+	modifiers.mp_cocktail_apply_ante_scaling_multiplier = modifiers.mp_cocktail_apply_ante_scaling_multiplier or 1
+	return modifiers
+end
+
+local function reset_cocktail_ante_scaling_state()
+	local modifiers = get_cocktail_modifiers()
+	modifiers.mp_cocktail_base_ante_scaling = nil
+	modifiers.mp_cocktail_config_ante_scaling_multiplier = nil
+	modifiers.mp_cocktail_apply_ante_scaling_multiplier = nil
+end
+
+local function register_cocktail_config_ante_scaling(center)
+	local scale = center and center.config and tonumber(center.config.ante_scaling) or nil
+	if not scale or scale <= 0 then
+		return
+	end
+
+	local modifiers = get_cocktail_ante_scaling_state()
+	modifiers.mp_cocktail_config_ante_scaling_multiplier = modifiers.mp_cocktail_config_ante_scaling_multiplier * scale
+end
+
+local function capture_cocktail_apply_ante_scaling(previous_ante_scaling, center)
+	local previous = tonumber(previous_ante_scaling)
+	local current = get_starting_ante_scaling()
+	if not previous or previous == 0 or previous == current then
+		return
+	end
+
+	set_starting_ante_scaling(previous)
+	if center and center.config and center.config.ante_scaling then
+		return
+	end
+
+	local modifiers = get_cocktail_ante_scaling_state()
+	modifiers.mp_cocktail_apply_ante_scaling_multiplier = modifiers.mp_cocktail_apply_ante_scaling_multiplier
+		* (current / previous)
+end
+
+local function finalize_cocktail_ante_scaling(back)
+	local modifiers = get_cocktail_ante_scaling_state()
+	local base = tonumber(modifiers.mp_cocktail_base_ante_scaling) or 1
+	local config_multiplier = tonumber(modifiers.mp_cocktail_config_ante_scaling_multiplier) or 1
+	local apply_multiplier = tonumber(modifiers.mp_cocktail_apply_ante_scaling_multiplier) or 1
+	local combined_ante_scaling = base * config_multiplier * apply_multiplier
+	set_starting_ante_scaling(combined_ante_scaling)
+	sync_cocktail_config_ante_scaling(back, combined_ante_scaling)
+end
+
+local function adjust_cocktail_dynamic_ante_scaling_delta(back, previous_ante_scaling, current_ante_scaling, center)
+	local previous = tonumber(previous_ante_scaling)
+	local current = tonumber(current_ante_scaling)
+	if not previous or not current or previous == current then
+		return
+	end
+
+	local modifiers = get_cocktail_modifiers()
+	local config_multiplier = tonumber(modifiers.mp_cocktail_config_ante_scaling_multiplier) or 1
+	local center_config_multiplier = center and center.config and tonumber(center.config.ante_scaling) or nil
+	if center_config_multiplier and center_config_multiplier ~= 0 then
+		config_multiplier = config_multiplier / center_config_multiplier
+	end
+	if config_multiplier == 1 then
+		sync_cocktail_config_ante_scaling(back, current)
+		return
+	end
+
+	local adjusted_ante_scaling = previous + (current - previous) * config_multiplier
+	set_starting_ante_scaling(adjusted_ante_scaling)
+	sync_cocktail_config_ante_scaling(back, adjusted_ante_scaling)
 end
 
 local function get_cocktail_selector_areas()
@@ -51,20 +161,20 @@ local function reset_cocktail_runtime_decks()
 	local modifiers = get_cocktail_modifiers()
 	modifiers.mp_cocktail = {}
 	modifiers.mp_cocktail_sticker = {}
+	reset_cocktail_ante_scaling_state()
 end
 
 local function set_cocktail_seed(seed)
 	G.GAME.pseudorandom.seed = seed
 end
 
-local function mark_cocktail_run_seeded()
-	G.GAME.seeded = true
-end
-
 local function build_cocktail_mod_whitelist()
 	local whitelist = {
 		Multiplayer = true,
 		MultiplayerExperimental = true,
+		Cryptid = true,
+		aikoyorisshenanigans = true,
+		allinjest = true,
 	}
 
 	local current_mod_id = SMODS and SMODS.current_mod and SMODS.current_mod.id or nil
@@ -87,7 +197,9 @@ local function merge_cocktail_back_config_values(t1, t2, safe)
 	for k, v in pairs(t2) do
 		local existing = t3[k]
 
-		if type(existing) == "number" and type(v) == "number" then
+		if k == "ante_scaling" and type(existing) == "number" and type(v) == "number" then
+			t3[k] = existing * v
+		elseif type(existing) == "number" and type(v) == "number" then
 			t3[k] = existing + v
 		elseif type(existing) == "table" and type(v) == "table" then
 			t3[k] = merge_cocktail_back_config_values(existing, v, true)
@@ -104,7 +216,9 @@ local function merge_cocktail_back_config_values(t1, t2, safe)
 end
 
 local function is_cocktail_deck_center(key, center)
-	return center.set == "Back" and key ~= "b_challenge" and key ~= "b_mp_cocktail" and sticker_x_pos[key]
+	local cocktail_back = G and G.P_CENTERS and G.P_CENTERS["b_mp_cocktail"] or nil
+	local blacklist = cocktail_back and cocktail_back.deck_blacklist or cocktail_deck_blacklist
+	return center.set == "Back" and not blacklist[key]
 end
 
 local function is_cocktail_deck_whitelisted(center)
@@ -282,11 +396,26 @@ local function apply_cocktail_back_config_for_deck(back, deck_key)
 end
 
 local function apply_cocktail_runtime_deck_effect(back, deck_key)
+	local obj = G.P_CENTERS[deck_key]
+	register_cocktail_config_ante_scaling(obj)
 	apply_cocktail_back_config_for_deck(back, deck_key)
 
-	local obj = G.P_CENTERS[deck_key]
 	if obj.apply and type(obj.apply) == "function" then
+		local previous_ante_scaling = get_starting_ante_scaling()
 		obj:apply(back)
+		capture_cocktail_apply_ante_scaling(previous_ante_scaling, obj)
+	end
+
+	G.GAME.starting_params = G.GAME.starting_params or {}
+	G.GAME.modifiers = G.GAME.modifiers or {}
+	if back.effect.config.akyrs_starting_letters then
+		G.GAME.starting_params.akyrs_starting_letters = back.effect.config.akyrs_starting_letters
+	end
+	if back.effect.config.akyrs_letters_no_uppercase then
+		G.GAME.starting_params.akyrs_letters_no_uppercase = back.effect.config.akyrs_letters_no_uppercase
+	end
+	if deck_key == "b_aij_patchwork" then
+		G.GAME.modifiers.b_aij_patchwork = true
 	end
 end
 
@@ -305,25 +434,27 @@ end
 
 local function apply_cocktail_runtime_back_effects(back)
 	local deck_keys = G.GAME.modifiers.mp_cocktail
+	get_cocktail_ante_scaling_state()
 	for i = 1, #deck_keys do
 		apply_cocktail_runtime_deck_effect(back, deck_keys[i])
 	end
+	finalize_cocktail_ante_scaling(back)
 
 	if content_runtime.is_ruleset_active("smallworld") then
 		content_runtime.apply_fake_back_vouchers(back)
 	end
 
 	back.effect.mp_cocktailed = true
-	if cocktail_check_edited() then
-		mark_cocktail_run_seeded()
-	end
 end
 
 local function calculate_cocktail_runtime_back_effects(back, context)
 	local deck_keys = G.GAME.modifiers.mp_cocktail
 	for i = 1, #deck_keys do
-		back:change_to(G.P_CENTERS[deck_keys[i]])
+		local center = G.P_CENTERS[deck_keys[i]]
+		back:change_to(center)
+		local previous_ante_scaling = get_starting_ante_scaling()
 		local ret1, ret2 = back:trigger_effect(context)
+		adjust_cocktail_dynamic_ante_scaling_delta(back, previous_ante_scaling, get_starting_ante_scaling(), center)
 		back:change_to(G.P_CENTERS["b_mp_cocktail"])
 		if ret1 or ret2 then
 			return ret1, ret2
@@ -361,6 +492,7 @@ end
 runtime.collect_deck_keys = collect_cocktail_deck_keys
 runtime.get_decks = get_cocktail_decks
 content_runtime.get_cocktail_config = cocktail_cfg_get
+content_runtime.get_cocktail_decks = get_cocktail_decks
 runtime.cfg_edit = cocktail_cfg_edit
 runtime.cfg_readpos = cocktail_cfg_readpos
 runtime.check_edited = cocktail_check_edited
@@ -373,6 +505,7 @@ SMODS.Back({
 	atlas = "mp_decks",
 	pos = { x = 4, y = 0 },
 	mod_whitelist = build_cocktail_mod_whitelist(),
+	deck_blacklist = cocktail_deck_blacklist,
 	apply = function(self)
 		local seed = G._MP_SET_SEED
 		set_cocktail_seed(seed or generate_starting_seed())

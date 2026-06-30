@@ -233,7 +233,23 @@ function selection.build_gamemode_tabs(gamemode)
 	return build_selection_tabs(gamemode, "gamemode_switch_tabs", "gamemode", G.C.ORANGE, false)
 end
 
-local function build_ruleset_button_config(ruleset)
+local function get_ruleset_selection_mode(mode)
+	if mode then
+		return mode
+	end
+	return selection.get_ruleset_selection_mode and selection.get_ruleset_selection_mode() or "lobby"
+end
+
+local function build_ruleset_button_config(ruleset, mode)
+	if get_ruleset_selection_mode(mode) == "practice" then
+		return {
+			id = "start_practice_button",
+			button = "start_practice_run",
+			label = { localize("b_practice") },
+			colour = G.C.GREEN,
+		}
+	end
+
 	return {
 		id = "select_gamemode_button",
 		button = ruleset.forced_gamemode and "force_" .. ruleset.forced_gamemode or "select_gamemode",
@@ -242,22 +258,17 @@ local function build_ruleset_button_config(ruleset)
 	}
 end
 
-function selection.build_ruleset_info(ruleset_name)
-	local ruleset = MP.Rulesets["ruleset_mp_" .. ruleset_name]
-	local ruleset_info_tabs = UIBox({
-		definition = G.UIDEF.ruleset_tabs(ruleset),
-		config = { align = "cm" },
-	})
+function selection.build_ruleset_continue_button(ruleset, minw, mode)
 	local ruleset_disabled = ruleset.is_disabled()
-	local button_config = build_ruleset_button_config(ruleset)
+	local button_config = build_ruleset_button_config(ruleset, mode)
 
-	return build_selection_info_panel(ruleset_info_tabs, MP.UI.Disableable_Button({
+	return MP.UI.Disableable_Button({
 		id = button_config.id,
 		button = button_config.button,
 		align = "cm",
 		padding = 0.05,
 		r = 0.1,
-		minw = 8,
+		minw = minw or 8,
 		minh = 0.8,
 		colour = button_config.colour,
 		hover = true,
@@ -267,7 +278,144 @@ function selection.build_ruleset_info(ruleset_name)
 		enabled_ref_table = { val = not ruleset_disabled },
 		enabled_ref_value = "val",
 		disabled_text = { ruleset_disabled },
-	}))
+	})
+end
+
+function selection.build_modifier_button(ruleset, mode)
+	if ruleset.forced_lobby_options then
+		return nil
+	end
+	if type(ruleset.get_modifiers_ui) == "function" then
+		return ruleset:get_modifiers_ui(mode)
+	end
+
+	return MP.UI.Disableable_Button({
+		button = "mp_open_modifiers_overlay",
+		align = "cm",
+		padding = 0.05,
+		r = 0.1,
+		minw = 3.5,
+		minh = 0.8,
+		colour = G.C.ORANGE,
+		hover = true,
+		shadow = true,
+		label = { "Modifiers..." },
+		scale = 0.4,
+		enabled_ref_table = { val = true },
+		enabled_ref_value = "val",
+		ref_table = {
+			ruleset = ruleset,
+			mode = get_ruleset_selection_mode(mode),
+		},
+	})
+end
+
+function selection.build_practice_options_button(ruleset)
+	return MP.UI.Disableable_Button({
+		button = "mp_open_practice_options_overlay",
+		align = "cm",
+		padding = 0.05,
+		r = 0.1,
+		minw = 3.5,
+		minh = 0.8,
+		colour = G.C.ORANGE,
+		hover = true,
+		shadow = true,
+		label = { localize("k_practice_options") },
+		scale = 0.4,
+		enabled_ref_table = { val = true },
+		enabled_ref_value = "val",
+		ref_table = {
+			ruleset = ruleset,
+			mode = "practice",
+		},
+	})
+end
+
+local function build_ranked_smods_recommendation_node(ruleset)
+	if
+		not (
+			ruleset
+			and MP.UTILS
+			and MP.UTILS.is_ranked_ruleset_key
+			and MP.UTILS.is_ranked_ruleset_key(ruleset.key)
+			and MP.UTILS.get_recommended_smods_version
+		)
+	then
+		return nil
+	end
+
+	local recommended_version = MP.UTILS.get_recommended_smods_version()
+	local text = localize({
+		type = "variable",
+		key = "k_ruleset_recommended_smods_version",
+		vars = { recommended_version },
+	})
+	local is_recommended = MP.UTILS.is_recommended_smods_version and MP.UTILS.is_recommended_smods_version()
+
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.02, minh = 0.35 },
+		nodes = {
+			{
+				n = G.UIT.T,
+				config = {
+					text = text,
+					scale = 0.34,
+					colour = is_recommended and G.C.GREEN or G.C.ORANGE,
+				},
+			},
+		},
+	}
+end
+
+local function build_ruleset_action_node(ruleset)
+	local columns = {}
+	local function add_column(node)
+		if node then
+			columns[#columns + 1] = {
+				n = G.UIT.C,
+				config = { align = "cm", padding = 0.05 },
+				nodes = { node },
+			}
+		end
+	end
+
+	local nodes = {}
+	local smods_recommendation_node = build_ranked_smods_recommendation_node(ruleset)
+	if smods_recommendation_node then
+		nodes[#nodes + 1] = smods_recommendation_node
+	end
+
+	if get_ruleset_selection_mode() == "practice" then
+		add_column(selection.build_practice_options_button(ruleset))
+		add_column(selection.build_ruleset_continue_button(ruleset, #columns > 0 and 5 or 8, "practice"))
+	else
+		add_column(selection.build_modifier_button(ruleset))
+		add_column(selection.build_ruleset_continue_button(ruleset, #columns > 0 and 5 or 8))
+	end
+
+	nodes[#nodes + 1] = {
+		n = G.UIT.R,
+		config = { align = "cm" },
+		nodes = columns,
+	}
+
+	return {
+		n = G.UIT.C,
+		config = { align = "cm" },
+		nodes = nodes,
+	}
+end
+
+function selection.build_ruleset_info(ruleset_name)
+	local ruleset = MP.Rulesets["ruleset_mp_" .. ruleset_name]
+	local ruleset_info_tabs = UIBox({
+		definition = G.UIDEF.ruleset_tabs(ruleset),
+		config = { align = "cm" },
+	})
+
+	return build_selection_info_panel(ruleset_info_tabs, build_ruleset_action_node(ruleset))
 end
 
 function selection.build_ruleset_tabs(ruleset)

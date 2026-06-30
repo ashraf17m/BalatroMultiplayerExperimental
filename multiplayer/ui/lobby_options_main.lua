@@ -38,7 +38,7 @@ local function create_main_lobby_options_title(info_area_id)
 	})
 end
 
-function MP.UI.Main_Lobby_Options(info_area_id, default_info_area, button_func, buttons_data, selected_button_id)
+local function build_main_lobby_options_columns(info_area_id, default_info_area, button_func, buttons_data, selected_button_id)
 	local categories = {
 		create_main_lobby_options_title(info_area_id),
 	}
@@ -70,18 +70,39 @@ function MP.UI.Main_Lobby_Options(info_area_id, default_info_area, button_func, 
 		categories[#categories + 1] = MP.UI.BackgroundGrouping(localize(category.name), buttons)
 	end
 
-	return create_UIBox_generic_options({
-		back_func = "play_options",
-		contents = {
-			{ n = G.UIT.C, config = { align = "tm", minh = 8, minw = 4, padding = 0.1 }, nodes = categories },
-			{
-				n = G.UIT.C,
-				config = { align = "cm", minh = 8, maxh = 8, minw = 11, maxw = 11 },
-				nodes = {
-					{ n = G.UIT.O, config = { id = info_area_id, object = default_info_area } },
-				},
+	return {
+		{ n = G.UIT.C, config = { align = "tm", minh = 8, minw = 4, padding = 0.1 }, nodes = categories },
+		{
+			n = G.UIT.C,
+			config = { align = "cm", minh = 8, maxh = 8, minw = 11, maxw = 11 },
+			nodes = {
+				{ n = G.UIT.O, config = { id = info_area_id, object = default_info_area } },
 			},
 		},
+	}
+end
+
+function MP.UI.Main_Lobby_Options(info_area_id, default_info_area, button_func, buttons_data, selected_button_id, args)
+	args = args or {}
+	local columns = build_main_lobby_options_columns(
+		info_area_id,
+		default_info_area,
+		button_func,
+		buttons_data,
+		selected_button_id
+	)
+
+	if args.raw then
+		return {
+			n = G.UIT.ROOT,
+			config = { colour = G.C.CLEAR },
+			nodes = columns,
+		}
+	end
+
+	return create_UIBox_generic_options({
+		back_func = args.back_func or "play_options",
+		contents = columns,
 	})
 end
 

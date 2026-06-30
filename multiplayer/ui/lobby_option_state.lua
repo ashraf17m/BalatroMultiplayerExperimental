@@ -59,6 +59,14 @@ local function is_duels_lobby_selected()
 	return MP.LOBBY and MP.LOBBY.lobby_type == MP.LOBBY_TYPES.DUELS
 end
 
+local function is_teams_lobby_selected()
+	return MP.is_teams_mode and MP.is_teams_mode()
+end
+
+local function is_full_shared_progress_lobby_selected()
+	return is_teams_lobby_selected() or is_coop_gamemode_selected()
+end
+
 local function is_party_scoring_locked()
 	return is_head_to_head_lobby_selected() or is_duels_lobby_selected()
 end
@@ -295,6 +303,8 @@ local function apply_local_party_mode_defaults(previous_lobby_type, lobby_type)
 		return
 	end
 
+	config.team_card_sync = lobby_type == MP.LOBBY_TYPES.TEAMS or lobby_type == MP.LOBBY_TYPES.COOP
+
 	if lobby_type == MP.LOBBY_TYPES.ONE_V_ONE then
 		config.max_players = 2
 		config.pvp_custom_winners = 1
@@ -449,6 +459,24 @@ local function build_coop_blind_scaling_display_options()
 	return options
 end
 
+local function get_timer_base_multiplier()
+	local config_multiplier = MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.timer_base_multiplier
+	if config_multiplier then
+		return config_multiplier
+	end
+	local ruleset = MP.current_ruleset and MP.current_ruleset() or nil
+	return (ruleset and ruleset.timer_base_multiplier) or 1
+end
+
+local function build_timer_base_display_options()
+	local multiplier = get_timer_base_multiplier()
+	local options = {}
+	for idx, value in ipairs(timer_base_values) do
+		options[idx] = tostring(value * multiplier) .. "s"
+	end
+	return options
+end
+
 view_model.PARTY_OPTION_TAB_SPECS = {
 	general = {
 		{
@@ -576,6 +604,21 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 		},
 		{ kind = "toggle", control_id = "multiplayer_jokers_toggle", label_key = "b_opts_multiplayer_jokers", option_key = "multiplayer_jokers" },
 		{ kind = "toggle", control_id = "different_decks_toggle", label_key = "b_opts_player_diff_deck", option_key = "different_decks" },
+		{
+			kind = "toggle",
+			control_id = "random_loadout_toggle",
+			label_key = "b_opts_random_loadout",
+			option_key = "random_loadout",
+			on_toggle = function(value)
+				if MP.LOBBY and MP.LOBBY.config then
+					MP.LOBBY.config.random_loadout = not not value
+				end
+				if MP.UI and MP.UI.request_lobby_main_menu_refresh then
+					MP.UI.request_lobby_main_menu_refresh()
+				end
+				view_model.send_lobby_option_update("random_loadout", not not value)
+			end,
+		},
 		{ kind = "toggle", control_id = "normal_bosses_toggle", label_key = "b_opts_normal_bosses", option_key = "normal_bosses" },
 	},
 	advanced = {
@@ -587,7 +630,7 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			label_key = "b_opts_legacy_smallworld",
 			option_key = "legacy_smallworld",
 			when = function()
-				return MP.LOBBY.config.ruleset == "ruleset_mp_smallworld"
+				return MP.is_layer_active and MP.is_layer_active("smallworld")
 			end,
 		},
 		{
@@ -606,7 +649,7 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			option_key = "timer_base_seconds",
 			scale = 0.85,
 			option_values = timer_base_values,
-			display_options = { "30s", "60s", "90s", "120s", "150s", "180s", "210s", "240s" },
+			display_options = build_timer_base_display_options,
 		},
 		{
 			kind = "cycle",
@@ -660,6 +703,7 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			label_key = "b_opts_team_hand_level_sync",
 			option_key = "team_hand_level_sync",
 			ui_args = team_options_toggle_ui,
+			when = is_full_shared_progress_lobby_selected,
 		},
 		{
 			kind = "toggle",
@@ -667,6 +711,7 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			label_key = "b_opts_team_money_sync",
 			option_key = "team_money_sync",
 			ui_args = team_options_toggle_ui,
+			when = is_full_shared_progress_lobby_selected,
 		},
 	},
 }

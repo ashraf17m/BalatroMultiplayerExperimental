@@ -54,11 +54,18 @@ local function stop_local_ante_timer_runtime()
 end
 
 local function get_local_ante_timer_base_time()
+	if MP.UTILS and MP.UTILS.timer_base then
+		return normalize_ante_timer_time(MP.UTILS.timer_base())
+	end
 	return normalize_ante_timer_time(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.timer_base_seconds)
 end
 
-function ante_timer_runtime.get_match_start_time()
-	local base_time = get_local_ante_timer_base_time()
+function ante_timer_runtime.get_match_start_time(timer_kind)
+	local base_time = timer_kind == "pvp"
+		and MP.UTILS
+		and MP.UTILS.pvp_timer_base
+		and normalize_ante_timer_time(MP.UTILS.pvp_timer_base())
+		or get_local_ante_timer_base_time()
 	if MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.ruleset == "ruleset_mp_speedlatro" then
 		return math.max(0, base_time - 3)
 	end
@@ -229,12 +236,39 @@ function ante_timer_runtime.apply_state(time, timer_started, play_sfx, server_no
 	end
 end
 
+function ante_timer_runtime.apply_local_signal(timer_started, from_self, play_sfx)
+	if not MP.GAME then
+		return
+	end
+
+	if play_sfx then
+		maybe_play_ante_timer_sfx()
+	end
+
+	clear_timer_sync()
+	stop_local_ante_timer_runtime()
+	if from_self then
+		MP.GAME.timer_started = not not timer_started
+	else
+		MP.GAME.nemesis_timer_started = not not timer_started
+	end
+
+	trace_runtime_event(timer_started and "ante_timer.local_started" or "ante_timer.local_paused", {
+		from_self = not not from_self,
+		time = MP.GAME.timer,
+	})
+end
+
 function ante_timer_runtime.reset_for_ante(time)
 	if match_domain.reset_timer_for_ante then
 		match_domain.reset_timer_for_ante(normalize_ante_timer_time(time))
 	end
 	clear_timer_sync()
 	clear_timer_event_handle()
+	if MP.GAME then
+		MP.GAME.nemesis_timer_started = false
+		MP.GAME.timer_consumed = false
+	end
 end
 
 function ante_timer_runtime.apply_skip_for_ante(skip_count_delta)
@@ -278,6 +312,11 @@ function ante_timer_runtime.handle_start_ante_timer(time, server_now, deadline_a
 		return
 	end
 
+	if MP.timer_is_local and MP.timer_is_local() then
+		ante_timer_runtime.apply_local_signal(TIMER_STARTED, false, PLAY_TIMER_SFX)
+		return
+	end
+
 	ante_timer_runtime.start(time, server_now, deadline_at, timer_generation)
 end
 
@@ -287,6 +326,11 @@ function ante_timer_runtime.handle_pause_ante_timer(time, server_now, deadline_a
 		and MP.RESUME.buffer_runtime_pause_ante_timer
 		and MP.RESUME.buffer_runtime_pause_ante_timer(time, server_now, deadline_at, timer_generation)
 	then
+		return
+	end
+
+	if MP.timer_is_local and MP.timer_is_local() then
+		ante_timer_runtime.apply_local_signal(TIMER_PAUSED, false, SKIP_TIMER_SFX)
 		return
 	end
 

@@ -185,6 +185,19 @@ local function resolve_team_row_location_label(row_key)
 	return tostring(row_key or "") .. " Blind"
 end
 
+local function join_location_text(location, location_text, value)
+	if not value or value == "" then
+		return location_text
+	end
+	if location == "loc_selecting" then
+		location_text = tostring(location_text or ""):gsub("%s*[Aa]%s+[Bb]lind%s*$", "")
+	end
+	if not tostring(location_text or ""):match("%s$") then
+		location_text = tostring(location_text or "") .. " "
+	end
+	return location_text .. value
+end
+
 function MP.UTILS.resolve_location_text(location_str)
 	if not location_str then
 		return nil, "Unknown"
@@ -210,7 +223,7 @@ function MP.UTILS.resolve_location_text(location_str)
 		if location_text == nil and location == "loc_ready_for_team_row" then
 			location_text = "Ready for "
 		elseif location_text == nil and location == "loc_ready_to_skip_for_team_row" then
-			location_text = "wants to skip "
+			location_text = "ready to skip "
 		end
 
 		return location, location_text .. resolve_team_row_location_label(value)
@@ -229,11 +242,11 @@ function MP.UTILS.resolve_location_text(location_str)
 
 	local location_text = dictionary[location]
 	if location_text == nil and location == "loc_ready_to_skip_for_team_row" then
-		location_text = "wants to skip "
+		location_text = "ready to skip "
 	end
 	if location_text == nil then
 		location_text = location or "Unknown"
 	end
 
-	return location, location_text .. value
+	return location, join_location_text(location, location_text, value)
 end

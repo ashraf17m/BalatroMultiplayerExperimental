@@ -115,13 +115,28 @@ function action_route_runtime.build_protocol_v2_match_routes()
 	local route_noargs, route_field, route_fields, route_action = get_route_helpers()
 
 	return {
-		[build_protocol_route_key("match", "startGame", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_start_game", { "seed", "stake" }),
+		[build_protocol_route_key("match", "startGame", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_start_game", {
+			"seed",
+			"stake",
+			"back",
+			"challenge",
+			"sleeve",
+			"cocktail",
+		}),
 		[build_protocol_route_key("match", "startBlind", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_start_blind", {
 			"blindRow",
 			"blindKind",
 			"duelRole",
+			"blindTarget",
 		}),
-		[build_protocol_route_key("match", "endPvp", MATCH_STATE_SCHEMA_ID)] = route_noargs("handle_end_pvp"),
+		[build_protocol_route_key("match", "endPvp", MATCH_STATE_SCHEMA_ID)] = route_fields(
+			"handle_end_pvp",
+			{ "lost", "pvpTimerLost" }
+		),
+		[build_protocol_route_key("match", "endCoopBlind", MATCH_STATE_SCHEMA_ID)] = route_field(
+			"handle_end_coop_blind",
+			"lost"
+		),
 		[build_protocol_route_key("match", "enemyInfo", MATCH_STATE_SCHEMA_ID)] = route_action("handle_enemy_info"),
 		[build_protocol_route_key("match", "playerInfo", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_player_info", {
 			"lives",
@@ -134,7 +149,18 @@ function action_route_runtime.build_protocol_v2_match_routes()
 			{ "money", "delta", "sourcePlayerId" }
 		),
 		[build_protocol_route_key("match", "enemyLocation", MATCH_STATE_SCHEMA_ID)] = route_action("handle_enemy_location"),
-		[build_protocol_route_key("team", "skipBlind", TEAM_STATE_SCHEMA_ID)] = route_field("handle_team_skip_blind", "blindRow"),
+		[build_protocol_route_key("match", "coopBlindPreview", MATCH_STATE_SCHEMA_ID)] = route_fields(
+			"handle_coop_blind_preview",
+			{ "previewKey", "targets" }
+		),
+		[build_protocol_route_key("match", "coopBossBlind", MATCH_STATE_SCHEMA_ID)] = route_fields(
+			"handle_coop_boss_blind",
+			{ "phase", "ante", "revision", "sourcePlayerId", "bossKey", "isReroll" }
+		),
+		[build_protocol_route_key("team", "skipBlind", TEAM_STATE_SCHEMA_ID)] = route_fields(
+			"handle_team_skip_blind",
+			{ "blindRow", "ante" }
+		),
 		[build_protocol_route_key("sync", "teamCard", SYNC_STATE_SCHEMA_ID)] = route_action("handle_team_card_sync"),
 		[build_protocol_route_key("sync", "teamHandLevel", SYNC_STATE_SCHEMA_ID)] = route_action("handle_team_hand_level_sync"),
 		[build_protocol_route_key("match", "startAnteTimer", MATCH_STATE_SCHEMA_ID)] = route_fields(
@@ -189,6 +215,14 @@ function action_route_runtime.build_protocol_v2_feature_routes()
 		[build_protocol_route_key("endgame", "receiveNemesisDeck", ENDGAME_STATE_SCHEMA_ID)] = route_fields(
 			"handle_receive_nemesis_deck",
 			{ "cards", "sourcePlayerId" }
+		),
+		[build_protocol_route_key("endgame", "getEndGameSummary", ENDGAME_STATE_SCHEMA_ID)] = route_field(
+			"handle_get_end_game_summary",
+			"requesterPlayerId"
+		),
+		[build_protocol_route_key("endgame", "receiveEndGameSummary", ENDGAME_STATE_SCHEMA_ID)] = route_fields(
+			"handle_receive_end_game_summary",
+			{ "summary", "sourcePlayerId" }
 		),
 		[build_protocol_route_key("feature", "jimboAppear", FEATURE_EVENT_SCHEMA_ID)] = route_fields(
 			"handle_jimbo_appear",

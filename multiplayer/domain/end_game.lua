@@ -6,6 +6,7 @@ local END_GAME_DOMAIN = MP.DOMAIN.END_GAME
 function END_GAME_DOMAIN.build_view_state()
 	return {
 		players = nil,
+		self_player = nil,
 		standings_participants = nil,
 		target_id = nil,
 		target_index = 1,
@@ -60,14 +61,17 @@ end
 
 local function build_viewable_player_snapshot(players, self_player_id)
 	local snapshot = {}
+	local self_snapshot = nil
 
 	for _, player in ipairs(players or {}) do
-		if player.id ~= self_player_id then
+		if player.id == self_player_id then
+			self_snapshot = copy_player_snapshot(player)
+		else
 			snapshot[#snapshot + 1] = copy_player_snapshot(player)
 		end
 	end
 
-	return snapshot
+	return snapshot, self_snapshot
 end
 
 function END_GAME_DOMAIN.get_standings_participants()
@@ -81,18 +85,30 @@ function END_GAME_DOMAIN.get_viewable_players(lobby_players, self_player_id)
 		return state.players
 	end
 
-	return build_viewable_player_snapshot(lobby_players, self_player_id)
+	local snapshot = build_viewable_player_snapshot(lobby_players, self_player_id)
+	return snapshot
+end
+
+function END_GAME_DOMAIN.get_self_player(lobby_players, self_player_id)
+	local state = END_GAME_DOMAIN.ensure_view_state()
+	if state.self_player then
+		return state.self_player
+	end
+
+	local _, self_snapshot = build_viewable_player_snapshot(lobby_players, self_player_id)
+	return self_snapshot
 end
 
 function END_GAME_DOMAIN.capture_view_players(lobby_players, self_player_id, standings_players)
 	local state = END_GAME_DOMAIN.ensure_view_state()
 	local standings_participants = build_standings_participant_snapshot(standings_players)
-	local snapshot = build_viewable_player_snapshot(lobby_players, self_player_id)
+	local snapshot, self_snapshot = build_viewable_player_snapshot(lobby_players, self_player_id)
 
 	state.standings_participants = standings_participants
 	state.players = snapshot
+	state.self_player = self_snapshot
 	state.target_index = 1
-	state.target_id = snapshot[1] and snapshot[1].id or nil
+	state.target_id = snapshot[1] and snapshot[1].id or (self_snapshot and self_snapshot.id or nil)
 
 	return snapshot
 end
@@ -100,11 +116,12 @@ end
 function END_GAME_DOMAIN.resolve_view_target(lobby_players, self_player_id)
 	local state = END_GAME_DOMAIN.ensure_view_state()
 	local players = END_GAME_DOMAIN.get_viewable_players(lobby_players, self_player_id)
+	local self_player = END_GAME_DOMAIN.get_self_player(lobby_players, self_player_id)
 
 	if #players == 0 then
 		state.target_index = 1
-		state.target_id = nil
-		return players, nil, nil
+		state.target_id = self_player and self_player.id or nil
+		return players, self_player, nil
 	end
 
 	local target_index = nil
@@ -115,6 +132,12 @@ function END_GAME_DOMAIN.resolve_view_target(lobby_players, self_player_id)
 				break
 			end
 		end
+	end
+
+	if not target_index and self_player and state.target_id == self_player.id then
+		target_index = math.min(math.max(state.target_index or 1, 1), #players)
+		state.target_index = target_index
+		return players, self_player, target_index
 	end
 
 	if not target_index then

@@ -171,9 +171,6 @@ function lobby_session.apply_lobby_options(options)
 		return false, result
 	end
 
-	if lobby_domain.sync_run_deck_from_config then
-		lobby_domain.sync_run_deck_from_config()
-	end
 	if MP.UI and MP.UI.refresh_lobby_options_tab then
 		MP.UI.refresh_lobby_options_tab(options)
 	end

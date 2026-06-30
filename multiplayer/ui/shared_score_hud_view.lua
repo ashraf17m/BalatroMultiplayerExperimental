@@ -175,10 +175,11 @@ BALATRO.set_ui_function("mp_shared_chip_UI_set", function(e)
 	apply_shared_score_display(e, get_shared_score_display_state())
 end)
 
-local function create_row_dollars_chips_label_line(text)
+local function create_row_dollars_chips_label_line(text, width)
+	width = width or 1.3
 	return {
 		n = G.UIT.R,
-		config = { align = "cm", padding = 0, maxw = 1.3 },
+		config = { align = "cm", padding = 0, maxw = width },
 		nodes = {
 			{
 				n = G.UIT.T,
@@ -193,56 +194,292 @@ local function create_row_dollars_chips_label_line(text)
 	}
 end
 
-local function create_row_dollars_chips_label_column(label_lines)
+local function create_row_dollars_chips_label_column(label_lines, width)
+	width = width or 1.3
 	return {
 		n = G.UIT.C,
-		config = { align = "cm", minw = 1.3 },
+		config = { align = "cm", minw = width },
 		nodes = {
-			create_row_dollars_chips_label_line(label_lines[1]),
-			create_row_dollars_chips_label_line(label_lines[2]),
+			create_row_dollars_chips_label_line(label_lines[1], width),
+			create_row_dollars_chips_label_line(label_lines[2], width),
 		},
 	}
 end
 
-local function create_row_dollars_chips_value_panel(value_nodes)
+local function create_row_dollars_chips_value_panel(value_nodes, minw)
 	return {
 		n = G.UIT.C,
-		config = { align = "cm", minw = 3.3, minh = 0.7, r = 0.1, colour = G.C.DYN_UI.BOSS_DARK },
+		config = { align = "cm", minw = minw or 3.3, minh = 0.7, r = 0.1, colour = G.C.DYN_UI.BOSS_DARK },
 		nodes = value_nodes,
 	}
 end
 
-local function create_row_dollars_chips_row(label_lines, value_nodes)
+local function create_row_dollars_chips_row(label_lines, value_nodes, value_minw, label_minw)
 	return {
 		n = G.UIT.C,
 		config = { align = "cm", padding = 0.1 },
 		nodes = {
-			create_row_dollars_chips_label_column(label_lines),
-			create_row_dollars_chips_value_panel(value_nodes),
+			create_row_dollars_chips_label_column(label_lines, label_minw),
+			create_row_dollars_chips_value_panel(value_nodes, value_minw),
 		},
 	}
 end
 
+local function get_enemy_location_display()
+	local enemy = MP.GAME and MP.GAME.enemy or {}
+	return MP.UI
+		and MP.UI.UTILS
+		and MP.UI.UTILS.resolve_location_display
+		and MP.UI.UTILS.resolve_location_display(enemy.raw_location, enemy.location)
+		or {
+			text = enemy.location,
+			full_text = enemy.location,
+		}
+end
+
+local function create_enemy_location_blind_render()
+	local display = get_enemy_location_display()
+	local icon_object = (display.icon_kind or display.blind_key)
+		and MP.UI
+		and MP.UI.UTILS
+		and MP.UI.UTILS.create_location_blind_icon_object
+		and MP.UI.UTILS.create_location_blind_icon_object(display, 0.4)
+		or nil
+	if icon_object then
+		return icon_object
+	end
+
+	local blind_text = display.icon_label or display.blind_value
+	if blind_text and blind_text ~= "" then
+		return DynaText({
+			string = { blind_text },
+			colours = { G.C.WHITE },
+			scale = 0.35,
+			shadow = true,
+		})
+	end
+
+	return Moveable()
+end
+
 local function create_enemy_location_row()
-	return create_row_dollars_chips_row(localize("ml_enemy_loc"), {
-		{
-			n = G.UIT.T,
-			config = {
-				ref_table = MP.GAME.enemy,
-				ref_value = "location",
-				scale = 0.35,
-				colour = G.C.WHITE,
-				id = "chip_UI_count",
-				shadow = true,
+	local label_lines = localize("ml_enemy_loc")
+	local display = get_enemy_location_display()
+	local has_icon = display.icon_kind or display.blind_key
+	local text = has_icon and (display.text or "") or (display.full_text or display.text or "")
+
+	return {
+		n = G.UIT.C,
+		config = { align = "cm", padding = 0.1, id = "mp_enemy_location_row" },
+		nodes = {
+			{
+				n = G.UIT.O,
+				config = {
+					w = 0.5,
+					h = 0.5,
+					object = get_stake_sprite(BALATRO.get_stake and BALATRO.get_stake() or 1, 0.5),
+					hover = true,
+					can_collide = false,
+				},
+			},
+			create_row_dollars_chips_label_column(label_lines, 1.2),
+			{
+				n = G.UIT.C,
+				config = { align = "cm", minw = 2.8, minh = 0.7, r = 0.1, colour = G.C.DYN_UI.BOSS_DARK },
+				nodes = {
+					{
+						n = G.UIT.C,
+						config = {
+							maxw = 2.2,
+							align = "cm",
+						},
+						nodes = {
+							{
+								n = G.UIT.T,
+								config = {
+									text = tostring(text),
+									scale = 0.35,
+									colour = G.C.WHITE,
+									id = "chip_UI_count",
+									shadow = true,
+									maxw = 2.5,
+								},
+							},
+						},
+					},
+					{ n = G.UIT.B, config = { w = 0.1, h = 0.1 } },
+					{
+						n = G.UIT.O,
+						config = {
+							object = create_enemy_location_blind_render(),
+							id = "mp_enemy_location_render",
+						},
+					},
+				},
 			},
 		},
-	})
+	}
 end
+
+local function has_duels_hover_enemy()
+	if MP.is_duels_bye and MP.is_duels_bye() then
+		return false
+	end
+
+	if not (
+		MP.OPPONENTS
+		and MP.OPPONENTS.get_nemesis_lobby_player
+		and MP.OPPONENTS.get_nemesis_lobby_player()
+	) then
+		return false
+	end
+
+	return not not (MP.OPPONENTS.get_nemesis_enemy_state and MP.OPPONENTS.get_nemesis_enemy_state())
+end
+
+local function is_enemy_location_score_hover_lobby_type()
+	return not not (
+		MP.LOBBY
+		and MP.LOBBY_TYPES
+		and (
+			MP.LOBBY.lobby_type == MP.LOBBY_TYPES.ONE_V_ONE
+			or MP.LOBBY.lobby_type == MP.LOBBY_TYPES.DUELS
+		)
+	)
+end
+
+local function should_enable_enemy_location_score_hover()
+	if not (is_enemy_location_score_hover_lobby_type() and MP.LOBBY.code and MP.GAME and MP.GAME.enemy) then
+		return false
+	end
+
+	if MP.LOBBY.lobby_type == MP.LOBBY_TYPES.ONE_V_ONE then
+		return true
+	end
+
+	return not not (MP.is_duels_mode and MP.is_duels_mode() and has_duels_hover_enemy())
+end
+
+local function close_enemy_location_hover_popup(anchor)
+	if not (G and G.mp_enemy_location_ui) then
+		return false
+	end
+	if anchor and G.mp_enemy_location_ui_anchor and G.mp_enemy_location_ui_anchor ~= anchor then
+		return false
+	end
+
+	if G.mp_enemy_location_ui.remove then
+		G.mp_enemy_location_ui:remove()
+	end
+	G.mp_enemy_location_ui = nil
+	G.mp_enemy_location_ui_anchor = nil
+	return true
+end
+
+local function create_enemy_location_hover_definition()
+	return {
+		n = G.UIT.ROOT,
+		config = { colour = G.C.DYN_UI.BOSS_MAIN, emboss = 0.05, r = 0.25 },
+		nodes = {
+			create_enemy_location_row(),
+		},
+	}
+end
+
+local function open_enemy_location_hover_popup(anchor, force_refresh)
+	if not (anchor and should_enable_enemy_location_score_hover() and UIBox) then
+		close_enemy_location_hover_popup(anchor)
+		return false
+	end
+
+	if MP.OPPONENTS and MP.OPPONENTS.refresh_primary_enemy_view then
+		MP.OPPONENTS.refresh_primary_enemy_view()
+	end
+
+	if G.mp_enemy_location_ui and G.mp_enemy_location_ui_anchor == anchor and not force_refresh then
+		return true
+	end
+
+	close_enemy_location_hover_popup()
+	G.mp_enemy_location_ui_anchor = anchor
+	G.mp_enemy_location_ui = UIBox({
+		definition = create_enemy_location_hover_definition(),
+		config = {
+			align = "tmi",
+			offset = { x = 0, y = ((anchor.T and anchor.T.h) or 0) + 0.15 },
+			major = anchor,
+			bond = "Weak",
+			instance_type = "CARD",
+		},
+	})
+	return true
+end
+
+local function refresh_enemy_location_hover_popup()
+	local anchor = G and G.mp_enemy_location_ui_anchor or nil
+	if not (G and G.mp_enemy_location_ui and anchor) then
+		return false
+	end
+
+	if not should_enable_enemy_location_score_hover() then
+		return close_enemy_location_hover_popup()
+	end
+
+	return open_enemy_location_hover_popup(anchor, true)
+end
+
+BALATRO.set_ui_function("mp_setup_hover_enemy_location_display", function(e)
+	if not (e and e.config) then
+		return
+	end
+	e.config.func = nil
+	if not is_enemy_location_score_hover_lobby_type() then
+		return
+	end
+	if e.config.mp_enemy_location_hover_installed then
+		return
+	end
+	e.config.mp_enemy_location_hover_installed = true
+	e.config.hover = true
+
+	if e.states then
+		if e.states.collide then
+			e.states.collide.can = true
+		end
+		if e.states.hover then
+			e.states.hover.can = true
+		end
+	end
+
+	local old_hover = e.hover
+	function e:hover(...)
+		if old_hover then
+			old_hover(self, ...)
+		end
+		open_enemy_location_hover_popup(self)
+	end
+
+	local old_stop_hover = e.stop_hover
+	function e:stop_hover(...)
+		if old_stop_hover then
+			old_stop_hover(self, ...)
+		end
+		close_enemy_location_hover_popup(self)
+	end
+
+	local old_remove = e.remove
+	function e:remove(...)
+		close_enemy_location_hover_popup(self)
+		if old_remove then
+			old_remove(self, ...)
+		end
+	end
+end)
 
 local function create_shared_score_row()
 	local score_labels = get_round_score_labels()
 
-	return create_row_dollars_chips_row({ score_labels.top, score_labels.bottom }, {
+	local row = create_row_dollars_chips_row({ score_labels.top, score_labels.bottom }, {
 		{
 			n = G.UIT.O,
 			config = {
@@ -268,6 +505,46 @@ local function create_shared_score_row()
 			},
 		},
 	})
+	if is_enemy_location_score_hover_lobby_type() then
+		row.config.func = "mp_setup_hover_enemy_location_display"
+	end
+	return row
+end
+
+local function update_enemy_location_text_node(text)
+	local text_node = BALATRO.get_hud_element_by_id and BALATRO.get_hud_element_by_id("chip_UI_count") or nil
+	if not (text_node and text_node.config) then
+		return false
+	end
+
+	text_node.config.text = tostring(text or "")
+	if text_node.update_text then
+		text_node:update_text()
+	end
+	return true
+end
+
+local function update_enemy_location_blind_render()
+	local renderer = BALATRO.get_hud_element_by_id and BALATRO.get_hud_element_by_id("mp_enemy_location_render") or nil
+	if not (renderer and MP.UI and MP.UI.UTILS and MP.UI.UTILS.replace_config_object) then
+		return false
+	end
+
+	return MP.UI.UTILS.replace_config_object(renderer, create_enemy_location_blind_render())
+end
+
+local function update_enemy_location_row_content()
+	local display = get_enemy_location_display()
+	local has_icon = display.icon_kind or display.blind_key
+	local text = has_icon and (display.text or "") or (display.full_text or display.text or "")
+	local text_updated = update_enemy_location_text_node(text)
+	local render_updated = update_enemy_location_blind_render()
+
+	if text_updated or render_updated then
+		refresh_enemy_location_hover_popup()
+		return true
+	end
+	return false
 end
 
 local function replace_row_dollars_chips(node)
@@ -298,6 +575,13 @@ function MP.UI.show_enemy_location()
 	if replace_row_dollars_chips(create_enemy_location_row()) then
 		recalc_row_dollars_chips_layout()
 	end
+end
+
+function MP.UI.refresh_enemy_location_ui()
+	if not (BALATRO.get_hud_element_by_id and BALATRO.get_hud_element_by_id("mp_enemy_location_row")) then
+		return false
+	end
+	return update_enemy_location_row_content()
 end
 
 function MP.UI.hide_enemy_location()

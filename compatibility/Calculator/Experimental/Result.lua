@@ -36,6 +36,23 @@ local function parse_score_string(value)
 	return nil
 end
 
+local function is_insane_int_score(value)
+	return type(value) == "table"
+		and value.coefficient ~= nil
+		and value.exponent ~= nil
+		and value.e_count ~= nil
+end
+
+local function parse_insane_int_score(value)
+	if not (MP and MP.INSANE_INT and type(MP.INSANE_INT.to_string) == "function") then
+		return nil
+	end
+
+	local ok, text = pcall(MP.INSANE_INT.to_string, value)
+	if not ok then return nil end
+	return parse_score_string(text)
+end
+
 function CALC.to_score_number(value)
 	if value == nil then return 0 end
 
@@ -46,6 +63,10 @@ function CALC.to_score_number(value)
 	end
 	if value_type == "table" then
 		if is_big_score(value) then return value end
+		if is_insane_int_score(value) then
+			local parsed = parse_insane_int_score(value)
+			if parsed ~= nil then return parsed end
+		end
 		if type(to_big) == "function" then
 			local converted = safe_call(to_big, value)
 			if converted ~= nil then return converted end

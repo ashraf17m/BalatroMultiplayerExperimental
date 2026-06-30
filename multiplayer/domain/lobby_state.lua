@@ -57,6 +57,7 @@ local function build_initial_client_state()
 		connected = false,
 		username = "Guest",
 		blind_col = 1,
+		blind_target_scale = nil,
 		pending_lobby_ready = nil,
 	}
 end

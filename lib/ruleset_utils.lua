@@ -56,6 +56,96 @@ function MP.UTILS.get_weekly()
 	return MP.PLATFORM.SMODS.get_config_value("weekly")
 end
 
+function MP.UTILS.timer_base()
+	local ruleset = MP.current_ruleset and MP.current_ruleset() or {}
+	local lobby_config = MP.LOBBY and MP.LOBBY.config or {}
+	local base = lobby_config.timer_base_seconds or ruleset.timer_base_seconds or 150
+	local mult = ruleset.timer_base_multiplier or 1
+	return base * mult
+end
+
+function MP.UTILS.pvp_timer_base()
+	if not (MP.is_layer_active and MP.is_layer_active("pvp_timer")) then
+		return MP.UTILS.timer_base()
+	end
+
+	local ruleset = MP.current_ruleset and MP.current_ruleset() or {}
+	local lobby_config = MP.LOBBY and MP.LOBBY.config or {}
+	local base = lobby_config.pvp_timer_base_seconds or ruleset.pvp_timer_base_seconds or 90
+	local mult = ruleset.pvp_timer_base_multiplier or 1
+	return base * mult
+end
+
+function MP.timer_is_local()
+	return (MP.is_layer_active and MP.is_layer_active("pressure_timer"))
+		or (MP.is_layer_active and MP.is_layer_active("no_animation_timer"))
+		or (
+			MP.is_pvp_boss
+			and MP.is_pvp_boss()
+			and MP.is_layer_active
+			and MP.is_layer_active("pvp_timer")
+		)
+end
+
+function MP.UTILS.is_ranked_ruleset_key(ruleset_key)
+	local key = tostring(ruleset_key or "")
+	if key ~= "" and key:sub(1, 11) ~= "ruleset_mp_" then
+		key = "ruleset_mp_" .. key
+	end
+
+	if key == "ruleset_mp_standard_ranked" or key == "ruleset_mp_legacy_ranked" then
+		return true
+	end
+
+	local ruleset = MP.Rulesets and MP.Rulesets[key] or nil
+	if not (ruleset and type(ruleset._layer_order) == "table") then
+		return false
+	end
+
+	for _, layer_key in ipairs(ruleset._layer_order) do
+		if layer_key == "ranked" then
+			return true
+		end
+	end
+	return false
+end
+
+local function normalize_smods_version(version)
+	return tostring(version or "")
+		:gsub("%-STEAMODDED$", "")
+		:gsub("~BETA%-", "-beta-")
+		:lower()
+end
+
+function MP.UTILS.get_recommended_smods_version()
+	return MP.RUNTIME_POLICY
+		and MP.RUNTIME_POLICY.smods
+		and MP.RUNTIME_POLICY.smods.recommended_version
+		or "1.0.0-beta-1814a"
+end
+
+function MP.UTILS.is_recommended_smods_version()
+	local recommended_smods_version = MP.UTILS.get_recommended_smods_version()
+	local current_smods_version = SMODS and SMODS.version or ""
+	return normalize_smods_version(current_smods_version) == normalize_smods_version(recommended_smods_version)
+end
+
+function MP.UTILS.check_smods_recommended_version()
+	local recommended_smods_version = MP.UTILS.get_recommended_smods_version()
+	if not MP.UTILS.is_recommended_smods_version() then
+		return localize({
+			type = "variable",
+			key = "k_ruleset_recommended_smods_version",
+			vars = { recommended_smods_version },
+		})
+	end
+	return false
+end
+
+function MP.UTILS.check_smods_version()
+	return false
+end
+
 function MP.UTILS.check_lovely_version()
 	local lovely_mod = MP.PLATFORM.SMODS.get_loaded_mod("Lovely")
 	local lovely_ver = lovely_mod and lovely_mod.version or ""

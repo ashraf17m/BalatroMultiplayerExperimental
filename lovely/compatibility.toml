@@ -1,7 +1,18 @@
 [manifest]
 version = "1.0.0"
 dump_lua = true
-priority = 0
+priority = 2147483600
+
+# Steamodded 1.0.0-beta-1814a uses >= here, while Talisman 2.7 only patches
+# the older > variant. Without this, mixed normal/big-number scores can crash
+# during hand scoring with "attempt to compare number with table".
+[[patches]]
+[patches.regex]
+target = "functions/state_events.lua"
+pattern = '''SMODS\.last_hand_oneshot = SMODS\.calculate_round_score\(\) (?<op>>=?) G\.GAME\.blind\.chips'''
+position = "at"
+payload = '''SMODS.last_hand_oneshot = to_big(SMODS.calculate_round_score()) $op to_big(G.GAME.blind.chips)'''
+times = 1
 
 # Make Next Ante Preview display Nemesis Blind's size as "????"
 [[patches]]

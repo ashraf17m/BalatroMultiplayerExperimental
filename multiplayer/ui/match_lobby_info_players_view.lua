@@ -6,6 +6,7 @@ local MATCH_LOBBY_INFO_TAB_CONTENTS_ID = "tab_contents"
 local MATCH_LOBBY_INFO_PLAYERS_SINGLE_PAGE_SIZE = 16
 local MATCH_LOBBY_INFO_PLAYERS_PAGED_PAGE_SIZE = 15
 local MATCH_LOBBY_INFO_PLAYERS_PAGED_ROW_PADDING = 0.025
+local MATCH_LOBBY_INFO_SCORE_LANE_WIDTH = 2.87
 
 local function get_match_lobby_info_runtime()
 	return MP.UI and MP.UI.get_match_lobby_info_runtime and MP.UI.get_match_lobby_info_runtime() or nil
@@ -128,6 +129,12 @@ local function create_match_lobby_player_row(lobby_player, row_index, lobby_cont
 
 	ROW_LAYOUT.append_row_slot(
 		row_nodes,
+		ROW_LAYOUT.create_skip_chip(model.skip_chip_spec),
+		1.75
+	)
+
+	ROW_LAYOUT.append_row_slot(
+		row_nodes,
 		ROW_LAYOUT.create_host_chip(model.is_owner),
 		1.05
 	)
@@ -145,7 +152,7 @@ local function create_match_lobby_player_row(lobby_player, row_index, lobby_cont
 
 	ROW_LAYOUT.append_surface_lane_slot(row_nodes, model.location_lane_spec, 4.05)
 
-	ROW_LAYOUT.append_surface_lane_slot(row_nodes, model.score_lane_spec, 2.45)
+	ROW_LAYOUT.append_surface_lane_slot(row_nodes, model.score_lane_spec, MATCH_LOBBY_INFO_SCORE_LANE_WIDTH)
 
 	local row = ROW_LAYOUT.create_player_row_shell(model, row_nodes, {
 		tooltip_player_id = lobby_player.id,
@@ -218,6 +225,7 @@ local function create_match_lobby_players_body_definition()
 	local lobby_context = MP.get_lobby_state_context and MP.get_lobby_state_context() or {}
 	local player_rows, page, page_count = create_match_lobby_player_rows(lobby_context)
 	local pager = create_match_lobby_players_pager(page, page_count)
+	local body_minw = lobby_context.can_show_shared_money_actions and 18.95 or 16.95
 	if pager then
 		player_rows[#player_rows + 1] = pager
 	end
@@ -228,7 +236,7 @@ local function create_match_lobby_players_body_definition()
 		nodes = {
 			{
 				n = G.UIT.C,
-				config = { align = "tm", minw = lobby_context.can_show_shared_money_actions and 16.7 or 14.7, padding = 0.02 },
+				config = { align = "tm", minw = body_minw, padding = 0.02 },
 				nodes = player_rows,
 			},
 		},

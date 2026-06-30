@@ -31,6 +31,7 @@ end
 local function build_player_warning_key(player)
 	local config = player and player.config or {}
 	local mods = config and config.Mods or {}
+	local banned_mods = MP.UTILS.get_banned_mods and MP.UTILS.get_banned_mods(mods) or {}
 
 	return table.concat({
 		stringify(player and player.id),
@@ -38,7 +39,10 @@ local function build_player_warning_key(player)
 		stringify(player and player.cached),
 		stringify(config and config.unlocked),
 		stringify(mods and mods.extracredit),
+		stringify(mods and mods.MultiplayerExperimental),
+		stringify(mods and mods.Multiplayer),
 		stringify(mods and mods.Steamodded),
+		table.concat(banned_mods, ","),
 	}, "|")
 end
 
@@ -50,8 +54,10 @@ local function build_lobby_warning_cache_key()
 
 	return table.concat({
 		stringify(MP.LOBBY and MP.LOBBY.lobby_type),
+		stringify(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.ruleset),
 		stringify(MP.LOBBY and MP.LOBBY.client and MP.LOBBY.client.username),
 		stringify(MP.UTILS.unlock_check and MP.UTILS.unlock_check()),
+		stringify(SMODS and SMODS.version),
 		table.concat(players, ";"),
 	}, "||")
 end
@@ -59,6 +65,7 @@ end
 local function compute_lobby_warnings()
 	local warnings = {}
 	local cheating_warning_added = false
+	local banned_mods_warning_added = false
 	local warning_text_colour = get_warning_text_colour()
 
 	local self_player_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
@@ -73,6 +80,14 @@ local function compute_lobby_warnings()
 
 			if p.config and p.config.unlocked == false then
 				add_warning(warnings, localize("k_warning_nemesis_unlock"), warning_text_colour, 0.25)
+			end
+		end
+
+		if not banned_mods_warning_added and p.config and MP.UTILS.get_banned_mods then
+			local banned_mods = MP.UTILS.get_banned_mods(p.config.Mods)
+			if #banned_mods > 0 then
+				add_warning(warnings, localize("k_warning_banned_mods"), G.C.RED or warning_text_colour, 0.4)
+				banned_mods_warning_added = true
 			end
 		end
 	end
@@ -125,6 +140,10 @@ local function compute_lobby_warnings()
 	end
 
 	if host and host.config then
+		if MP.UTILS.mp_version_mismatch and MP.UTILS.mp_version_mismatch(MP.LOBBY.players) then
+			add_warning(warnings, localize("k_mp_version_warning"), warning_text_colour)
+		end
+
 		local host_steamodded_version = host.config.Mods["Steamodded"]
 		for _, p in ipairs(MP.LOBBY.players or {}) do
 			if not p.is_owner and p.config then
@@ -134,6 +153,13 @@ local function compute_lobby_warnings()
 					break
 				end
 			end
+		end
+	end
+
+	if MP.UTILS and MP.UTILS.is_ranked_ruleset_key and MP.UTILS.is_ranked_ruleset_key(MP.LOBBY.config and MP.LOBBY.config.ruleset) then
+		local smods_warning = MP.UTILS.check_smods_recommended_version and MP.UTILS.check_smods_recommended_version() or false
+		if smods_warning then
+			add_warning(warnings, smods_warning, warning_text_colour, 0.25)
 		end
 	end
 

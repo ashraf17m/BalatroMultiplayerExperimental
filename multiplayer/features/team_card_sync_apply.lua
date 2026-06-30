@@ -501,6 +501,33 @@ function team_card_sync.sync_card_list(cards)
 	end
 end
 
+function team_card_sync.sync_full_deck()
+	if is_applying_remote_change or not is_team_card_sync_active() then
+		return 0
+	end
+
+	local playing_cards = BALATRO.get_playing_cards and BALATRO.get_playing_cards() or {}
+	local sent_count = 0
+	for _, card in ipairs(playing_cards) do
+		if is_relayable_synced_team_card(card) then
+			local encoded, compare_encoded = build_snapshot_data(card, true)
+			if encoded then
+				local payload = {
+					card_id = tostring(card.mp_card_id),
+					action_type = "sync",
+					card_data = encoded,
+				}
+				if team_card_sync.relay_payload(payload) then
+					card.mp_last_sync_raw = compare_encoded
+					sent_count = sent_count + 1
+				end
+			end
+		end
+	end
+
+	return sent_count
+end
+
 function team_card_sync.handle_sync(data)
 	trace_team_card_sync("remote_sync_received", {
 		card_id = data and tostring(data.cardKey or "nil") or "nil",
@@ -508,11 +535,20 @@ function team_card_sync.handle_sync(data)
 		active = is_team_card_sync_active(),
 		card_data_bytes = data and type(data.cardData) == "string" and #data.cardData or 0,
 	})
-	if not is_team_card_sync_active() or not data.cardKey then return end
+	if not (data and data.cardKey) then return end
 	local id = data.cardKey
 
 	if data.actionType == "removed" then
 		mark_removed_card_id(id)
+		if not is_team_card_sync_active() then
+			if team_card_sync.defer_remote_change_until_active then
+				team_card_sync.defer_remote_change_until_active({
+					card_id = id,
+					action_type = "removed",
+				})
+			end
+			return
+		end
 		apply_remote_team_card_removal(id)
 		return
 	end
@@ -531,6 +567,18 @@ function team_card_sync.handle_sync(data)
 			reason = "decode_failed",
 			card_data_bytes = type(data.cardData) == "string" and #data.cardData or 0,
 		})
+		return
+	end
+
+	local change = {
+		card_id = id,
+		action_type = "sync",
+		snapshot = snapshot,
+	}
+	if not is_team_card_sync_active() then
+		if team_card_sync.defer_remote_change_until_active then
+			team_card_sync.defer_remote_change_until_active(change)
+		end
 		return
 	end
 

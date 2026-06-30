@@ -89,8 +89,9 @@ function G.UIDEF.create_UIBox_view_nemesis_deck()
 end
 
 function G.UIDEF.multiplayer_deck()
+	local ruleset = MP.current_ruleset and MP.current_ruleset() or MP.Rulesets[MP.LOBBY.config.ruleset]
 	return G.UIDEF.challenge_description(
-		get_challenge_int_from_id(MP.Rulesets[MP.LOBBY.config.ruleset].challenge_deck),
+		get_challenge_int_from_id(ruleset.challenge_deck),
 		nil,
 		false
 	)

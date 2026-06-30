@@ -4,6 +4,13 @@ MP.UI.BLIND_CHOICE_PREVIEW = MP.UI.BLIND_CHOICE_PREVIEW or {}
 local blind_choice_preview = MP.UI.BLIND_CHOICE_PREVIEW
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
+local function should_show_blind_tag(type, run_info)
+	if type ~= "Small" and type ~= "Big" then
+		return false
+	end
+	return true
+end
+
 local function create_pvp_extra_text(localization_key, string_colour, text_colours, scale, bump)
 	return DynaText({
 		string = { { string = localize(localization_key), colour = string_colour } },
@@ -59,14 +66,14 @@ function blind_choice_preview.get_blind_choice_extras(type, run_info)
 		return create_pvp_blind_extras()
 	end
 
-	if type == "Small" or type == "Big" then
+	if should_show_blind_tag(type, run_info) then
 		return create_UIBox_blind_tag(type, run_info)
 	end
 
 	return nil
 end
 
-function blind_choice_preview.create_name_node(blind_context, disabled)
+function blind_choice_preview.create_name_node(blind_context)
 	return {
 		n = G.UIT.R,
 		config = { id = "blind_name", align = "cm", padding = 0.07 },
@@ -90,9 +97,9 @@ function blind_choice_preview.create_name_node(blind_context, disabled)
 						config = {
 							object = DynaText({
 								string = blind_context.loc_name,
-								colours = { disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE },
-								shadow = not disabled,
-								float = not disabled,
+								colours = { G.C.WHITE },
+								shadow = true,
+								float = true,
 								y_offset = -4,
 								scale = 0.45,
 								maxw = 2.8,
@@ -105,11 +112,11 @@ function blind_choice_preview.create_name_node(blind_context, disabled)
 	}
 end
 
-local function create_blind_description_text(text, disabled)
-	return create_text_node(text or "-", 0.32, disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE, not disabled)
+local function create_blind_description_text(text)
+	return create_text_node(text or "-", 0.32, G.C.WHITE, true)
 end
 
-local function create_blind_description_row(text, disabled, blind_choice)
+local function create_blind_description_row(text, blind_choice)
 	local nodes = {}
 	if blind_choice then
 		nodes[#nodes + 1] = {
@@ -119,13 +126,13 @@ local function create_blind_description_row(text, disabled, blind_choice)
 				ref_table = { val = "" },
 				ref_value = "val",
 				scale = 0.32,
-				colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE,
-				shadow = not disabled,
+				colour = G.C.WHITE,
+				shadow = true,
 				func = "HUD_blind_debuff_prefix",
 			},
 		}
 	end
-	nodes[#nodes + 1] = create_blind_description_text(text, disabled)
+	nodes[#nodes + 1] = create_blind_description_text(text)
 
 	return {
 		n = G.UIT.R,
@@ -134,15 +141,15 @@ local function create_blind_description_row(text, disabled, blind_choice)
 	}
 end
 
-local function create_text_rows(text_table, blind_choice, disabled)
+local function create_text_rows(text_table, blind_choice)
 	return {
-		text_table and text_table[1] and create_blind_description_row(text_table[1], disabled, blind_choice) or nil,
-		text_table[2] and create_blind_description_row(text_table[2], disabled) or nil,
-		text_table[3] and create_blind_description_row(text_table[3], disabled) or nil,
+		text_table and text_table[1] and create_blind_description_row(text_table[1], blind_choice) or nil,
+		text_table[2] and create_blind_description_row(text_table[2]) or nil,
+		text_table[3] and create_blind_description_row(text_table[3]) or nil,
 	}
 end
 
-function blind_choice_preview.create_details_node(blind_context, disabled)
+function blind_choice_preview.create_details_node(blind_context)
 	local blind_choice = blind_context.blind_choice
 	local text_table = blind_context.text_table
 
@@ -173,7 +180,7 @@ function blind_choice_preview.create_details_node(blind_context, disabled)
 									padding = 0.05,
 									minw = 2.9,
 								},
-								nodes = create_text_rows(text_table, blind_choice, disabled),
+								nodes = create_text_rows(text_table, blind_choice),
 							} or nil,
 						},
 					},
@@ -195,8 +202,8 @@ function blind_choice_preview.create_details_node(blind_context, disabled)
 									create_text_node(
 										localize("ph_blind_score_at_least"),
 										0.3,
-										disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE,
-										not disabled
+										G.C.WHITE,
+										true
 									),
 								},
 							},
@@ -219,10 +226,11 @@ function blind_choice_preview.create_details_node(blind_context, disabled)
 									{
 										n = G.UIT.T,
 										config = {
+											id = "mp_blind_preview_score_" .. tostring(blind_context.row or ""),
 											text = number_format(blind_context.blind_amt),
 											scale = score_number_scale(0.9, blind_context.blind_amt),
-											colour = disabled and G.C.UI.TEXT_INACTIVE or G.C.RED,
-											shadow = not disabled,
+											colour = G.C.RED,
+											shadow = true,
 										},
 									},
 								},
@@ -234,14 +242,14 @@ function blind_choice_preview.create_details_node(blind_context, disabled)
 									create_text_node(
 										localize("ph_blind_reward"),
 										0.35,
-										disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE,
-										not disabled
+										G.C.WHITE,
+										true
 									),
 									create_text_node(
 										string.rep(localize("$"), blind_choice.config.dollars) .. "+",
 										0.35,
-										disabled and G.C.UI.TEXT_INACTIVE or G.C.MONEY,
-										not disabled
+										G.C.MONEY,
+										true
 									),
 								},
 							} or nil,

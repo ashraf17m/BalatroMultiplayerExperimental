@@ -53,6 +53,7 @@ function MP.get_lobby_state_context()
 		is_coop_lobby_type = not not capabilities.is_coop_lobby_type,
 		uses_shared_sync_group = not not capabilities.uses_shared_sync_group,
 		uses_team_colours = not not capabilities.uses_team_colours,
+		can_show_shared_progress_options = not not capabilities.can_show_shared_progress_options,
 		can_show_team_options = not not capabilities.can_show_team_options,
 		can_show_shared_money_actions = not not capabilities.can_show_shared_money_actions,
 		capabilities = capabilities,

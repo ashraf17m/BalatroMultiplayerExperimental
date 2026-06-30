@@ -53,15 +53,24 @@ pattern = '''if center.consumeable then'''
 position = 'before'
 payload = '''
 if old_center ~= center or initial then
-	if MP and MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.ruleset then
-		local ruleset = string.sub(MP.LOBBY.config.ruleset, 12, #MP.LOBBY.config.ruleset)
+	local mp_sticker_balanced = center.config and center.config.mp_sticker_balanced == true
+	if MP then
+		local active_ruleset = MP.get_active_ruleset and MP.get_active_ruleset() or (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.ruleset)
+		local ruleset = active_ruleset and string.sub(active_ruleset, 12, #active_ruleset) or nil
 		
-		if center.mp_reworks and center.mp_reworks[ruleset] and ruleset ~= 'vanilla' then
-			if not center.mp_silent[ruleset] then
-				self.ability.mp_sticker_balanced = true
+		if center.mp_reworks and ruleset and ruleset ~= 'vanilla' then
+			local rework_keys = MP.active_layer_chain and MP.active_layer_chain(ruleset) or { ruleset }
+			for _, rework_key in ipairs(rework_keys) do
+				if center.mp_reworks[rework_key] then
+					if not center.mp_silent or not center.mp_silent[rework_key] then
+						mp_sticker_balanced = true
+					end
+					break
+				end
 			end
 		end
 	end
+	self.ability.mp_sticker_balanced = mp_sticker_balanced
 end'''
 match_indent = true
 times = 1

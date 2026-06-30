@@ -28,6 +28,64 @@ if not load_missing_blind_choice_module(INTERNAL.perform_team_skip, "multiplayer
 	return nil
 end
 
+local function get_playing_location_for_selection(e, blind_kind)
+	if blind_kind == "pvp" then
+		return "loc_playing-bl_mp_nemesis"
+	end
+
+	local ref_table = e and e.config and e.config.ref_table or nil
+	local blind_key = ref_table and (ref_table.key or ref_table.name) or nil
+	if blind_key ~= nil and blind_key ~= "" then
+		return "loc_playing-" .. blind_key
+	end
+
+	return "loc_playing"
+end
+
+local function any_other_player_ready()
+	local self_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	for _, player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
+		if player and player.id ~= self_id and player.is_ready then
+			return true
+		end
+	end
+	return false
+end
+
+local function hide_finished_blind_skip_tag(e, row)
+	local blind_state = BALATRO.get_blind_state and BALATRO.get_blind_state(row) or nil
+	if blind_state ~= "Skipped" and blind_state ~= "Defeated" then
+		return
+	end
+
+	local tag = e.UIBox and e.UIBox:get_UIE_by_ID("tag_" .. row)
+	local tag_container = e.UIBox and e.UIBox:get_UIE_by_ID("tag_container")
+	local button = tag and tag.children and tag.children[2]
+	if button and button.config then
+		button.config.button = nil
+		button.config.hover = false
+		button.config.colour = G.C.UI.BACKGROUND_INACTIVE
+		if button.children and button.children[1] and button.children[1].config then
+			button.children[1].config.colour = G.C.UI.TEXT_INACTIVE
+		end
+	end
+	if tag and tag.config then
+		tag.config.outline_colour = G.C.UI.BACKGROUND_INACTIVE
+	end
+	if tag_container and tag_container.children then
+		local heading = tag_container.children[1]
+		local skip_button = tag_container.children[2]
+		if skip_button and skip_button.set_role then
+			skip_button:set_role({ xy_bond = "Weak" })
+			skip_button:align(0, 10)
+		end
+		if heading and heading.set_role then
+			heading:set_role({ xy_bond = "Weak" })
+			heading:align(0, 10)
+		end
+	end
+end
+
 BALATRO.set_ui_function("pvp_ready_button", function(e)
 	local row = INTERNAL.get_blind_choice_row_type(e)
 	local blind_on_deck = BALATRO.get_blind_on_deck and BALATRO.get_blind_on_deck() or nil
@@ -53,6 +111,10 @@ BALATRO.set_ui_function("mp_toggle_ready", function(e)
 	if not MP.GAME.ready_blind then
 		INTERNAL.clear_skip_ready_for_blind_toggle(false)
 	end
+	local will_ready = not MP.GAME.ready_blind
+	if will_ready and blind_kind == "pvp" then
+		MP.GAME.pvp_reached_first = not any_other_player_ready()
+	end
 	local is_ready = match_domain.set_ready_blind_state and match_domain.set_ready_blind_state(not MP.GAME.ready_blind, blind_kind)
 
 	if is_ready then
@@ -76,35 +138,7 @@ BALATRO.set_ui_function("blind_choice_handler", function(e)
 	local row = e.config.id
 	if row ~= blind_on_deck then
 		INTERNAL.restore_blind_select_label(e, row)
-		local blind_state = BALATRO.get_blind_state and BALATRO.get_blind_state(row) or nil
-		if blind_state == "Skipped" or blind_state == "Defeated" then
-			local tag = e.UIBox and e.UIBox:get_UIE_by_ID("tag_" .. row)
-			local tag_container = e.UIBox and e.UIBox:get_UIE_by_ID("tag_container")
-			local button = tag and tag.children and tag.children[2]
-			if button then
-				button.config.button = nil
-				button.config.hover = false
-				button.config.colour = G.C.UI.BACKGROUND_INACTIVE
-				if button.children and button.children[1] and button.children[1].config then
-					button.children[1].config.colour = G.C.UI.TEXT_INACTIVE
-				end
-			end
-			if tag and tag.config then
-				tag.config.outline_colour = G.C.UI.BACKGROUND_INACTIVE
-			end
-			if tag_container and tag_container.children then
-				local heading = tag_container.children[1]
-				local skip_button = tag_container.children[2]
-				if skip_button and skip_button.set_role then
-					skip_button:set_role({ xy_bond = "Weak" })
-					skip_button:align(0, 10)
-				end
-				if heading and heading.set_role then
-					heading:set_role({ xy_bond = "Weak" })
-					heading:align(0, 10)
-				end
-			end
-		end
+		hide_finished_blind_skip_tag(e, row)
 	end
 	if row ~= blind_on_deck or not INTERNAL.is_team_skip_ready_row(row) then
 		return
@@ -151,10 +185,11 @@ end)
 
 local select_blind_ref = BALATRO.get_ui_function("select_blind")
 BALATRO.set_ui_function("select_blind", function(e)
+	local selected_blind_kind = INTERNAL.get_blind_choice_row_kind and INTERNAL.get_blind_choice_row_kind(e) or nil
 	if match_domain.prepare_blind_selection then
 		match_domain.prepare_blind_selection()
 	end
-	INTERNAL.clear_skip_ready_state()
+	INTERNAL.clear_skip_ready_state({ notify_server = true })
 	if teams_domain.reset_round_score_state then
 		teams_domain.reset_round_score_state()
 	end
@@ -169,7 +204,17 @@ BALATRO.set_ui_function("select_blind", function(e)
 			MP.ACTIONS.play_hand(0, BALATRO.get_round_reset_value and BALATRO.get_round_reset_value("hands", nil) or nil)
 		end
 		MP.ACTIONS.new_round()
-		MP.ACTIONS.set_location("loc_playing-" .. (e.config.ref_table.key or e.config.ref_table.name))
+		MP.ACTIONS.set_location(get_playing_location_for_selection(e, selected_blind_kind))
+		if MP.UI.hide_enemy_location then
+			MP.UI.hide_enemy_location()
+		end
+	elseif MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active() then
+		if MP.GAME then
+			MP.GAME.ante_key = tostring(math.random())
+		end
+		if MP.GHOST.init_playback and BALATRO.get_ante then
+			MP.GHOST.init_playback(BALATRO.get_ante())
+		end
 		if MP.UI.hide_enemy_location then
 			MP.UI.hide_enemy_location()
 		end

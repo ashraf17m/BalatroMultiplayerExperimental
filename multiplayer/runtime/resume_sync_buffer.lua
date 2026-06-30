@@ -69,6 +69,7 @@ end
 
 local MATCH_OUTCOME_HANDLERS = {
 	endPvP = "handle_end_pvp",
+	endCoopBlind = "handle_end_coop_blind",
 	winGame = "handle_win_game",
 	aloneGame = "handle_alone_game",
 	loseGame = "handle_lose_game",
@@ -148,7 +149,7 @@ local function apply_buffered_runtime_match_outcome(runtime_match_sync)
 	local handler_name = MATCH_OUTCOME_HANDLERS[runtime_match_sync.match_outcome_action]
 	local handler = handler_name and MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL[handler_name]
 	if handler then
-		handler()
+		handler(runtime_match_sync.match_outcome_lost, runtime_match_sync.match_outcome_pvp_timer_lost)
 	end
 end
 
@@ -301,12 +302,14 @@ function RESUME_SYNC_BUFFER.buffer_runtime_team_hand_level_sync(parsed_action)
 	})
 end
 
-function RESUME_SYNC_BUFFER.buffer_runtime_match_outcome(action_name)
+function RESUME_SYNC_BUFFER.buffer_runtime_match_outcome(action_name, lost, pvp_timer_lost)
 	if type(action_name) ~= "string" or action_name == "" then
 		return false
 	end
 
 	return set_runtime_match_sync_field("match_outcome_action", action_name)
+		and set_runtime_match_sync_field("match_outcome_lost", lost)
+		and set_runtime_match_sync_field("match_outcome_pvp_timer_lost", pvp_timer_lost)
 end
 
 function RESUME_SYNC_BUFFER.flush_runtime_match_sync_buffer()

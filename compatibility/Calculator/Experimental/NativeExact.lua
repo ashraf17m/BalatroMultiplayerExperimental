@@ -51,6 +51,16 @@ local function calculate_current_round_score()
 	return fail("no round-score function is available")
 end
 
+local function enter_scoring_time_round_state()
+	local round = G and G.GAME and G.GAME.current_round
+	local hands_left = round and tonumber(round.hands_left)
+	if hands_left == nil then
+		return
+	end
+
+	round.hands_left = math.max(0, hands_left - 1)
+end
+
 local function run_real_evaluate_play(ctx)
 	if not is_run_ready() then
 		return fail("game is not in a playable run state")
@@ -60,6 +70,7 @@ local function run_real_evaluate_play(ctx)
 	end
 
 	local starting_chips = CALC.to_score_number(G.GAME.chips or 0)
+	enter_scoring_time_round_state()
 	if type(CALC.run_pre_score_effects) == "function" then
 		local pre_score_ok, pre_score_err = CALC.run_pre_score_effects(ctx)
 		if not pre_score_ok then

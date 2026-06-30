@@ -799,6 +799,7 @@ return {
 			k_set_name = "메인 메뉴에서 유저네임을 설정하세요! (Mods > Multiplayer > Config)",
 
 			k_steamodded_warning = "플레이어들의 Steamodded 버전이 다릅니다. 시드가 달라질 수 있어요.",
+			k_mp_version_warning = "Players are on different Multiplayer versions! Seeds and jokers will desync - update so you both match.",
 			k_warning_unlock_profile = "현재 플레이 중인 프로필이 완전히 해금되지 않았습니다. 랭크/토너먼트 게임이라면 새 프로필을 만들고 프로필 설정에서 'unlock all'을 눌러주세요.",
 			k_warning_nemesis_unlock = "상대가 완전히 해금되지 않은 프로필로 플레이 중입니다. 새 프로필 생성 후 프로필 설정에서 'unlock all'을 누르도록 안내해주세요.",
 			k_warning_no_order = "한 플레이어는 The Order 연동이 켜져 있고, 다른 플레이어는 꺼져 있습니다. 이 경우 시드가 달라질 수 있어요.",

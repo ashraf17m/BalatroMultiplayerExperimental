@@ -10,17 +10,12 @@ local function parse_env_override_value(value)
 	return value
 end
 
-local ENV_OVERRIDE_FILES = {
-	"developer.env",
-	".env",
-}
+local ENV_OVERRIDE_FILE = "developer.env"
 
 local function read_experimental_env_overrides()
-	for _, filename in ipairs(ENV_OVERRIDE_FILES) do
-		local env_path = MP.path .. "/" .. filename
-		if NFS.getInfo(env_path) then
-			return NFS.read(env_path), filename
-		end
+	local env_path = MP.path .. "/" .. ENV_OVERRIDE_FILE
+	if NFS.getInfo(env_path) then
+		return NFS.read(env_path), ENV_OVERRIDE_FILE
 	end
 
 	return nil, nil
@@ -39,12 +34,31 @@ function MP.initialize_multiplayer_settings()
 	}
 
 	MP.EXPERIMENTAL = {
+		show_hidden_collection_content = false,
 		show_sandbox_collection = false,
 		alt_stakes = false,
 		testing_tools = false,
 		runtime_trace_logging = false,
 		calculator_trace_logging = false,
+		suppress_dev_warning = false,
+		mem_debug = false,
 	}
+	MP.ENV = MP.ENV or {}
+end
+
+function MP.show_hidden_collection_content()
+	return MP.EXPERIMENTAL and MP.EXPERIMENTAL.show_hidden_collection_content == true
+end
+
+function MP.should_hide_collection_item()
+	return not MP.show_hidden_collection_content()
+end
+
+function MP.should_hide_sandbox_collection()
+	return not (
+		MP.show_hidden_collection_content()
+		or (MP.EXPERIMENTAL and MP.EXPERIMENTAL.show_sandbox_collection == true)
+	)
 end
 
 function MP.apply_experimental_env_overrides()
@@ -57,11 +71,15 @@ function MP.apply_experimental_env_overrides()
 		line = line:match("^%s*(.-)%s*$")
 		if line ~= "" and not line:match("^#") then
 			local key, value = line:match("^([%w_]+)%s*=%s*(.+)$")
-			if key and MP.EXPERIMENTAL[key] ~= nil then
-				MP.EXPERIMENTAL[key] = parse_env_override_value(value)
+			if key then
+				local parsed_value = parse_env_override_value(value)
+				MP.ENV[key] = parsed_value
+				if MP.EXPERIMENTAL[key] ~= nil then
+					MP.EXPERIMENTAL[key] = parsed_value
+				end
 			end
 		end
 	end
 
-	sendDebugMessage("Loaded " .. tostring(source_file) .. " overrides for MP.EXPERIMENTAL", "MULTIPLAYER")
+	sendDebugMessage("Loaded " .. tostring(source_file) .. " multiplayer environment overrides", "MULTIPLAYER")
 end

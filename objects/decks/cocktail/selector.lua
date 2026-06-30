@@ -1,4 +1,6 @@
 local selector = {}
+local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
+local cocktail_selector_return_context = nil
 
 local function is_cocktail_select(runtime, card)
 	if Galdur then
@@ -11,6 +13,163 @@ local function is_cocktail_select(runtime, card)
 			and G.GAME.viewed_back.effect.center.key == "b_mp_cocktail"
 			and card.facing == "back"
 	end
+end
+
+local function get_viewed_back_center()
+	local viewed_back = G.GAME and G.GAME.viewed_back or nil
+	if viewed_back and viewed_back.effect and viewed_back.effect.center then
+		return viewed_back.effect.center
+	end
+
+	return viewed_back
+end
+
+local function get_center_key(center)
+	if center and center.key then
+		return center.key
+	end
+	if BALATRO.get_center_key then
+		return BALATRO.get_center_key(center)
+	end
+	for key, candidate in pairs(G.P_CENTERS or {}) do
+		if candidate == center then
+			return key
+		end
+	end
+	return nil
+end
+
+local function get_current_setup()
+	if BALATRO.get_setting_value then
+		return BALATRO.get_setting_value("current_setup", nil)
+	end
+	return G.SETTINGS and G.SETTINGS.current_setup or nil
+end
+
+local function set_current_setup(value)
+	if value == nil then
+		return
+	end
+	if BALATRO.set_current_setup then
+		BALATRO.set_current_setup(value)
+	elseif G.SETTINGS then
+		G.SETTINGS.current_setup = value
+	end
+end
+
+local function get_deck_pool()
+	local deck_pool = G.P_CENTER_POOLS and G.P_CENTER_POOLS.Back or {}
+	if SMODS and SMODS.collection_pool then
+		deck_pool = SMODS.collection_pool(deck_pool)
+	end
+	return deck_pool or {}
+end
+
+local function find_deck_pool_index(deck_key, deck_name)
+	for index, center in ipairs(get_deck_pool()) do
+		if center.key == deck_key or center.name == deck_name then
+			return index, center.name
+		end
+	end
+	return nil, deck_name
+end
+
+local function snapshot_cocktail_selector_return_context()
+	local center = get_viewed_back_center()
+	cocktail_selector_return_context = {
+		current_setup = get_current_setup(),
+		deck_key = get_center_key(center) or "b_mp_cocktail",
+		deck_name = center and center.name or nil,
+		stake = G.viewed_stake,
+		sleeve = G.viewed_sleeve,
+		lobby_code = MP.LOBBY and MP.LOBBY.code or nil,
+		galdur_page = Galdur and Galdur.run_setup and Galdur.run_setup.current_page or nil,
+	}
+end
+
+local function remove_lobby_run_setup_seed(context)
+	if not (context and context.lobby_code and MP.LOBBY and MP.LOBBY.code == context.lobby_code) then
+		return
+	end
+
+	if G.OVERLAY_MENU and G.OVERLAY_MENU.get_UIE_by_ID then
+		local seed_toggle = G.OVERLAY_MENU:get_UIE_by_ID("run_setup_seed")
+		if seed_toggle and seed_toggle.remove then
+			seed_toggle:remove()
+		end
+	end
+end
+
+local function restore_cocktail_galdur_state(context)
+	if not (Galdur and Galdur.run_setup and Galdur.run_setup.choices) then
+		return
+	end
+
+	if context.galdur_page then
+		Galdur.run_setup.current_page = context.galdur_page
+	end
+	if G.GAME and G.GAME.viewed_back then
+		Galdur.run_setup.choices.deck = G.GAME.viewed_back
+	end
+	if context.stake then
+		Galdur.run_setup.choices.stake = context.stake
+	end
+end
+
+local function restore_cocktail_selection(context)
+	if not context then
+		return
+	end
+
+	local center = context.deck_key and G.P_CENTERS and G.P_CENTERS[context.deck_key] or nil
+	local deck_index, deck_name = find_deck_pool_index(context.deck_key, context.deck_name)
+	local galdur_setup = Galdur and Galdur.config and Galdur.config.use and Galdur.run_setup
+	if center and galdur_setup and G.GAME then
+		if Back and get_deck_from_name and center.name then
+			G.GAME.viewed_back = Back(get_deck_from_name(center.name))
+		else
+			G.GAME.viewed_back = center
+		end
+	elseif center and deck_index and G.FUNCS and G.FUNCS.change_viewed_back then
+		G.FUNCS.change_viewed_back({ to_key = deck_index, to_val = deck_name })
+	elseif center and G.GAME and G.GAME.viewed_back and G.GAME.viewed_back.change_to then
+		G.GAME.viewed_back:change_to(center)
+	elseif center and G.GAME then
+		G.GAME.viewed_back = center
+	end
+
+	if context.stake then
+		if G.FUNCS and G.FUNCS.change_stake then
+			G.FUNCS.change_stake({ to_key = context.stake })
+		else
+			G.viewed_stake = context.stake
+		end
+	end
+	if context.sleeve then
+		G.viewed_sleeve = context.sleeve
+	end
+
+	restore_cocktail_galdur_state(context)
+	set_current_setup(context.current_setup)
+end
+
+local function return_from_cocktail_selector(e)
+	local context = cocktail_selector_return_context
+	set_current_setup(context and context.current_setup)
+
+	if G.FUNCS and G.FUNCS.setup_run then
+		G.FUNCS.setup_run(e or { config = {} })
+		remove_lobby_run_setup_seed(context)
+		restore_cocktail_selection(context)
+	else
+		if BALATRO.exit_overlay_menu then
+			BALATRO.exit_overlay_menu()
+		elseif G.FUNCS and G.FUNCS.exit_overlay_menu then
+			G.FUNCS.exit_overlay_menu()
+		end
+	end
+
+	cocktail_selector_return_context = nil
 end
 
 local function get_cocktail_deck_selection_state(config_char)
@@ -116,7 +275,7 @@ end
 
 local function build_cocktail_selector_overlay_definition(runtime, deck_tables)
 	return create_UIBox_generic_options({
-		back_func = "setup_run",
+		back_func = "mp_return_from_cocktail_selector",
 		snap_back = true,
 		contents = {
 			{
@@ -152,6 +311,7 @@ end
 
 local function open_cocktail_selector_overlay(runtime)
 	local selector_state = build_cocktail_selector_state(runtime)
+	snapshot_cocktail_selector_return_context()
 	create_cocktail_selector_areas(runtime)
 	populate_cocktail_selector_areas(runtime, selector_state)
 
@@ -324,6 +484,11 @@ function selector.install(runtime)
 		return false
 	end
 
+	if BALATRO.set_ui_function then
+		BALATRO.set_ui_function("mp_return_from_cocktail_selector", return_from_cocktail_selector)
+	else
+		G.FUNCS.mp_return_from_cocktail_selector = return_from_cocktail_selector
+	end
 	install_cocktail_card_hooks(runtime)
 	install_cocktail_area_hooks(runtime)
 	install_cocktail_controller_hooks(runtime)

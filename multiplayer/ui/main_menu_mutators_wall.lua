@@ -1,0 +1,412 @@
+MP.UI = MP.UI or {}
+G.FUNCS = G.FUNCS or {}
+
+local function has_modifier(name)
+	return MP.has_modifier and MP.has_modifier(name)
+end
+
+local function add_modifier(name)
+	if MP.add_modifier then MP.add_modifier(name) end
+end
+
+local function remove_modifier(name)
+	if MP.remove_modifier then MP.remove_modifier(name) end
+end
+
+local function timer_modifier_to_index()
+	if has_modifier("pressure_timer_plus") then return 4 end
+	if has_modifier("pressure_timer") then return 3 end
+	if has_modifier("no_animation_timer") then return 2 end
+	return 1
+end
+
+G.FUNCS.change_modifier_timer = function(args)
+	remove_modifier("no_animation_timer")
+	remove_modifier("pressure_timer")
+	remove_modifier("pressure_timer_plus")
+	if args.to_key == 2 then
+		add_modifier("no_animation_timer")
+	elseif args.to_key == 3 then
+		add_modifier("pressure_timer")
+	elseif args.to_key == 4 then
+		add_modifier("pressure_timer")
+		add_modifier("pressure_timer_plus")
+	end
+end
+
+local function play_ui_sound(name, pitch, volume)
+	if play_sound then
+		play_sound(name, pitch, volume)
+	end
+end
+
+local GLASS_VARIANTS = {
+	{ label = "Inherit", mod = nil, blurb = "Inherit the main ruleset." },
+	{ label = "Vanilla", mod = "glass_vanilla", blurb = "x2 mult." },
+	{ label = "Standard", mod = "glass_standard", blurb = "x1.5 (Justice Disabled)." },
+	{ label = "Legacy", mod = "glass_legacy", blurb = "x1.5 (Justice Enabled)." },
+	{ label = "Experimental", mod = "glass_experimental", blurb = "x2 (Grim/Familiar/Incantation only)." },
+}
+
+local function variant_labels(variants)
+	local labels = {}
+	for idx, variant in ipairs(variants) do
+		labels[idx] = variant.label
+	end
+	return labels
+end
+
+local function variant_index(variants)
+	for idx, variant in ipairs(variants) do
+		if variant.mod and has_modifier(variant.mod) then
+			return idx
+		end
+	end
+	return 1
+end
+
+local function pick_variant(variants, to_key)
+	for _, variant in ipairs(variants) do
+		if variant.mod then
+			remove_modifier(variant.mod)
+		end
+	end
+	local chosen = variants[to_key]
+	if chosen and chosen.mod then
+		add_modifier(chosen.mod)
+	end
+end
+
+local function variant_blurb_func(variants)
+	return function(e)
+		local txt = variants[variant_index(variants)].blurb
+		if e.children[1] and e.children[1].config.text ~= txt then
+			e.children[1].config.text = txt
+			e.UIBox:recalculate(true)
+		end
+	end
+end
+
+G.FUNCS.change_glass_variant = function(args)
+	pick_variant(GLASS_VARIANTS, args.to_key)
+end
+G.FUNCS.mp_glass_blurb = variant_blurb_func(GLASS_VARIANTS)
+
+local MUTATOR_WALL = {
+	{
+		name = "ECONOMY",
+		colour = G.C.MONEY,
+		cells = {
+			{ key = "inflation", label = "Inflation", desc = { "Shop prices creep up $1 with", "every card you buy." } },
+			{ key = "no_interest", label = "No Interest", desc = { "Savings earn nothing.", "Spend it or lose the edge." } },
+			{ key = "discard_tax", label = "Discard Tax", desc = { "Every discard costs $1." } },
+			{ key = "frugal", label = "Frugal", desc = { "Unspent discards pay out $1." } },
+		},
+	},
+	{
+		name = "MAYHEM",
+		colour = G.C.PURPLE,
+		cells = {
+			{ key = "flipped_cards", label = "Blind Poker", desc = { "Your hand is dealt face-down." } },
+			{ key = "debuff_played_cards", label = "Dead Cards", desc = { "Playing cards are debuffed.", "Jokers are the whole engine." } },
+			{ key = "all_eternal", label = "No Takebacks", desc = { "Every joker is eternal." } },
+			{ key = "shrinking_hand", label = "Heavy Pockets", desc = { "-1 hand size for every $10", "you're holding." } },
+		},
+	},
+	{
+		name = "HAZARDS",
+		colour = G.C.RED,
+		cells = {
+			{ key = "gambling_opportunity", label = "No Easy Money", desc = { "No Gold or Lucky cards." } },
+			{ key = "no_uncommons", label = "No Uncommons", desc = { "Uncommon jokers are out", "of the pool." } },
+			{ key = "bigger_shop", label = "Bigger Shop", desc = { "One extra card slot", "in the shop." } },
+			{ key = "chip_cap", label = "Cash Ceiling", desc = { "Chip score can't exceed your", "cash. Greed is the only way up." } },
+		},
+	},
+	{
+		name = "CHAOS",
+		colour = G.C.ORANGE,
+		cells = {
+			{ key = "glass_cannon", label = "Glass Cannon", desc = { "Only 2 hands a round — but", "every hand hits for 4x mult." } },
+			{ key = "smallworld", label = "Small World", desc = { "75% of the pool banned at", "random. Showman always on." } },
+			{ key = "spartan", label = "Spartan", desc = { "No cash from Small or Big", "blinds." } },
+			{ key = "pricey_packs", label = "Pricey Packs", desc = { "Booster packs cost more", "for each ante you reach." } },
+		},
+	},
+}
+
+local SOON = {
+	cells = {
+		{ key = "pvp_reward_draft", label = "Reward Draft", desc = { "Win a PvP blind, draft 1 of 3", "rewards.", "(coming soon)" } },
+		{ key = "rubber_band", label = "Rubber Band", desc = { "Falling behind grants", "escalating buffs.", "(coming soon)" } },
+		{ key = "score_tax", label = "Score Tax", desc = { "Each hand you play raises", "your opponent's target.", "(coming soon)" } },
+	},
+}
+
+G.FUNCS.mp_toggle_mutator = function(e)
+	local key = e.config.ref_table.key
+	MP.MUTATORS_BLIND = false
+	if has_modifier(key) then
+		remove_modifier(key)
+		play_ui_sound("cardSlide2", 1.1, 0.4)
+	else
+		add_modifier(key)
+		play_ui_sound("cardSlide1", 1.1, 0.5)
+	end
+	e:juice_up(0.2, 0.1)
+end
+
+G.FUNCS.mp_mutator_cell_colour = function(e)
+	local rt = e.config.ref_table
+	local lit = has_modifier(rt.key) and not MP.MUTATORS_BLIND
+	e.config.colour = lit and rt.on or rt.off
+end
+
+local function roll_mutators()
+	for _, category in ipairs(MUTATOR_WALL) do
+		for _, cell in ipairs(category.cells) do
+			remove_modifier(cell.key)
+			if math.random() < 0.35 then
+				add_modifier(cell.key)
+			end
+		end
+	end
+end
+
+G.FUNCS.mp_randomize_mutators = function(e)
+	MP.MUTATORS_BLIND = false
+	roll_mutators()
+	play_ui_sound("generic1", 1.0, 0.5)
+	e:juice_up(0.3, 0.1)
+end
+
+G.FUNCS.mp_blind_random_mutators = function(e)
+	roll_mutators()
+	MP.MUTATORS_BLIND = true
+	play_ui_sound("timpani", 1.0, 0.5)
+	e:juice_up(0.3, 0.1)
+end
+
+local function variant_cycle(args)
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.04 },
+		nodes = {
+			{
+				n = G.UIT.R,
+				config = { align = "cm" },
+				nodes = {
+					create_option_cycle({
+						id = args.id,
+						label = args.label,
+						scale = 0.7,
+						options = args.options,
+						current_option = args.current_option,
+						opt_callback = args.opt_callback,
+						w = 4,
+						minw = 4,
+					}),
+				},
+			},
+			{
+				n = G.UIT.R,
+				config = { align = "cm", func = args.blurb_func, minh = 0.3 },
+				nodes = {
+					{ n = G.UIT.T, config = { text = "", scale = 0.3, colour = G.C.UI.TEXT_INACTIVE } },
+				},
+			},
+		},
+	}
+end
+
+function MP.UI.build_glass_cycle()
+	return variant_cycle({
+		id = "modifier_glass_option",
+		label = "Glass",
+		options = variant_labels(GLASS_VARIANTS),
+		current_option = variant_index(GLASS_VARIANTS),
+		opt_callback = "change_glass_variant",
+		blurb_func = "mp_glass_blurb",
+	})
+end
+
+function MP.UI.build_timer_modifier_cycle()
+	return MP.UI.Disableable_Option_Cycle({
+		id = "modifier_timer_option",
+		enabled_ref_table = { val = true },
+		enabled_ref_value = "val",
+		label = localize("k_opts_modifier_timer"),
+		scale = 0.8,
+		options = localize("ml_mp_modifier_timer_opt"),
+		current_option = timer_modifier_to_index(),
+		opt_callback = "change_modifier_timer",
+		minw = 4,
+		w = 4,
+	})
+end
+
+function MP.UI.build_pvp_timer_toggle()
+	local toggle_state = {
+		val = has_modifier("pvp_timer"),
+	}
+	return MP.UI.Disableable_Toggle({
+		id = "modifier_pvp_timer_toggle",
+		label = localize("b_opts_modifier_pvp_timer"),
+		enabled_ref_table = { val = true },
+		enabled_ref_value = "val",
+		ref_table = toggle_state,
+		ref_value = "val",
+		callback = function(value)
+			local enabled = value
+			if enabled == nil then
+				enabled = toggle_state.val
+			end
+
+			if enabled then
+				add_modifier("pvp_timer")
+			else
+				remove_modifier("pvp_timer")
+			end
+		end,
+	})
+end
+
+local function mutator_cell(cell, colour)
+	local on = colour
+	local off = darken(colour, 0.72)
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.035 },
+		nodes = {
+			{
+				n = G.UIT.C,
+				config = {
+					align = "cm",
+					minw = 2.5,
+					minh = 0.46,
+					padding = 0.06,
+					r = 0.1,
+					emboss = 0.05,
+					hover = true,
+					shadow = true,
+					colour = off,
+					button = "mp_toggle_mutator",
+					func = "mp_mutator_cell_colour",
+					ref_table = { key = cell.key, on = on, off = off },
+					tooltip = { title = cell.label, text = cell.desc },
+				},
+				nodes = {
+					{
+						n = G.UIT.T,
+						config = {
+							text = cell.label,
+							scale = 0.34,
+							colour = G.C.UI.TEXT_LIGHT,
+						},
+					},
+				},
+			},
+		},
+	}
+end
+
+local function mutator_column(category)
+	local nodes = {
+		{
+			n = G.UIT.R,
+			config = { align = "cm", padding = 0.04, minh = 0.4 },
+			nodes = {
+				{ n = G.UIT.T, config = { text = category.name, scale = 0.4, colour = category.colour, shadow = true } },
+			},
+		},
+	}
+	for _, cell in ipairs(category.cells) do
+		nodes[#nodes + 1] = mutator_cell(cell, category.colour)
+	end
+	return { n = G.UIT.C, config = { align = "tm", padding = 0.06 }, nodes = nodes }
+end
+
+function MP.UI.build_mutators_wall()
+	local columns = {}
+	for _, category in ipairs(MUTATOR_WALL) do
+		columns[#columns + 1] = mutator_column(category)
+	end
+
+	local soon_labels = {}
+	for _, cell in ipairs(SOON.cells) do
+		soon_labels[#soon_labels + 1] = cell.label
+	end
+
+	return {
+		n = G.UIT.R,
+		config = { align = "cm" },
+		nodes = {
+			{
+				n = G.UIT.R,
+				config = { align = "cm", padding = 0.02 },
+				nodes = {
+					{ n = G.UIT.T, config = { text = "MUTATORS", scale = 0.5, colour = G.C.UI.TEXT_LIGHT, shadow = true } },
+				},
+			},
+			{
+				n = G.UIT.R,
+				config = { align = "cm", padding = 0.02 },
+				nodes = {
+					{ n = G.UIT.T, config = { text = "stack freely · hover for details", scale = 0.3, colour = G.C.UI.TEXT_INACTIVE } },
+				},
+			},
+			{ n = G.UIT.R, config = { align = "cm", padding = 0.04 }, nodes = columns },
+			{ n = G.UIT.R, config = { minh = 0.06 } },
+			{
+				n = G.UIT.R,
+				config = { align = "cm", padding = 0.02 },
+				nodes = {
+					{ n = G.UIT.T, config = { text = "coming soon · " .. table.concat(soon_labels, " · "), scale = 0.3, colour = G.C.UI.TEXT_INACTIVE } },
+				},
+			},
+		},
+	}
+end
+
+function MP.UI.build_mutator_randomize_row()
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.05 },
+		nodes = {
+			{
+				n = G.UIT.C,
+				config = { align = "cm", padding = 0.05 },
+				nodes = {
+					UIBox_button({
+						id = "mp_randomize_mutators_btn",
+						button = "mp_randomize_mutators",
+						label = { "Randomize" },
+						colour = G.C.ORANGE,
+						minw = 2.8,
+						minh = 0.7,
+						scale = 0.4,
+						hover = true,
+						shadow = true,
+					}),
+				},
+			},
+			{
+				n = G.UIT.C,
+				config = { align = "cm", padding = 0.05 },
+				nodes = {
+					UIBox_button({
+						id = "mp_blind_random_mutators_btn",
+						button = "mp_blind_random_mutators",
+						label = { "Blind Random" },
+						colour = G.C.PURPLE,
+						minw = 2.8,
+						minh = 0.7,
+						scale = 0.4,
+						hover = true,
+						shadow = true,
+					}),
+				},
+			},
+		},
+	}
+end

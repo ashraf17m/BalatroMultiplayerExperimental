@@ -2,6 +2,7 @@ local content_runtime = MP.CONTENT.RUNTIME
 
 SMODS.Joker({
 	key = "hanging_chad",
+	no_collection = MP.should_hide_collection_item(),
 	unlocked = true,
 	discovered = true,
 	blueprint_compat = true,

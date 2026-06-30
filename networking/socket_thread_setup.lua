@@ -28,6 +28,9 @@ local networkBuffer = ""
 local outgoingBuffer = ""
 local RECONNECTING_ACTION = '{"action":"reconnecting"}'
 local DISCONNECTED_ACTION = '{"action":"disconnected"}'
+local TESTING_STALL_READS_ON = "__mp_testing_stall_reads_on"
+local TESTING_STALL_READS_OFF = "__mp_testing_stall_reads_off"
+local testingStallServerReads = false
 
 local function pushNetworkUiPayload(payload)
 	if payload ~= nil then

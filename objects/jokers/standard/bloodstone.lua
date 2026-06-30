@@ -31,6 +31,7 @@ end
 
 SMODS.Joker({
 	key = "bloodstone",
+	no_collection = MP.should_hide_collection_item(),
 	unlocked = true,
 	discovered = true,
 	blueprint_compat = true,
@@ -40,7 +41,7 @@ SMODS.Joker({
 	cost = 7,
 	pos = { x = 0, y = 8 },
 	mp_include = content_runtime.include_standard_ruleset,
-	config = { extra = { odds = 2, Xmult = 1.5 } },
+	config = { extra = { odds = 2, Xmult = 1.5 }, mp_sticker_balanced = true },
 	loc_vars = function(self, info_queue, card)
 		local numerator, denominator = get_bloodstone_probability(card)
 		return {

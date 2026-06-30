@@ -134,7 +134,7 @@ local function build_resume_match_state()
 
 	local team_card_restore = nil
 	local playing_cards = BALATRO.get_playing_cards()
-	if MP.uses_shared_sync_group() and playing_cards then
+	if MP.is_shared_card_sync_enabled() and playing_cards then
 		local card_ids = {}
 		local card_ids_by_playing_card = {}
 		for index, card in ipairs(playing_cards) do

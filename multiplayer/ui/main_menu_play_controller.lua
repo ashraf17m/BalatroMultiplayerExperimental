@@ -38,6 +38,9 @@ local function clear_singleplayer_selection()
 	if lobby_domain.clear_config_selection then
 		lobby_domain.clear_config_selection()
 	end
+	if MP.clear_practice_mode then
+		MP.clear_practice_mode()
+	end
 end
 
 local function store_join_lobby_code(temp_code)
@@ -46,12 +49,29 @@ local function store_join_lobby_code(temp_code)
 	end
 end
 
+local function create_ruleset_selection_overlay(initial_ruleset_key, options)
+	if G.UIDEF.ruleset_selection_tabs then
+		return G.UIDEF.ruleset_selection_tabs(initial_ruleset_key, options)
+	end
+	return G.UIDEF.ruleset_selection_options(initial_ruleset_key, options)
+end
+
+local function create_gamemode_selection_overlay(initial_gamemode_key, options)
+	if G.UIDEF.gamemode_selection_tabs then
+		return G.UIDEF.gamemode_selection_tabs(initial_gamemode_key, options)
+	end
+	return G.UIDEF.gamemode_selection_options(initial_gamemode_key, options)
+end
+
 local function open_multiplayer_lobby_creation(lobby_type)
+	if MP.clear_practice_mode then
+		MP.clear_practice_mode()
+	end
 	if lobby_type and lobby_domain.set_lobby_type then
 		lobby_domain.set_lobby_type(lobby_type)
 	end
 
-	open_paused_overlay(G.UIDEF.ruleset_selection_options())
+	open_paused_overlay(create_ruleset_selection_overlay())
 end
 
 BALATRO.set_ui_function("start_vanilla_sp", function(e)
@@ -89,11 +109,21 @@ BALATRO.set_ui_function("create_group_lobby", function()
 	open_multiplayer_lobby_creation(MP.LOBBY_TYPES.FFA)
 end)
 
+BALATRO.set_ui_function("return_to_ruleset_selection", function()
+	local ruleset_key = lobby_domain.get_creation_ruleset and lobby_domain.get_creation_ruleset()
+		or MP.DEFAULT_LOBBY_CREATION_RULESET
+	open_paused_overlay(create_ruleset_selection_overlay(ruleset_key, {
+		preserve_modifiers = true,
+	}))
+end)
+
 BALATRO.set_ui_function("select_gamemode", function()
 	if MP.ACTIONS and MP.ACTIONS.request_coop_saves then
 		MP.ACTIONS.request_coop_saves()
 	end
-	open_paused_overlay(G.UIDEF.gamemode_selection_options())
+	local gamemode_key = lobby_domain.get_creation_gamemode and lobby_domain.get_creation_gamemode()
+		or MP.DEFAULT_LOBBY_CREATION_GAMEMODE
+	open_paused_overlay(create_gamemode_selection_overlay(gamemode_key))
 end)
 
 BALATRO.set_ui_function("join_lobby", function()

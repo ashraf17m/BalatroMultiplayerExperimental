@@ -753,6 +753,7 @@ return {
 			k_warn_service = "ADVERTENCIA: No se encontró el servidor multijugador",
 			k_set_name = "¡Agrega tu usuario en el menú pricipal! (Mods > Multijugador > Configuración)",
 			k_steamodded_warning = "Los jugadores tienen versiones diferentes de Steamodded instaladas. Esto puede causar que las semillas difieran.",
+			k_mp_version_warning = "Players are on different Multiplayer versions! Seeds and jokers will desync - update so you both match.",
 			k_warning_unlock_profile = "El perfil que estás usando no está completamente desbloqueado. Si es una partida con ranking/torneo, crea un perfil nuevo y usa 'Desbloquear todo' en ajustes del perfil.",
 			k_warning_nemesis_unlock = "Tu oponente está jugando en un perfil que no está completamente desbloqueado. Pídele que cree un perfil nuevo y use 'Desbloquear todo' en ajustes del perfil.",
 			k_warning_no_order = "Un jugador tiene habilitada la integración con La Orden y el otro no. Esto hará que las semillas difieran.",

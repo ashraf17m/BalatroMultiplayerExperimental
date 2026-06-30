@@ -82,7 +82,8 @@ function G.FUNCS.gamemode_switch_tabs(args)
 end
 
 function G.FUNCS.change_ruleset_selection(e)
-	if e.config.id == "weekly_ruleset_button" and G.FUNCS.weekly_interrupt(e) then
+	local mode = selection.get_ruleset_selection_mode and selection.get_ruleset_selection_mode() or "lobby"
+	if mode ~= "practice" and e.config.id == "weekly_ruleset_button" and G.FUNCS.weekly_interrupt(e) then
 		return
 	end
 
@@ -100,7 +101,11 @@ function G.FUNCS.change_ruleset_selection(e)
 		end,
 		default_button,
 		function(ruleset_name)
-			selection.apply_ruleset_selection(ruleset_name)
+			if mode == "practice" and MP.set_practice_ruleset then
+				MP.set_practice_ruleset("ruleset_mp_" .. ruleset_name)
+			else
+				selection.apply_ruleset_selection(ruleset_name)
+			end
 		end
 	)
 

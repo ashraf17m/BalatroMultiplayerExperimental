@@ -11,10 +11,11 @@ local CORE = MP.CALCULATOR
 local NATIVE = MP.CALCULATOR_V2
 
 CORE.text = CORE.text or {
-	score = { l = " ", r = "" },
+	score = { l = " ", m = "", r = "" },
 }
 CORE.text.score = CORE.text.score or {}
 CORE.text.score.l = CORE.text.score.l ~= "" and CORE.text.score.l or " "
+CORE.text.score.m = CORE.text.score.m or ""
 CORE.text.score.r = CORE.text.score.r or ""
 CORE.text.score_colours = CORE.text.score_colours or {}
 CORE.HIDDEN_SCORE_TEXT = " ???? "
@@ -116,11 +117,51 @@ function CORE.is_coop_calculation_context()
 		or (MP.LOBBY_TYPES and MP.LOBBY.lobby_type == MP.LOBBY_TYPES.COOP)
 end
 
-function CORE.calculation_start_delay(is_current_pvp_blind)
-	if MP and MP.LOBBY and MP.LOBBY.code and not is_current_pvp_blind and not CORE.is_coop_calculation_context() then
-		return 3 * (G and G.SETTINGS and G.SETTINGS.GAMESPEED or 1)
+local function get_calculation_timer_settings(is_current_pvp_blind)
+	if not (
+		MP
+		and MP.LOBBY
+		and MP.LOBBY.code
+		and MP.LOBBY.config
+		and MP.LOBBY.config.timer
+		and not is_current_pvp_blind
+		and not CORE.is_coop_calculation_context()
+	) then
+		return 0, 0
 	end
-	return 0
+
+	local ruleset = MP.current_ruleset and MP.current_ruleset() or {}
+	local fallback_delay = 3 * (G and G.SETTINGS and G.SETTINGS.GAMESPEED or 1)
+	local delay = MP.LOBBY.config.preview_calculate_delay or ruleset.preview_calculate_delay or fallback_delay
+	local cost = MP.LOBBY.config.preview_calculate_cost or ruleset.preview_calculate_cost or 0
+	return tonumber(delay) or 0, tonumber(cost) or 0
+end
+
+function CORE.calculation_start_delay(is_current_pvp_blind)
+	local delay = get_calculation_timer_settings(is_current_pvp_blind)
+	return delay
+end
+
+function CORE.consume_calculation_timer_cost(is_current_pvp_blind, result)
+	local _, cost = get_calculation_timer_settings(is_current_pvp_blind)
+	if cost <= 0 then
+		return false
+	end
+	if result and (result.empty or result.hidden_information or result.unsupported) then
+		return false
+	end
+	if not (
+		MP.GAME
+		and MP.GAME.timer
+		and not MP.GAME.timer_started
+		and not MP.GAME.nemesis_timer_started
+		and not MP.GAME.timer_consumed
+		and MP.UI
+		and MP.UI.consume_timer
+	) then
+		return false
+	end
+	return MP.UI.consume_timer(cost, nil, math.max(10, cost))
 end
 
 local function safe_call(fn, ...)
@@ -160,10 +201,34 @@ function CORE.values_equal(left, right)
 	return tostring(left) == tostring(right)
 end
 
+local function get_current_score_for_win_check()
+	local teams_domain = MP and MP.DOMAIN and MP.DOMAIN.TEAMS or nil
+	if teams_domain and type(teams_domain.get_cooperative_blind_score) == "function" then
+		local cooperative_score = teams_domain.get_cooperative_blind_score()
+		if cooperative_score ~= nil then
+			return cooperative_score
+		end
+	end
+
+	return G.GAME.chips
+end
+
+local function get_current_target_for_win_check()
+	local teams_domain = MP and MP.DOMAIN and MP.DOMAIN.TEAMS or nil
+	if teams_domain and type(teams_domain.get_cooperative_blind_target) == "function" then
+		local cooperative_target = teams_domain.get_cooperative_blind_target()
+		if cooperative_target ~= nil then
+			return cooperative_target
+		end
+	end
+
+	return G.GAME.blind.chips
+end
+
 function CORE.is_enough_to_win(chips)
 	if G and G.GAME and G.GAME.blind and CORE.is_score_calculator_state() then
-		local total = CORE.add_values(G.GAME.chips, chips)
-		local target = CORE.to_score_number(G.GAME.blind.chips)
+		local total = CORE.add_values(get_current_score_for_win_check(), chips)
+		local target = CORE.to_score_number(get_current_target_for_win_check())
 		local ok, enough = pcall(function() return total >= target end)
 		return ok and enough or false
 	end
@@ -176,11 +241,6 @@ function CORE.format_number(num)
 		local ok, formatted = pcall(number_format, num)
 		if ok then return tostring(formatted) end
 		return tostring(num)
-	end
-	if num >= 1e7 then
-		local x = string.format("%.4g", num)
-		local fac = math.floor(math.log(tonumber(x), 10))
-		return string.format("%.2f", x / (10 ^ fac)) .. "e" .. fac
 	end
 	return number_format(num)
 end
@@ -209,6 +269,7 @@ local function single_part(text, should_pulse, colour)
 			should_pulse = should_pulse or false,
 			colour = colour or G.C.UI.TEXT_LIGHT,
 		},
+		m = blank_part(),
 		r = blank_part(),
 	}
 end
@@ -224,7 +285,8 @@ local function display_parts_from_result(result, unknown_text)
 
 	if min ~= nil and max ~= nil and not CORE.values_equal(min, max) then
 		return {
-			l = scored_part(CORE.format_number(min) .. " - ", min),
+			l = scored_part(CORE.format_number(min), min),
+			m = scored_part(" - ", min),
 			r = scored_part(CORE.format_number(max), max),
 		}
 	end
@@ -306,6 +368,7 @@ end
 
 function CORE.refresh_display()
 	CORE.text.score.l = CORE.text.score.l ~= "" and CORE.text.score.l or " "
+	CORE.text.score.m = CORE.text.score.m or ""
 	CORE.text.score.r = CORE.text.score.r or ""
 end
 

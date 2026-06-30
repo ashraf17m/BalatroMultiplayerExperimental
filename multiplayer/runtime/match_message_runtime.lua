@@ -9,6 +9,7 @@ local MATCH_FLOW_RUNTIME_METHODS = {
 	"start_match_blind_runtime",
 	"handle_team_skip_blind_runtime",
 	"end_current_pvp_runtime",
+	"end_current_coop_blind_runtime",
 	"handle_match_win_runtime",
 	"handle_match_alone_runtime",
 	"handle_match_loss_runtime",
@@ -65,24 +66,37 @@ local function apply_state_update(method_name, ...)
 	return nil
 end
 
-function match_message_runtime.handle_start_game(seed, stake_str)
-	call_match_flow_runtime("start_match_runtime", seed, stake_str)
+function match_message_runtime.handle_start_game(seed, stake_str, back, challenge, sleeve, cocktail)
+	call_match_flow_runtime("start_match_runtime", seed, stake_str, {
+		back = back,
+		challenge = challenge,
+		sleeve = sleeve,
+		cocktail = cocktail,
+	})
 end
 
-function match_message_runtime.handle_start_blind(blind_row, blind_kind, duel_role)
-	call_match_flow_runtime("start_match_blind_runtime", blind_row, blind_kind, duel_role)
+function match_message_runtime.handle_start_blind(blind_row, blind_kind, duel_role, blind_target)
+	call_match_flow_runtime("start_match_blind_runtime", blind_row, blind_kind, duel_role, blind_target)
 end
 
-function match_message_runtime.handle_team_skip_blind(blind_row)
-	call_match_flow_runtime("handle_team_skip_blind_runtime", blind_row)
+function match_message_runtime.handle_team_skip_blind(blind_row, ante)
+	call_match_flow_runtime("handle_team_skip_blind_runtime", blind_row, ante)
 end
 
-function match_message_runtime.handle_end_pvp()
-	if buffer_resume_method("buffer_runtime_match_outcome", "endPvP") then
+function match_message_runtime.handle_end_pvp(lost, pvp_timer_lost)
+	if buffer_resume_method("buffer_runtime_match_outcome", "endPvP", lost, pvp_timer_lost) then
 		return
 	end
 
-	call_match_flow_runtime("end_current_pvp_runtime")
+	call_match_flow_runtime("end_current_pvp_runtime", lost, pvp_timer_lost)
+end
+
+function match_message_runtime.handle_end_coop_blind(lost)
+	if buffer_resume_method("buffer_runtime_match_outcome", "endCoopBlind", lost) then
+		return
+	end
+
+	call_match_flow_runtime("end_current_coop_blind_runtime", lost)
 end
 
 function match_message_runtime.handle_player_info(lives, life_loss_reason, previous_lives, team)
@@ -166,10 +180,31 @@ function match_message_runtime.handle_enemy_location(options)
 	apply_state_update("enemy_location", options)
 end
 
+function match_message_runtime.handle_coop_blind_preview(preview_key, targets)
+	local blind_choice_state = MP.UI and MP.UI.BLIND_CHOICE_STATE or nil
+	if blind_choice_state and blind_choice_state.handle_coop_blind_preview then
+		blind_choice_state.handle_coop_blind_preview(preview_key, targets)
+	end
+end
+
+function match_message_runtime.handle_coop_boss_blind(phase, ante, revision, source_player_id, boss_key, is_reroll)
+	if MP.COOP_BOSS_BLIND and MP.COOP_BOSS_BLIND.handle_server_update then
+		MP.COOP_BOSS_BLIND.handle_server_update({
+			phase = phase,
+			ante = ante,
+			revision = revision,
+			source_player_id = source_player_id,
+			boss_key = boss_key,
+			is_reroll = is_reroll,
+		})
+	end
+end
+
 MP.NETWORKING_INTERNAL.handle_start_game = match_message_runtime.handle_start_game
 MP.NETWORKING_INTERNAL.handle_start_blind = match_message_runtime.handle_start_blind
 MP.NETWORKING_INTERNAL.handle_team_skip_blind = match_message_runtime.handle_team_skip_blind
 MP.NETWORKING_INTERNAL.handle_end_pvp = match_message_runtime.handle_end_pvp
+MP.NETWORKING_INTERNAL.handle_end_coop_blind = match_message_runtime.handle_end_coop_blind
 MP.NETWORKING_INTERNAL.handle_player_info = match_message_runtime.handle_player_info
 MP.NETWORKING_INTERNAL.handle_money_update = match_message_runtime.handle_money_update
 MP.NETWORKING_INTERNAL.handle_win_game = match_message_runtime.handle_win_game
@@ -177,3 +212,5 @@ MP.NETWORKING_INTERNAL.handle_alone_game = match_message_runtime.handle_alone_ga
 MP.NETWORKING_INTERNAL.handle_lose_game = match_message_runtime.handle_lose_game
 MP.NETWORKING_INTERNAL.handle_enemy_info = match_message_runtime.handle_enemy_info
 MP.NETWORKING_INTERNAL.handle_enemy_location = match_message_runtime.handle_enemy_location
+MP.NETWORKING_INTERNAL.handle_coop_blind_preview = match_message_runtime.handle_coop_blind_preview
+MP.NETWORKING_INTERNAL.handle_coop_boss_blind = match_message_runtime.handle_coop_boss_blind

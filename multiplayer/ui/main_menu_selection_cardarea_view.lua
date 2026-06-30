@@ -36,18 +36,33 @@ local function build_tab_entries(ruleset_or_gamemode, is_banned_tab)
 	}
 
 	local function copy_list(key)
+		local lists = nil
 		if is_banned_tab then
-			return merge_lists({
+			lists = {
 				MP.DECK["BANNED_" .. string.upper(key)],
 				ruleset_or_gamemode["banned_" .. key],
 				forced_gamemode["banned_" .. key],
-			})
+			}
+			for _, modifier_name in ipairs(MP.MODIFIERS or {}) do
+				local layer = MP.Layers and MP.Layers[modifier_name] or nil
+				if layer then
+					lists[#lists + 1] = layer["banned_" .. key]
+				end
+			end
+			return merge_lists(lists)
 		end
 
-		return merge_lists({
+		lists = {
 			ruleset_or_gamemode["reworked_" .. key],
 			forced_gamemode["reworked_" .. key],
-		})
+		}
+		for _, modifier_name in ipairs(MP.MODIFIERS or {}) do
+			local layer = MP.Layers and MP.Layers[modifier_name] or nil
+			if layer then
+				lists[#lists + 1] = layer["reworked_" .. key]
+			end
+		end
+		return merge_lists(lists)
 	end
 
 	local tabs = {}

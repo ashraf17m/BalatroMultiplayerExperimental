@@ -11,6 +11,37 @@ local function clamp_blind_col(num)
 	return math.max(1, math.min(25, tonumber(num) or 1))
 end
 
+local function finite_score_number(value)
+	if value == nil or value ~= value or value == math.huge or value == -math.huge then
+		return nil
+	end
+	return value
+end
+
+local function normalize_score_number(value)
+	if type(value) == "number" then
+		return finite_score_number(value)
+	end
+	if value == nil then
+		return nil
+	end
+
+	local numeric_value = tonumber(value)
+	if numeric_value ~= nil then
+		return finite_score_number(numeric_value)
+	end
+
+	local value_text = tostring(value)
+	if value_text == "" then
+		return nil
+	end
+	return finite_score_number(tonumber((string.gsub(value_text, ",", ""))))
+end
+
+function BALATRO.to_score_number(value)
+	return normalize_score_number(value)
+end
+
 function BALATRO.get_player_blind_pos(player)
 	local blind_key = MP.UTILS.blind_col_numtokey(clamp_blind_col(player and player.blind_col))
 	local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(blind_key) or nil
@@ -216,8 +247,13 @@ function BALATRO.set_current_blind_score(chips, chip_text)
 		return false
 	end
 
-	blind.chips = chips
-	blind.chip_text = chip_text
+	local numeric_chips = normalize_score_number(chips)
+	if numeric_chips == nil then
+		return false
+	end
+
+	blind.chips = numeric_chips
+	blind.chip_text = chip_text or number_format(numeric_chips)
 	return true
 end
 

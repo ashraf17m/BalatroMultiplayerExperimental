@@ -51,9 +51,11 @@ end
 
 local function append_settings_toggle_rows(nodes, Disableable_Toggle, toggle_specs)
 	for _, toggle_spec in ipairs(toggle_specs or {}) do
-		local row = create_settings_toggle_row(Disableable_Toggle, toggle_spec)
-		if row then
-			nodes[#nodes + 1] = row
+		if not toggle_spec.when or toggle_spec.when(toggle_spec) then
+			local row = create_settings_toggle_row(Disableable_Toggle, toggle_spec)
+			if row then
+				nodes[#nodes + 1] = row
+			end
 		end
 	end
 end
@@ -88,7 +90,8 @@ function MP.UI.create_UIBox_settings()
 		nodes[#nodes + 1] = create_settings_value_row("b_beat_average_mode", get_scoring_rule_label())
 	end
 
-	if MP.uses_shared_sync_group and MP.uses_shared_sync_group() then
+	local lobby_capabilities = MP.get_lobby_capabilities and MP.get_lobby_capabilities() or {}
+	if lobby_capabilities.can_show_shared_progress_options then
 		local lobby_option_tab_specs = MP.UI.LOBBY_OPTION_TAB_SPECS or {}
 		append_settings_toggle_rows(nodes, Disableable_Toggle, lobby_option_tab_specs.team_options)
 	end

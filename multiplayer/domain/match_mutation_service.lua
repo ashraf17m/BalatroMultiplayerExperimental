@@ -51,11 +51,9 @@ function MATCH_DOMAIN.apply_local_player_info(lives, life_loss_reason, server_pr
 	local granted_comeback_bonus = false
 
 	if changed and previous_lives ~= 0 and MP.LOBBY.config.gold_on_life_loss then
-		if MP.is_pvp_boss() or MP.is_major_league_ruleset() then
-			state.comeback_bonus_given = false
-			state.comeback_bonus = state.comeback_bonus + 1
-			granted_comeback_bonus = true
-		end
+		state.comeback_bonus_given = false
+		state.comeback_bonus = state.comeback_bonus + 1
+		granted_comeback_bonus = true
 	end
 
 	state.lives = lives
@@ -261,6 +259,12 @@ function MATCH_DOMAIN.set_ready_blind_state(is_ready, blind_kind, state)
 	state.ready_blind = not not is_ready
 	state.ready_blind_kind = state.ready_blind and blind_kind or nil
 	state.ready_blind_text = state.ready_blind and localize("b_unready") or localize("b_ready")
+	if blind_kind == "pvp" then
+		state.pvp_reached = state.ready_blind
+		if not state.ready_blind then
+			state.pvp_reached_first = false
+		end
+	end
 	return state.ready_blind
 end
 
@@ -313,6 +317,8 @@ function MATCH_DOMAIN.begin_new_round(state)
 	state.duplicate_end = false
 	state.round_failed = false
 	state.round_ended = false
+	state.coop_deck_out_waiting = false
+	state.coop_deck_out_resolved = false
 	return state
 end
 
@@ -329,6 +335,8 @@ function MATCH_DOMAIN.prepare_blind_selection(state)
 	state.duel_bye_waiting = false
 	state.prevent_eval = false
 	state.round_failed = false
+	state.coop_deck_out_waiting = false
+	state.coop_deck_out_resolved = false
 	state.wait_for_enemys_furthest_blind = false
 	state.highest_score = MP.INSANE_INT.empty()
 	state.score_display = MP.INSANE_INT.empty()
@@ -375,11 +383,24 @@ function MATCH_DOMAIN.mark_duplicate_end(state)
 	return true
 end
 
-function MATCH_DOMAIN.mark_end_pvp(state)
+local function mark_server_resolved_blind(state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.end_pvp = true
+	state.timer_consumed = false
+	state.timer_started = false
+	state.nemesis_timer_started = false
+	state.pvp_reached = false
+	state.pvp_reached_first = false
 	state.duel_blind_role = nil
 	return MATCH_DOMAIN.reset_ready_blind_state(state)
+end
+
+function MATCH_DOMAIN.mark_end_pvp(state)
+	return mark_server_resolved_blind(state)
+end
+
+function MATCH_DOMAIN.mark_end_coop_blind(state)
+	return mark_server_resolved_blind(state)
 end
 
 function MATCH_DOMAIN.mark_match_won(state)
@@ -393,15 +414,30 @@ function MATCH_DOMAIN.mark_match_won(state)
 	return true
 end
 
-function MATCH_DOMAIN.mark_match_alone(state)
+function MATCH_DOMAIN.mark_match_abandoned(state)
 	state = state or MATCH_DOMAIN.ensure_state()
-	if state.won and state.end_game_result == "alone" then
+	if not state.won and state.end_game_result == "abandoned" then
 		return false
 	end
 
-	state.won = true
-	state.end_game_result = "alone"
+	state.won = false
+	state.end_game_result = "abandoned"
 	return true
+end
+
+function MATCH_DOMAIN.mark_match_lost(state)
+	state = state or MATCH_DOMAIN.ensure_state()
+	if not state.won and state.end_game_result == "loss" then
+		return false
+	end
+
+	state.won = false
+	state.end_game_result = "loss"
+	return true
+end
+
+function MATCH_DOMAIN.mark_match_alone(state)
+	return MATCH_DOMAIN.mark_match_abandoned(state)
 end
 
 return MATCH_DOMAIN

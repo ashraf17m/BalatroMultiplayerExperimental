@@ -52,6 +52,9 @@ function FN.PRE.start_calculation_event()
 	end
 	local func = function()
 		FN.PRE.simulate()
+		if MP and MP.CALCULATOR and type(MP.CALCULATOR.consume_calculation_timer_cost) == "function" then
+			MP.CALCULATOR.consume_calculation_timer_cost(is_pvp_blind, FN.PRE.data)
+		end
 		FN.PRE.lock_updates = false
 		FN.PRE.show_preview = true
 		FN.PRE.add_update_event("immediate") -- Refresh UI again

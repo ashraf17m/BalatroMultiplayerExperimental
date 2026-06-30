@@ -2,7 +2,7 @@ G.P_CENTER_POOLS.Ruleset = {}
 MP.Rulesets = {}
 local selection_utils = MP.UTILS
 
-MP.Ruleset = SMODS.GameObject:extend({
+local RulesetBase = SMODS.GameObject:extend({
 	obj_table = {},
 	obj_buffer = {},
 	required_params = {
@@ -41,10 +41,35 @@ MP.Ruleset = SMODS.GameObject:extend({
 	end,
 })
 
+local function add_ruleset_reverse_index_entries(index, ruleset_key, entries)
+	if not index or not ruleset_key then
+		return
+	end
+	for _, key in ipairs(entries or {}) do
+		index[key] = index[key] or {}
+		index[key][#index[key] + 1] = ruleset_key
+	end
+end
+
+function MP.Ruleset(init)
+	if MP.resolve_layers then
+		init = MP.resolve_layers(init)
+	end
+
+	add_ruleset_reverse_index_entries(MP._JOKER_LAYERS, init and init.key, init and init.reworked_jokers)
+	add_ruleset_reverse_index_entries(MP._CONSUMABLE_LAYERS, init and init.key, init and init.reworked_consumables)
+	add_ruleset_reverse_index_entries(MP._TAG_LAYERS, init and init.key, init and init.reworked_tags)
+
+	return RulesetBase(init)
+end
+
 function MP.is_ruleset_active(ruleset_name)
 	local key = "ruleset_mp_" .. ruleset_name
 	if MP.LOBBY.code then
 		return MP.LOBBY.config.ruleset == key
+	end
+	if MP.is_practice_mode and MP.is_practice_mode() and MP.SP then
+		return MP.SP.ruleset == key
 	end
 	return false
 end
@@ -73,7 +98,11 @@ local function apply_base_ruleset_bans()
 	local ruleset_key = nil
 	local gamemode = nil
 
-	if MP.LOBBY.code and MP.LOBBY.config.ruleset then
+	if MP.get_active_ruleset then
+		ruleset_key = MP.get_active_ruleset()
+		local gamemode_key = MP.get_active_gamemode and MP.get_active_gamemode() or nil
+		gamemode = gamemode_key and MP.Gamemodes[gamemode_key] or nil
+	elseif MP.LOBBY.code and MP.LOBBY.config.ruleset then
 		ruleset_key = MP.LOBBY.config.ruleset
 		gamemode = MP.Gamemodes[MP.LOBBY.config.gamemode]
 	end
@@ -116,19 +145,25 @@ function MP.ApplyBans()
 			handler()
 		end
 	end
+	if MP.apply_layer_run_start_fields then
+		MP.apply_layer_run_start_fields()
+	end
+	if MP.RunLayerHooks then
+		MP.RunLayerHooks("on_apply_bans")
+	end
 	return result
 end
 
--- Rework a center for specific ruleset(s). Use MP.LoadReworks() to swap in the active ruleset.
+-- Rework a center for specific ruleset/layer slot(s). Use MP.LoadReworks() to swap in the active ruleset.
 ---@param key string e.g. "j_hanging_chad"
----@param opts table { rulesets, loc_key?, silent?, ...center properties }
+---@param opts table { rulesets|layers, loc_key?, silent?, ...center properties }
 function MP.ReworkCenter(key, opts)
 	local center = G.P_CENTERS[key]
 	opts = opts or {}
 
 	-- Meta keys (not center properties)
-	local reserved = { rulesets = true, loc_key = true, silent = true }
-	local rulesets = opts.rulesets
+	local reserved = { rulesets = true, layers = true, loc_key = true, silent = true }
+	local rulesets = opts.rulesets or opts.layers
 	local loc_key = opts.loc_key
 	local silent = opts.silent
 
@@ -185,6 +220,18 @@ end
 function MP.LoadReworks(ruleset, key)
 	ruleset = ruleset or "vanilla"
 	if string.sub(ruleset, 1, 11) == "ruleset_mp_" then ruleset = string.sub(ruleset, 12, #ruleset) end
+	local function get_rework_chain(ruleset_)
+		if ruleset_ == "vanilla" then
+			return { "vanilla" }
+		end
+		if MP.active_layer_chain then
+			local chain = MP.active_layer_chain(ruleset_)
+			if chain and #chain > 0 then
+				return chain
+			end
+		end
+		return { ruleset_ }
+	end
 	local function process(key_, ruleset_)
 		local center = G.P_CENTERS[key_]
 		for k, v in pairs(center) do
@@ -205,14 +252,22 @@ function MP.LoadReworks(ruleset, key)
 			end
 		end
 	end
+	local rework_chain = get_rework_chain(ruleset)
 	if key then
-		process(key, "mp_" .. ruleset .. "_")
+		for _, rework_key in ipairs(rework_chain) do
+			process(key, "mp_" .. rework_key .. "_")
+		end
 	else
 		for k, v in pairs(G.P_CENTERS) do
 			if v.mp_reworks then
-				if v.mp_reworks[ruleset] then
-					process(k, "mp_" .. ruleset .. "_")
-				elseif v.mp_reworks["vanilla"] then -- Check vanilla separately to reset reworked jokers
+				local applied = false
+				for _, rework_key in ipairs(rework_chain) do
+					if v.mp_reworks[rework_key] then
+						process(k, "mp_" .. rework_key .. "_")
+						applied = true
+					end
+				end
+				if not applied and v.mp_reworks["vanilla"] then -- Check vanilla separately to reset reworked jokers
 					process(k, "mp_vanilla_")
 				end
 			end

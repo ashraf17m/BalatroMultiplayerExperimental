@@ -20,6 +20,25 @@ local function create_option_page(nodes, minh, minw)
 	}
 end
 
+local function get_compact_option_page_minh(visible_count, minh, args)
+	if not (args and args.compact_empty_space) then
+		return minh
+	end
+
+	visible_count = visible_count or 0
+	if visible_count <= 0 then
+		return args.compact_empty_minh or 1
+	end
+
+	local base_minh = minh or 4
+	local row_minh = args.compact_row_minh or 0.86
+	local padding_minh = args.compact_padding_minh or 0.75
+	local min_minh = args.compact_min_minh or 1.6
+	local compact_minh = math.max(min_minh, padding_minh + row_minh * visible_count)
+
+	return math.min(base_minh, compact_minh)
+end
+
 local function get_cycle_spec_id(spec)
 	return spec.spec_id or spec.id or spec.option_key
 end
@@ -299,6 +318,8 @@ end
 function view_model.create_lobby_option_specs_page(specs, minh, args)
 	args = args or {}
 	local nodes = view_model.build_lobby_option_controls(specs)
+	local visible_count = #nodes
+	minh = get_compact_option_page_minh(visible_count, minh, args)
 	if args.center_controls then
 		nodes = create_centered_option_controls(nodes)
 	end

@@ -1,28 +1,12 @@
-local BANNED_MODS = {
-	["Incantation"] = true,
-	["Brainstorm"] = true,
-	["DVPreview"] = true,
-	["Aura"] = true,
-	["NotJustYet"] = true,
-	["Showman"] = true,
-	["TagPreview"] = true,
-	["FantomsPreview"] = true,
-}
+local function starts_with(text, prefix)
+	return type(text) == "string" and string.sub(text, 1, #prefix) == prefix
+end
 
-local function format_mod_display_text(mod_name, mod_version)
-	if mod_name == "Multiplayer" then
-		local display_name = MP.display_name or MP.name or mod_name
-		if mod_version then
-			return display_name .. " " .. mod_version
-		end
-		return display_name
+local function fade_colour(colour, alpha)
+	if adjust_alpha then
+		return adjust_alpha(colour, alpha)
 	end
-
-	if mod_version then
-		return mod_name .. "-" .. mod_version
-	end
-
-	return mod_name
+	return colour
 end
 
 local function get_player_mods(player_id)
@@ -67,29 +51,97 @@ function MP.UI.modlist_to_view(mods, text_colour)
 		return nodes
 	end
 
+	local special_mods_targets = {
+		"Lovely",
+		"Steamodded",
+		"Multiplayer",
+		"Preview",
+	}
+	local special_mods_found = {}
+	local other_mods = {}
 	for mod_name, mod_version in pairs(mods) do
-		local display_text = format_mod_display_text(mod_name, mod_version)
-		local color = BANNED_MODS[mod_name] and G.C.RED or text_colour
-		table.insert(nodes, {
+		local found = false
+		for _, id in ipairs(special_mods_targets) do
+			if not special_mods_found[id] and starts_with(mod_name, id) then
+				special_mods_found[id] = { name = mod_name, version = mod_version }
+				found = true
+				break
+			end
+		end
+		if not found then
+			other_mods[#other_mods + 1] = { name = mod_name, version = mod_version }
+		end
+	end
+
+	table.sort(other_mods, function(a, b)
+		return a.name < b.name
+	end)
+
+	local function add_mod_row(mod)
+		if not mod then return end
+
+		local mod_name = mod.name
+		local mod_version = mod.version
+		if MP.UTILS and MP.UTILS.resolve_mod_name_and_version then
+			mod_name, mod_version = MP.UTILS.resolve_mod_name_and_version(mod_name, mod_version)
+		end
+		local color = MP.BANNED_MODS and MP.BANNED_MODS[mod.name] and G.C.RED or text_colour
+		nodes[#nodes + 1] = {
 			n = G.UIT.R,
 			config = {
-				padding = 0.02,
+				padding = 0.025,
 				align = "cm",
 			},
 			nodes = {
 				{
 					n = G.UIT.T,
 					config = {
-						text = display_text,
-						shadow = true,
-						scale = 0.4,
+						text = mod_name,
+						scale = 0.32,
 						colour = color,
 					},
 				},
+				mod_version and {
+					n = G.UIT.T,
+					config = {
+						text = " " .. mod_version,
+						scale = 0.32,
+						colour = fade_colour(color, 0.6),
+					},
+				} or nil,
 			},
-		})
+		}
 	end
 
+	local function add_separator()
+		if #nodes == 0 then return end
+		nodes[#nodes + 1] = {
+			n = G.UIT.R,
+			config = {
+				minh = 0.025,
+				colour = fade_colour(text_colour, 0.25),
+			},
+		}
+	end
+
+	local function add_group(group)
+		local group_rows = {}
+		for _, mod in ipairs(group) do
+			if mod then
+				group_rows[#group_rows + 1] = mod
+			end
+		end
+		if #group_rows == 0 then return end
+
+		add_separator()
+		for _, mod in ipairs(group_rows) do
+			add_mod_row(mod)
+		end
+	end
+
+	add_group({ special_mods_found.Lovely, special_mods_found.Steamodded })
+	add_group({ special_mods_found.Multiplayer, special_mods_found.Preview })
+	add_group(other_mods)
 	return nodes
 end
 

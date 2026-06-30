@@ -14,9 +14,16 @@ local TEAM_CARD_REMOTE_APPLY_RETRY_DELAY = 0.1
 local pending_remote_changes_by_card_id = {}
 local pending_remote_change_order = {}
 local pending_remote_flush_scheduled = false
+local startup_remote_changes_by_card_id = {}
+local startup_remote_change_order = {}
+local startup_remote_flush_scheduled = false
 
 local function is_team_card_sync_active()
 	return team_card_sync.is_sync_active and team_card_sync.is_sync_active()
+end
+
+local function is_multiplayer_match_active()
+	return MP.is_lobby_match_in_progress and MP.is_lobby_match_in_progress()
 end
 
 local function apply_remote_team_card_changes_now(changes, options)
@@ -53,9 +60,32 @@ local function remember_pending_remote_change(change)
 	return true
 end
 
+local function remember_startup_remote_change(change)
+	if not (change and change.card_id and change.action_type) then
+		return false
+	end
+
+	local card_id = tostring(change.card_id)
+	if not startup_remote_changes_by_card_id[card_id] then
+		startup_remote_change_order[#startup_remote_change_order + 1] = card_id
+	end
+	startup_remote_changes_by_card_id[card_id] = change
+	return true
+end
+
 local function has_pending_remote_changes()
 	for _, card_id in ipairs(pending_remote_change_order) do
 		if pending_remote_changes_by_card_id[card_id] then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function has_startup_remote_changes()
+	for _, card_id in ipairs(startup_remote_change_order) do
+		if startup_remote_changes_by_card_id[card_id] then
 			return true
 		end
 	end
@@ -78,6 +108,21 @@ local function take_pending_remote_changes()
 	return changes
 end
 
+local function take_startup_remote_changes()
+	local changes = {}
+	for _, card_id in ipairs(startup_remote_change_order) do
+		local change = startup_remote_changes_by_card_id[card_id]
+		if change then
+			changes[#changes + 1] = change
+			startup_remote_changes_by_card_id[card_id] = nil
+		end
+	end
+
+	startup_remote_change_order = {}
+	startup_remote_flush_scheduled = false
+	return changes
+end
+
 local function schedule_pending_remote_flush()
 	if pending_remote_flush_scheduled or not BALATRO.queue_event then
 		return false
@@ -95,6 +140,23 @@ local function schedule_pending_remote_flush()
 	})
 end
 
+local function schedule_startup_remote_flush()
+	if startup_remote_flush_scheduled or not BALATRO.queue_event then
+		return false
+	end
+
+	startup_remote_flush_scheduled = true
+	return BALATRO.queue_event({
+		trigger = "after",
+		delay = TEAM_CARD_REMOTE_APPLY_RETRY_DELAY,
+		func = function()
+			startup_remote_flush_scheduled = false
+			team_card_sync.flush_startup_remote_changes()
+			return true
+		end,
+	})
+end
+
 local function queue_played_hand_remote_change_animation(changes, on_complete)
 	if team_card_sync.queue_played_hand_remote_change_animation then
 		return team_card_sync.queue_played_hand_remote_change_animation(changes, on_complete)
@@ -107,6 +169,18 @@ function team_card_sync.clear_pending_remote_changes()
 	pending_remote_changes_by_card_id = {}
 	pending_remote_change_order = {}
 	pending_remote_flush_scheduled = false
+	startup_remote_changes_by_card_id = {}
+	startup_remote_change_order = {}
+	startup_remote_flush_scheduled = false
+end
+
+function team_card_sync.defer_remote_change_until_active(change)
+	if not remember_startup_remote_change(change) then
+		return false
+	end
+
+	schedule_startup_remote_flush()
+	return true
 end
 
 function team_card_sync.defer_remote_change(change)
@@ -117,6 +191,24 @@ function team_card_sync.defer_remote_change(change)
 	remember_pending_remote_change(change)
 	schedule_pending_remote_flush()
 	return true
+end
+
+function team_card_sync.flush_startup_remote_changes()
+	if not has_startup_remote_changes() then
+		return false
+	end
+	if not is_team_card_sync_active() then
+		if not is_multiplayer_match_active() then
+			take_startup_remote_changes()
+			return false
+		end
+		schedule_startup_remote_flush()
+		return false
+	end
+
+	local changes = take_startup_remote_changes()
+	local applied_count = apply_remote_team_card_changes_now(changes, { force = true })
+	return applied_count > 0
 end
 
 function team_card_sync.flush_pending_remote_changes(options)
