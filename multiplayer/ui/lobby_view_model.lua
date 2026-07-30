@@ -36,6 +36,13 @@ local LOBBY_OPTIONS_TAB_SPECS = {
 		end,
 	},
 	{
+		id = "bonuses",
+		label_key = "k_lobby_bonuses",
+		build = function()
+			return MP.UI.create_bonuses_options_tab()
+		end,
+	},
+	{
 		id = "advanced",
 		label_key = "k_lobby_advanced",
 		build = function()

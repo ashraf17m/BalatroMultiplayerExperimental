@@ -205,7 +205,6 @@ function match_flow_runtime.start_match_blind_runtime(blind_row, blind_kind, due
 	local blind_choice = get_blind_choice_internal()
 	local ready_blind_kind = blind_kind or (blind_choice.get_match_ready_blind_kind and blind_choice.get_match_ready_blind_kind() or nil)
 	local is_pvp_blind = ready_blind_kind == "pvp"
-	local skip_pvp_countdown = MP.GAME and MP.GAME.start_blind_skip_pvp_countdown
 
 	if match_domain.set_duel_blind_role then
 		match_domain.set_duel_blind_role(duel_role)
@@ -221,14 +220,8 @@ function match_flow_runtime.start_match_blind_runtime(blind_row, blind_kind, due
 
 	if is_pvp_blind then
 		MP.ANTE_TIMER_RUNTIME.reset_for_ante(get_match_timer_start_time("pvp"))
-		if skip_pvp_countdown then
-			begin_pvp_blind()
-		else
-			MP.UI.start_pvp_countdown(begin_pvp_blind)
-		end
-	else
-		begin_pvp_blind()
 	end
+	begin_pvp_blind()
 
 	if MP.UI and MP.UI.refresh_timer_hud_binding then
 		MP.UI.refresh_timer_hud_binding()

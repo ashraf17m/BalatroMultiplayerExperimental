@@ -7,12 +7,8 @@ local function use_standings_hud()
 		or (MP.is_teams_mode and MP.is_teams_mode())
 end
 
-local function is_ghost_replay_active()
-	return MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
-end
-
 local function has_blind_hud_context()
-	return (MP and MP.LOBBY and MP.LOBBY.code) or is_ghost_replay_active()
+	return MP and MP.LOBBY and MP.LOBBY.code
 end
 
 function MP.UI.update_primary_opponent_blind_name(pop_in)
@@ -27,15 +23,6 @@ function MP.UI.update_primary_opponent_blind_name(pop_in)
 	local blind_name = BALATRO.get_hud_blind_element_by_id("HUD_blind_name")
 	if not blind_name then
 		return false
-	end
-
-	if is_ghost_replay_active() then
-		return BALATRO.set_text_object_ref(
-			blind_name,
-			(OPPONENTS.get_primary_enemy_state and OPPONENTS.get_primary_enemy_state()) or {},
-			"username",
-			pop_in
-		)
 	end
 
 	return BALATRO.set_text_object_ref(

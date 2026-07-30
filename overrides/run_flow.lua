@@ -9,10 +9,6 @@ local match_domain = MP.DOMAIN and MP.DOMAIN.MATCH or {}
 local teams_domain = MP.DOMAIN and MP.DOMAIN.TEAMS or {}
 local SURVIVAL_WAIT_WIN_ANTE_SENTINEL = 999
 
-local function is_ghost_replay_active()
-	return MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
-end
-
 local function set_win_ante(win_ante) G.GAME.win_ante = win_ante end
 
 local function set_state_complete(state_complete) G.STATE_COMPLETE = state_complete end
@@ -107,7 +103,7 @@ local function is_first_blind_draw_to_hand()
 end
 
 local function should_prepare_first_blind_draw_to_hand()
-	return (MP.LOBBY.code or is_ghost_replay_active()) and is_first_blind_draw_to_hand()
+	return MP.LOBBY.code and is_first_blind_draw_to_hand()
 end
 
 local function update_pvp_blind_hud_after_intro()
@@ -167,10 +163,8 @@ local function play_asteroid_send_sequence(asteroid_count)
 	end
 	G.E_MANAGER:add_event(Event({
 		func = function()
-			if not is_ghost_replay_active() then
-				for i = 1, asteroid_count do
-					MP.ACTIONS.asteroid()
-				end
+			for i = 1, asteroid_count do
+				MP.ACTIONS.asteroid()
 			end
 			return true
 		end,
@@ -300,10 +294,6 @@ local function should_use_server_resolved_hand_played_flow()
 	return is_connected_multiplayer_run() and MP.is_server_resolved_blind()
 end
 
-local function should_use_ghost_hand_played_flow()
-	return is_ghost_replay_active() and MP.is_pvp_boss and MP.is_pvp_boss()
-end
-
 local function remove_run_buttons_and_shop(game)
 	if game.buttons then
 		game.buttons:remove()
@@ -409,48 +399,6 @@ local function queue_server_hand_played_event()
 	}))
 end
 
-local function resolve_ghost_hand_played_event()
-	trace_runtime_event("run_flow.ghost_resolved_hand_start", {
-		chips = G.GAME.chips,
-		end_pvp = not not MP.GAME.end_pvp,
-		hands_left = G.GAME.current_round.hands_left,
-		has_hand_data = MP.GHOST.has_hand_data and MP.GHOST.has_hand_data(),
-	})
-
-	if should_wait_after_server_resolved_hand() then
-		local result = MP.GHOST.resolve_pvp_hands_exhausted and MP.GHOST.resolve_pvp_hands_exhausted(G.GAME.chips) or nil
-		if result == "won" then
-			win_game()
-			return true
-		elseif result == "game_over" then
-			transition_to_state(G.STATES.GAME_OVER, false)
-			return true
-		end
-
-		show_wait_for_enemy_hand_text()
-		if should_eval_waiting_hand() then
-			eval_hand_and_jokers()
-			G.FUNCS.draw_from_hand_to_discard()
-		end
-	elseif MP.GHOST.has_hand_data and MP.GHOST.has_hand_data() then
-		MP.GHOST.resolve_pvp_mid_hand(G.GAME.chips)
-		if should_draw_next_hand_after_play() then
-			transition_to_state(G.STATES.DRAW_TO_HAND, false)
-		end
-	elseif should_draw_next_hand_after_play() then
-		transition_to_state(G.STATES.DRAW_TO_HAND, false)
-	end
-
-	return true
-end
-
-local function queue_ghost_hand_played_event()
-	G.E_MANAGER:add_event(Event({
-		trigger = "immediate",
-		func = resolve_ghost_hand_played_event,
-	}))
-end
-
 local function should_enter_new_round_from_resolved_hand()
 	return MP.GAME.end_pvp and MP.is_server_resolved_blind() and not (G.GAME.STOP_USE and G.GAME.STOP_USE > 0)
 end
@@ -458,20 +406,6 @@ end
 local update_hand_played_ref = Game.update_hand_played
 ---@diagnostic disable-next-line: duplicate-set-field
 function Game:update_hand_played(dt)
-	if should_use_ghost_hand_played_flow() then
-		remove_run_buttons_and_shop(self)
-
-		if not G.STATE_COMPLETE then
-			set_state_complete(true)
-			queue_ghost_hand_played_event()
-		end
-
-		if should_enter_new_round_from_resolved_hand() then
-			enter_pvp_new_round({ state_complete = false })
-		end
-		return
-	end
-
 	if not should_use_server_resolved_hand_played_flow() then
 		update_hand_played_ref(self, dt)
 		return
@@ -513,13 +447,6 @@ local function fail_current_round_if_needed()
 	trace_runtime_event("run_flow.fail_round_send", { blind_chips = G.GAME.blind.chips, chips = G.GAME.chips, hands_played = G.GAME.current_round.hands_played, survival_final_life = is_survival_final_life() })
 
 	MP.GAME.round_failed = true
-	if is_ghost_replay_active() then
-		if MP.GHOST.resolve_round_fail and MP.GHOST.resolve_round_fail() == "game_over" then
-			transition_to_state(G.STATES.GAME_OVER, false)
-			return true
-		end
-		return false
-	end
 
 	mark_wait_for_enemy_furthest_blind_if_available()
 	MP.ACTIONS.fail_round(G.GAME.current_round.hands_played)
@@ -663,8 +590,8 @@ function MP.release_cooperative_deck_out_resolution()
 	return finish_resolved_cooperative_deck_out()
 end
 
-local function should_use_multiplayer_or_ghost_new_round_flow()
-	return (MP.LOBBY.code or is_ghost_replay_active()) and not G.STATE_COMPLETE
+local function should_use_multiplayer_new_round_flow()
+	return MP.LOBBY.code and not G.STATE_COMPLETE
 end
 
 local update_new_round_ref = Game.update_new_round
@@ -680,7 +607,7 @@ function Game:update_new_round(dt)
 			state_complete = releasing_coop_deck_out and false or nil,
 		})
 	end
-	if should_use_multiplayer_or_ghost_new_round_flow() then
+	if should_use_multiplayer_new_round_flow() then
 		if fail_current_round_if_needed() then
 			return
 		end
@@ -754,7 +681,7 @@ local function should_handle_empty_deck_selecting_hand()
 		and #G.hand.cards < 1
 		and #G.deck.cards < 1
 		and #G.play.cards < 1
-		and (MP.LOBBY.code or is_ghost_replay_active())
+		and MP.LOBBY.code
 end
 
 local function handle_empty_deck_selecting_hand()
@@ -764,9 +691,7 @@ local function handle_empty_deck_selecting_hand()
 	if not MP.is_server_resolved_blind() then
 		transition_to_state(G.STATES.NEW_ROUND, false)
 	else
-		if not is_ghost_replay_active() then
-			MP.ACTIONS.play_hand(G.GAME.chips, 0)
-		end
+		MP.ACTIONS.play_hand(G.GAME.chips, 0)
 		transition_to_state(G.STATES.HAND_PLAYED, false)
 	end
 end
@@ -789,7 +714,7 @@ function Game:update_selecting_hand(dt)
 end
 
 function MP.handle_duplicate_end()
-	if MP.LOBBY.code or is_ghost_replay_active() then
+	if MP.LOBBY.code then
 		if MP.GAME.round_ended then
 			if match_domain.mark_duplicate_end and match_domain.mark_duplicate_end() then
 				sendDebugMessage("Duplicate end_round calls prevented.", "MULTIPLAYER")

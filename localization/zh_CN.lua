@@ -302,7 +302,6 @@ return {
 			k_opts_pvp_timer = "计时器",
 			k_opts_showdown_starting_antes = "最终对决开始底注",
 			k_opts_pvp_timer_increment = "计时器增量",
-			k_opts_pvp_countdown_seconds = "PVP 倒计时秒数",
 			k_bl_life = "生命",
 			k_bl_or = "或",
 			k_bl_death = "死亡",

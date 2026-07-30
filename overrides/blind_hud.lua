@@ -1,8 +1,7 @@
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
 local function has_blind_hud_context()
-	return (MP.LOBBY and MP.LOBBY.code)
-		or (MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active())
+	return MP.LOBBY and MP.LOBBY.code
 end
 
 local function clear_coop_blind_base(self)

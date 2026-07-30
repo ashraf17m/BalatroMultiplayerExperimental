@@ -2,6 +2,46 @@ MP.DOMAIN = MP.DOMAIN or {}
 MP.DOMAIN.LOBBY = MP.DOMAIN.LOBBY or {}
 
 local LOBBY_DOMAIN = MP.DOMAIN.LOBBY
+local DEFAULT_LOBBY_ACCESS_MODE = "private"
+local LOBBY_ACCESS_MODE_CONFIG_PATH = { "lobby", "creation_access_mode" }
+local VALID_LOBBY_ACCESS_MODES = {
+	public = true,
+	ask_first = true,
+	private = true,
+}
+
+local function normalize_lobby_access_mode(access_mode)
+	access_mode = tostring(access_mode or "")
+	if VALID_LOBBY_ACCESS_MODES[access_mode] then
+		return access_mode
+	end
+	return DEFAULT_LOBBY_ACCESS_MODE
+end
+
+local function get_saved_lobby_access_mode()
+	local smods = MP.PLATFORM and MP.PLATFORM.SMODS or nil
+	if smods and type(smods.get_config_value) == "function" then
+		return normalize_lobby_access_mode(smods.get_config_value(
+			LOBBY_ACCESS_MODE_CONFIG_PATH,
+			DEFAULT_LOBBY_ACCESS_MODE,
+			MP
+		))
+	end
+	return DEFAULT_LOBBY_ACCESS_MODE
+end
+
+local function save_lobby_access_mode(access_mode)
+	local smods = MP.PLATFORM and MP.PLATFORM.SMODS or nil
+	if not (smods and type(smods.set_config_value) == "function") then
+		return false
+	end
+
+	smods.set_config_value(LOBBY_ACCESS_MODE_CONFIG_PATH, access_mode, MP)
+	if MP.save_current_config then
+		return MP.save_current_config()
+	end
+	return true
+end
 
 local function set_state_field(field, value, state)
 	state = state or LOBBY_DOMAIN.ensure_state()
@@ -68,6 +108,11 @@ local function build_initial_setup_state()
 		temp_seed = "",
 		creation_ruleset = MP.DEFAULT_LOBBY_CREATION_RULESET,
 		creation_gamemode = MP.DEFAULT_LOBBY_CREATION_GAMEMODE,
+		creation_access_mode = get_saved_lobby_access_mode(),
+		browser_lobbies = {},
+		browser_pending = false,
+		pending_join_request = nil,
+		pending_join_requests = {},
 		fetched_weekly = nil,
 		ruleset_preview = false,
 		gamemode_preview = false,
@@ -198,6 +243,160 @@ end
 
 function LOBBY_DOMAIN.set_setup_temp_code(temp_code, state)
 	return LOBBY_DOMAIN.set_setup_field("temp_code", tostring(temp_code or ""), state)
+end
+
+function LOBBY_DOMAIN.normalize_lobby_access_mode(access_mode)
+	return normalize_lobby_access_mode(access_mode)
+end
+
+function LOBBY_DOMAIN.set_creation_access_mode(access_mode, state)
+	local normalized_access_mode = LOBBY_DOMAIN.normalize_lobby_access_mode(access_mode)
+	local saved_access_mode = LOBBY_DOMAIN.set_setup_field(
+		"creation_access_mode",
+		normalized_access_mode,
+		state
+	)
+	save_lobby_access_mode(saved_access_mode)
+	return saved_access_mode
+end
+
+function LOBBY_DOMAIN.get_creation_access_mode(state)
+	state = state or LOBBY_DOMAIN.ensure_state()
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	return LOBBY_DOMAIN.normalize_lobby_access_mode(setup.creation_access_mode)
+end
+
+function LOBBY_DOMAIN.set_browser_lobbies(lobbies, state)
+	return LOBBY_DOMAIN.set_setup_field("browser_lobbies", type(lobbies) == "table" and lobbies or {}, state)
+end
+
+function LOBBY_DOMAIN.get_browser_lobbies(state)
+	state = state or LOBBY_DOMAIN.ensure_state()
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	return type(setup.browser_lobbies) == "table" and setup.browser_lobbies or {}
+end
+
+function LOBBY_DOMAIN.set_browser_pending(is_pending, state)
+	return set_boolean_setup_field("browser_pending", is_pending, state)
+end
+
+function LOBBY_DOMAIN.is_browser_pending(state)
+	state = state or LOBBY_DOMAIN.ensure_state()
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	return not not setup.browser_pending
+end
+
+local function get_real_time()
+	if G and G.TIMERS and G.TIMERS.REAL then
+		return G.TIMERS.REAL
+	end
+	if love and love.timer and love.timer.getTime then
+		return love.timer.getTime()
+	end
+	return os.clock()
+end
+
+local function normalize_join_request_timer(request)
+	if type(request) ~= "table" then
+		return request
+	end
+
+	local expires_in_ms = tonumber(request.expiresInMs or request.expires_in_ms)
+	if expires_in_ms and expires_in_ms == expires_in_ms and expires_in_ms >= 0 then
+		request.local_expires_at = get_real_time() + (expires_in_ms / 1000)
+	elseif request.expiresAt or request.expires_at then
+		local expires_at_seconds = (tonumber(request.expiresAt or request.expires_at) or 0) / 1000
+		request.local_expires_at = get_real_time() + math.max(0, expires_at_seconds - os.time())
+	else
+		request.local_expires_at = get_real_time() + 10
+	end
+
+	return request
+end
+
+function LOBBY_DOMAIN.get_join_request_remaining_seconds(request)
+	if type(request) ~= "table" then
+		return 0
+	end
+
+	local remaining = (tonumber(request.local_expires_at) or 0) - get_real_time()
+	return math.max(0, math.ceil(remaining))
+end
+
+function LOBBY_DOMAIN.set_pending_join_request(request, state)
+	if not (type(request) == "table" and request.requestId) then
+		return nil
+	end
+
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	request = normalize_join_request_timer(request)
+	setup.pending_join_request = request
+	return request
+end
+
+function LOBBY_DOMAIN.get_pending_join_request(state)
+	state = state or LOBBY_DOMAIN.ensure_state()
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	local request = type(setup.pending_join_request) == "table" and setup.pending_join_request or nil
+	if request and LOBBY_DOMAIN.get_join_request_remaining_seconds(request) <= 0 then
+		setup.pending_join_request = nil
+		return nil
+	end
+	return request
+end
+
+function LOBBY_DOMAIN.clear_pending_join_request(request_id, state)
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	local request = type(setup.pending_join_request) == "table" and setup.pending_join_request or nil
+	if request and request_id and tostring(request.requestId) ~= tostring(request_id) then
+		return false
+	end
+
+	setup.pending_join_request = nil
+	return request ~= nil
+end
+
+function LOBBY_DOMAIN.store_join_request(request, state)
+	if not (type(request) == "table" and request.requestId) then
+		return nil
+	end
+
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	setup.pending_join_requests = type(setup.pending_join_requests) == "table" and setup.pending_join_requests or {}
+	request = normalize_join_request_timer(request)
+	setup.pending_join_request_sequence = (tonumber(setup.pending_join_request_sequence) or 0) + 1
+	request.queueOrder = request.queueOrder or setup.pending_join_request_sequence
+	setup.pending_join_requests[tostring(request.requestId)] = request
+	return request
+end
+
+function LOBBY_DOMAIN.remove_join_request(request_id, state)
+	if not request_id then
+		return nil
+	end
+
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	setup.pending_join_requests = type(setup.pending_join_requests) == "table" and setup.pending_join_requests or {}
+	local key = tostring(request_id)
+	local request = setup.pending_join_requests[key]
+	setup.pending_join_requests[key] = nil
+	return request
+end
+
+function LOBBY_DOMAIN.get_join_request(request_id, state)
+	if not request_id then
+		return nil
+	end
+
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	local requests = type(setup.pending_join_requests) == "table" and setup.pending_join_requests or {}
+	return requests[tostring(request_id)]
+end
+
+function LOBBY_DOMAIN.get_pending_join_requests(state)
+	state = state or LOBBY_DOMAIN.ensure_state()
+	local setup = LOBBY_DOMAIN.ensure_setup_state(state)
+	return type(setup.pending_join_requests) == "table" and setup.pending_join_requests or {}
 end
 
 function LOBBY_DOMAIN.set_setup_fetched_weekly(fetched_weekly, state)

@@ -621,7 +621,6 @@ return {
 			k_opts_pvp_timer = "タイマーの秒数",
 			k_opts_showdown_starting_antes = "PvP初戦アンティ(バーサスルール限定)",
 			k_opts_pvp_timer_increment = "ブラインドスキップ時のタイマー追加秒数",
-			k_opts_pvp_countdown_seconds = "PvP開始時のカウントダウンタイマー",
 			k_bl_life = "Life",
 			k_bl_or = "or",
 			k_bl_death = "Death",

@@ -16,17 +16,36 @@ local function normalize_team_id(team_id)
 	return math.floor(numeric_team_id)
 end
 
-function MP.LOBBY_WIRE.build_create_lobby_payload(gamemode, lobby_type, options)
+function MP.LOBBY_WIRE.build_create_lobby_payload(gamemode, lobby_type, options, access_mode)
 	return build_lobby_action_payload("create", {
 		gameMode = gamemode,
 		lobbyType = lobby_type,
+		accessMode = access_mode,
 		options = options or {},
 	})
+end
+
+function MP.LOBBY_WIRE.build_request_lobby_list_payload()
+	return build_lobby_action_payload("list")
 end
 
 function MP.LOBBY_WIRE.build_join_lobby_payload(code)
 	return build_lobby_action_payload("join", {
 		code = code,
+	})
+end
+
+function MP.LOBBY_WIRE.build_respond_lobby_join_request_payload(request_id, accepted, blocked)
+	return build_lobby_action_payload("respondJoinRequest", {
+		requestId = request_id,
+		accepted = not not accepted,
+		blocked = blocked and true or nil,
+	})
+end
+
+function MP.LOBBY_WIRE.build_cancel_lobby_join_request_payload(request_id)
+	return build_lobby_action_payload("cancelJoinRequest", {
+		requestId = request_id,
 	})
 end
 

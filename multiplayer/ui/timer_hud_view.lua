@@ -1,5 +1,4 @@
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
-local match_domain = MP.DOMAIN and MP.DOMAIN.MATCH or {}
 
 local function get_blind_choice_internal()
 	return MP.BLIND_CHOICE_INTERNAL or {}
@@ -50,9 +49,6 @@ end
 
 function MP.UI.cam_timer_opponent()
 	if not (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.timer) then
-		return false
-	end
-	if MP.GAME and MP.GAME.pvp_countdown and MP.GAME.pvp_countdown > 0 then
 		return false
 	end
 	if get_timer_value() <= 0 then
@@ -204,66 +200,6 @@ function MP.UI.refresh_timer_hud_binding()
 	BALATRO.recalculate_ui(BALATRO.get_hud and BALATRO.get_hud() or nil)
 
 	return true
-end
-
-function MP.UI.start_pvp_countdown(callback)
-	local seconds = (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.pvp_countdown_seconds) or 3
-	if match_domain.begin_pvp_countdown then
-		match_domain.begin_pvp_countdown(seconds)
-	end
-
-	BALATRO.set_controller_lock("enter_pvp", true)
-
-	local function show_next()
-		if MP.GAME.pvp_countdown <= 0 then
-			if callback then callback() end
-			BALATRO.queue_event({
-				no_delete = true,
-				trigger = "after",
-				blocking = false,
-				blockable = false,
-				delay = 1,
-				timer = "TOTAL",
-				func = function()
-					BALATRO.clear_controller_lock("enter_pvp")
-					return true
-				end,
-			})
-			return true
-		end
-
-		BALATRO.call_ui_function("attention_text_realtime", {
-			text = tostring(MP.GAME.pvp_countdown),
-			scale = 5,
-			hold = 0.85,
-			align = "cm",
-			major = BALATRO.get_root and BALATRO.get_root() and BALATRO.get_root().play or nil,
-			backdrop_colour = G.C.MULT,
-		})
-
-		BALATRO.play_sound("tarot2", 1, 0.4)
-
-		if match_domain.tick_pvp_countdown then
-			match_domain.tick_pvp_countdown()
-		end
-
-		BALATRO.queue_event({
-			trigger = "after",
-			timer = "REAL",
-			delay = 1,
-			blockable = false,
-			func = show_next,
-		})
-		return true
-	end
-
-	BALATRO.queue_event({
-		trigger = "after",
-		timer = "REAL",
-		delay = 0,
-		blockable = false,
-		func = show_next,
-	})
 end
 
 BALATRO.set_ui_function("set_timer_box", function(e)

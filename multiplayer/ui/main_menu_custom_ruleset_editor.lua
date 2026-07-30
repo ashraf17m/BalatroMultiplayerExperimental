@@ -329,13 +329,6 @@ function G.FUNCS.mp_custom_save_and_play(e)
 		MP.LoadReworks(ruleset_short)
 	end
 
-	if MP.CUSTOM.editor_mode == "practice" then
-		if MP.set_practice_ruleset then
-			MP.set_practice_ruleset(ruleset_key, { preserve_modifiers = true })
-		end
-		return BALATRO.call_ui_function("start_practice_run", e)
-	end
-
 	if lobby_domain.set_creation_ruleset then
 		lobby_domain.set_creation_ruleset(ruleset_key)
 	end
@@ -374,11 +367,11 @@ end
 local function save_button()
 	return UIBox_button({
 		button = "mp_custom_save_and_play",
-		label = { MP.CUSTOM.editor_mode == "practice" and localize("b_practice") or localize("b_create_lobby") },
+		label = { localize("b_create_lobby") },
 		minw = 5,
 		minh = 0.85,
 		scale = 0.45,
-		colour = MP.CUSTOM.editor_mode == "practice" and G.C.GREEN or G.C.BLUE,
+		colour = G.C.BLUE,
 		hover = true,
 		shadow = true,
 	})

@@ -3,40 +3,42 @@ MP.UI.PLAYERS_HUD_SHARED = MP.UI.PLAYERS_HUD_SHARED or {}
 
 local shared = MP.UI.PLAYERS_HUD_SHARED
 local create_text_label = shared.create_text_label
+local create_stat_text_label = shared.create_stat_text_label or create_text_label
 local create_rank_label = shared.create_rank_label
 local create_player_blind_icon_object = shared.create_player_blind_icon_object
 local create_stake_score_box = shared.create_stake_score_box
 local create_blind_style_palette = shared.create_blind_style_palette
 local get_eased_score_display = shared.get_eased_score_display
-local create_view_all_button_row = shared.create_view_all_button_row
+local get_standings_stat_display = shared.get_standings_stat_display
 local create_blind_style_row = shared.create_blind_style_row
 
-shared.PVP_HUD_LAYOUT_REVISION = "pvp_hud_2026_05_21_shared_compact_selection"
+shared.PVP_HUD_LAYOUT_REVISION = "pvp_hud_2026_07_27_row_click_no_press"
 
 local COMPACT_SCORE_ROW_DEFAULTS = {
-	minw = 4.95,
-	minh = 1.08,
+	minw = 5.2,
+	minh = 1.12,
 	padding = 0.012,
-	left_w = 0.72,
+	left_w = 0.68,
 	center_w = 0.62,
 	right_w = 0.62,
 	right_minw = 0.62,
-	far_right_w = 2.91,
+	far_right_w = 3.12,
 	right_padding = 0.01,
-	header_minh = 0.38,
-	body_minh = 0.62,
+	header_minh = 0.42,
+	body_minh = 0.66,
 	outer_inset = 0.0,
 	inner_inset = 0.0,
-	header_left_w = 0.64,
+	header_left_w = 0.62,
 }
 
 local COMPACT_STANDINGS_STYLE = {
-	panel_minw = 4.95,
+	panel_minw = 5.2,
 	visible_limit = 3,
-	rank_text_scale = 0.29,
-	stat_text_scale = 0.28,
-	score_text_scale = 0.44,
-	score_box_w = 2.87,
+	rank_text_scale = 0.36,
+	title_text_scale = 0.38,
+	stat_text_scale = 0.36,
+	score_text_scale = 0.56,
+	score_box_w = 3.06,
 	full_list_column_size = 8,
 	full_list_column_gap = 0.08,
 }
@@ -49,6 +51,16 @@ local function create_compact_score_row(config)
 		end
 	end
 	return create_blind_style_row(config)
+end
+
+local function get_entry_stat_display(entry, stat_key, value)
+	if not get_standings_stat_display then
+		return nil
+	end
+
+	local bucket = tostring(entry.stat_bucket or "standings") .. "_" .. tostring(stat_key)
+	local key = entry.stat_key or entry.id or entry.title or entry.rank or "default"
+	return get_standings_stat_display(bucket, key, value)
 end
 
 local function create_compact_average_score_row(config)
@@ -71,29 +83,37 @@ local function create_compact_average_score_row(config)
 		right_slot_colour = G.C.BLACK,
 		far_right_slot_colour = palette.right_slot or darken(G.C.GREY, 0.45),
 		header_left_nodes = {
-			create_text_label(config.tag or "AVG", config.tag_scale or 0.22, G.C.UI.TEXT_LIGHT),
+			create_text_label(config.tag or "AVG", config.tag_scale or 0.3, G.C.UI.TEXT_LIGHT),
 		},
 		header_center_align = "cm",
 		header_center_nodes = {
-			create_text_label(config.title or "AVERAGE SCORE", config.title_scale or 0.3, G.C.UI.TEXT_LIGHT),
+			create_text_label(config.title or "AVERAGE SCORE", config.title_scale or 0.36, G.C.UI.TEXT_LIGHT),
 		},
 		left_nodes = {
-			create_text_label("-", config.placeholder_scale or 0.27, G.C.UI.TEXT_LIGHT),
+			create_text_label("-", config.placeholder_scale or 0.34, G.C.UI.TEXT_LIGHT),
 		},
 		center_nodes = {
-			create_text_label("-", config.stat_scale or 0.28, G.C.RED, false),
+			create_text_label("-", config.stat_scale or 0.36, G.C.RED, false),
 		},
 		right_nodes = {
-			create_text_label(tostring(config.total_hands or 0), config.stat_scale or 0.28, G.C.BLUE, false),
+			create_stat_text_label(
+				get_standings_stat_display
+						and get_standings_stat_display("average_standings_hands", config.average_key, config.total_hands)
+					or nil,
+				tostring(config.total_hands or 0),
+				config.stat_scale or 0.36,
+				G.C.BLUE,
+				false
+			),
 		},
 		far_right_nodes = {
 			create_stake_score_box(
 				average_score_display.text,
-				config.score_box_w or 2.87,
-				config.score_scale or 0.44,
+				config.score_box_w or COMPACT_STANDINGS_STYLE.score_box_w,
+				config.score_scale or 0.56,
 				G.C.WHITE,
-				config.score_minh or 0.46,
-				config.stake_scale or 0.38,
+				config.score_minh or 0.52,
+				config.stake_scale or 0.44,
 				average_score_display
 			),
 		},
@@ -339,6 +359,9 @@ local function create_compact_standings_entry(entry, pvp_col)
 		left_slot_no_fill = true,
 		left_align = "tm",
 		left_padding = 0.0,
+		header_left_colour = G.C.CLEAR,
+		header_left_emboss = 0,
+		header_left_no_fill = true,
 		center_slot_colour = G.C.BLACK,
 		right_slot_colour = G.C.BLACK,
 		far_right_slot_colour = palette.right_slot or mix_colours(far_right_source, G.C.BLACK, 0.72),
@@ -347,17 +370,29 @@ local function create_compact_standings_entry(entry, pvp_col)
 		},
 		header_center_align = "cm",
 		header_center_nodes = {
-			create_text_label(entry.title or "Unknown", 0.3, entry.title_colour or G.C.UI.TEXT_LIGHT, nil, {
+			create_text_label(entry.title or "Unknown", COMPACT_STANDINGS_STYLE.title_text_scale, entry.title_colour or G.C.UI.TEXT_LIGHT, nil, {
 				outline_colour = entry.title_outline_colour,
 				outline_offset = entry.title_outline_offset,
 			}),
 		},
 		left_nodes = create_compact_blind_icon_nodes(entry.blind_player),
 		center_nodes = {
-			create_text_label(tostring(entry.lives or 0), COMPACT_STANDINGS_STYLE.stat_text_scale, G.C.RED, false),
+			create_stat_text_label(
+				get_entry_stat_display(entry, "lives", entry.lives),
+				tostring(entry.lives or 0),
+				COMPACT_STANDINGS_STYLE.stat_text_scale,
+				G.C.RED,
+				false
+			),
 		},
 		right_nodes = {
-			create_text_label(tostring(entry.hands or 0), COMPACT_STANDINGS_STYLE.stat_text_scale, G.C.BLUE, false),
+			create_stat_text_label(
+				get_entry_stat_display(entry, "hands", entry.hands),
+				tostring(entry.hands or 0),
+				COMPACT_STANDINGS_STYLE.stat_text_scale,
+				G.C.BLUE,
+				false
+			),
 		},
 		far_right_nodes = {
 			create_stake_score_box(
@@ -365,8 +400,8 @@ local function create_compact_standings_entry(entry, pvp_col)
 				COMPACT_STANDINGS_STYLE.score_box_w,
 				COMPACT_STANDINGS_STYLE.score_text_scale,
 				G.C.WHITE,
-				0.46,
-				0.38,
+				0.52,
+				0.44,
 				entry.score_display
 			),
 		},
@@ -383,8 +418,15 @@ local function create_compact_standings_nodes(config)
 		or config.display_entries
 		or select_compact_standings_entries(entries, average_data, config)
 
+	local function mark_open_standings_row(row)
+		if not config.full_list and row and row.config then
+			row.config.mp_open_full_standings_row = true
+		end
+		return row
+	end
+
 	if average_data and average_data.show_average then
-		rows[#rows + 1] = create_compact_average_score_row({
+		rows[#rows + 1] = mark_open_standings_row(create_compact_average_score_row({
 			pvp_col = pvp_col,
 			title = average_data.title or config.average_title,
 			tag = average_data.tag,
@@ -392,7 +434,7 @@ local function create_compact_standings_nodes(config)
 			total_hands = average_data.total_hands,
 			average_score = average_data.average_score,
 			header_darken = config.average_header_darken,
-		})
+		}))
 		rows[#rows + 1] = { n = G.UIT.R, config = { minh = 0.014 } }
 	end
 
@@ -404,14 +446,9 @@ local function create_compact_standings_nodes(config)
 			panel_minw
 		)
 	else
-		append_spaced_stack_nodes(rows, display_entries, config.create_entry)
-	end
-
-	if not config.full_list and create_view_all_button_row then
-		if #rows > 0 then
-			rows[#rows + 1] = { n = G.UIT.R, config = { minh = 0.035 } }
-		end
-		rows[#rows + 1] = create_view_all_button_row(config.panel_minw or COMPACT_STANDINGS_STYLE.panel_minw)
+		append_spaced_stack_nodes(rows, display_entries, function(entry)
+			return mark_open_standings_row(config.create_entry(entry))
+		end)
 	end
 
 	local column_count = config.full_list

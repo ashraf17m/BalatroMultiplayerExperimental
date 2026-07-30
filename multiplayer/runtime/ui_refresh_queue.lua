@@ -17,6 +17,7 @@ end
 
 local REQUEST_REFRESH_KEYS = {
 	request_connection_status_refresh = "connection_status",
+	request_main_menu_multiplayer_buttons_refresh = "main_menu_multiplayer_buttons",
 	request_overlay_menu_close = "overlay_menu_close",
 	request_lobby_main_menu_refresh = "lobby_main_menu",
 	request_pending_lobby_overlay_refresh = "pending_lobby_overlay",
@@ -36,6 +37,9 @@ end
 local FLUSH_REFRESH_CALLBACKS = {
 	connection_status = function()
 		return MP.UI and MP.UI.update_connection_status
+	end,
+	main_menu_multiplayer_buttons = function()
+		return MP.UI and MP.UI.refresh_main_menu_multiplayer_buttons
 	end,
 	overlay_menu_close = function()
 		return MP.UI and MP.UI.close_active_overlay_menu

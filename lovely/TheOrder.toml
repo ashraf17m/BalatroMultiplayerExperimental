@@ -170,30 +170,3 @@ if MP.should_use_the_order() then
 end
 '''
 match_indent = true
-
-# Patch To-Do List rng to be the same on different operating systems
-# This is a vanilla bug!
-# Orbital adjacent fix is in ui/game.lua
-[[patches]]
-[patches.pattern]
-target = "card.lua"
-pattern = '''while not self.ability.to_do_poker_hand do'''
-position = "before"
-payload = '''
-if MP.should_use_the_order() then
-	_poker_hands = MP.sorted_hand_list(self.ability.to_do_poker_hand)
-end
-'''
-match_indent = true
-
-[[patches]]
-[patches.pattern]
-target = "card.lua"
-pattern = '''self.ability.to_do_poker_hand = pseudorandom_element(_poker_hands, pseudoseed('to_do'))'''
-position = "before"
-payload = '''
-if MP.should_use_the_order() then
-	_poker_hands = MP.sorted_hand_list(self.ability.to_do_poker_hand)
-end
-'''
-match_indent = true

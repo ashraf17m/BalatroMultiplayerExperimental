@@ -18,6 +18,7 @@ CALC.show_result = CALC.show_result or false
 CALC.display_result = CALC.display_result or nil
 CALC.display_signature = CALC.display_signature or nil
 CALC.display_guard_signature = CALC.display_guard_signature or nil
+CALC.request_id = CALC.request_id or 0
 
 local function has_selected_cards()
 	return G and G.hand and G.hand.highlighted and #G.hand.highlighted > 0
@@ -93,6 +94,7 @@ end
 
 local function clear_active_request()
 	CALC.queued = false
+	CALC.active_request_id = nil
 	CALC.active_request_signature = nil
 	CALC.active_request_guard_signature = nil
 	CALC.calculation_text = nil
@@ -114,8 +116,9 @@ local function show_unsupported_result()
 	refresh_display()
 end
 
-local function show_calculating_result(signature, guard_signature)
+local function show_calculating_result(request_id, signature, guard_signature)
 	CALC.queued = true
+	CALC.active_request_id = request_id
 	CALC.active_request_signature = signature
 	CALC.active_request_guard_signature = guard_signature
 	CALC.set_calculation_wait_text()
@@ -182,49 +185,25 @@ function CALC.request()
 		return
 	end
 
-	local signature = nil
-	local request_guard_signature = CALC.current_request_guard_signature()
-	local hidden_result = MP and MP.CALCULATOR and type(MP.CALCULATOR.current_hidden_information_result) == "function"
-		and MP.CALCULATOR.current_hidden_information_result()
-	if hidden_result then
-		signature = CALC.current_signature()
-		store_cached_result(signature, request_guard_signature, hidden_result)
-		CALC.finish(true, hidden_result)
-		return
-	end
-
-	local cached_result = nil
-	if type(CALC.current_result) == "function" then
-		if has_selected_cards() then
-			signature = CALC.current_signature()
-			cached_result = CALC.current_result(signature, request_guard_signature)
-		else
-			cached_result = CALC.current_result(nil, request_guard_signature)
-		end
-	end
-	if cached_result ~= nil then
-		clear_active_request()
-		show_ready_result(cached_result)
-		return
-	end
-
-	signature = signature or CALC.current_signature()
-	show_calculating_result(signature, request_guard_signature)
+	CALC.request_id = (CALC.request_id or 0) + 1
+	local request_id = CALC.request_id
+	show_calculating_result(request_id, CALC.current_signature(), CALC.current_request_guard_signature())
 
 	local request_is_pvp_blind = is_current_pvp_blind()
-	local function finish_for_signature(result, reason)
-		if CALC.active_request_signature ~= signature then
+	local calculation_signature = nil
+	local calculation_guard_signature = nil
+	local function finish_for_request(result, reason)
+		if CALC.active_request_id ~= request_id then
 			return
 		end
-		local current_signature = CALC.current_signature()
 		local current_guard_signature = CALC.current_request_guard_signature()
-		if request_guard_signature ~= current_guard_signature then
+		if calculation_guard_signature ~= current_guard_signature then
 			CALC.cancel_request()
 			return
 		end
 
 		if result ~= nil and not result.unsupported then
-			store_cached_result(current_signature, request_guard_signature, result)
+			store_cached_result(calculation_signature or CALC.current_signature(), calculation_guard_signature, result)
 			if MP and MP.CALCULATOR and type(MP.CALCULATOR.consume_calculation_timer_cost) == "function" then
 				MP.CALCULATOR.consume_calculation_timer_cost(request_is_pvp_blind, result)
 			end
@@ -246,19 +225,41 @@ function CALC.request()
 	end
 
 	local function start_backend()
-		if CALC.active_request_signature ~= signature then
+		if CALC.active_request_id ~= request_id then
 			return true
 		end
-		local current_signature = CALC.current_signature()
-		local current_guard_signature = CALC.current_request_guard_signature()
-		if not is_preview_state()
-			or request_guard_signature ~= current_guard_signature
-		then
+		if not is_preview_state() then
 			CALC.cancel_request()
 			return true
 		end
 
-		local ok, started_or_reason = pcall(CALC.run_native_exact_async, finish_for_signature)
+		calculation_guard_signature = CALC.current_request_guard_signature()
+		calculation_signature = CALC.current_signature()
+
+		local hidden_result = MP and MP.CALCULATOR and type(MP.CALCULATOR.current_hidden_information_result) == "function"
+			and MP.CALCULATOR.current_hidden_information_result()
+		if hidden_result then
+			store_cached_result(calculation_signature, calculation_guard_signature, hidden_result)
+			CALC.finish(true, hidden_result)
+			return true
+		end
+
+		local cached_result = nil
+		if type(CALC.current_result) == "function" then
+			if has_selected_cards() then
+				cached_result = CALC.current_result(calculation_signature, calculation_guard_signature)
+			else
+				cached_result = CALC.current_result(nil, calculation_guard_signature)
+				calculation_signature = CALC.last_signature or calculation_signature
+			end
+		end
+		if cached_result ~= nil then
+			clear_active_request()
+			show_ready_result(cached_result)
+			return true
+		end
+
+		local ok, started_or_reason = pcall(CALC.run_native_exact_async, finish_for_request)
 		if ok and started_or_reason then return true end
 		CALC.finish(false, nil, ok and (started_or_reason or "experimental exact backend did not start") or started_or_reason)
 		return true

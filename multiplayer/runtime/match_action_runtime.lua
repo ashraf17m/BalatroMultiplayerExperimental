@@ -204,10 +204,7 @@ function match_action_runtime.ready_blind(e)
 	local blind_row = blind_choice.get_blind_choice_row_type and blind_choice.get_blind_choice_row_type(e) or nil
 	local blind_kind = blind_choice.get_blind_choice_row_kind and blind_choice.get_blind_choice_row_kind(e) or nil
 	if match_domain.queue_next_blind_context then
-		match_domain.queue_next_blind_context(
-			e,
-			blind_kind ~= nil and blind_kind ~= "pvp"
-		)
+		match_domain.queue_next_blind_context(e)
 	end
 	local payload = MP.MATCH_WIRE.build_ready_blind_payload(blind_row, blind_kind, {
 		hands_left = get_starting_hands_for_ready_blind(),
@@ -284,7 +281,7 @@ function match_action_runtime.play_hand(score, hands_left, options)
 	})
 	local insane_int_score = MP.INSANE_INT.from_string(fixed_score)
 	if match_domain.apply_local_hand_score then
-		match_domain.apply_local_hand_score(fixed_score, insane_int_score)
+		match_domain.apply_local_hand_score(fixed_score, insane_int_score, hands_left)
 	end
 	send_end_game_summary_update_after_state_settles()
 	apply_local_pvp_timer_score_gate(insane_int_score)

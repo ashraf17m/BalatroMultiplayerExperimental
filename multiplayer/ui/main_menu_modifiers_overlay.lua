@@ -78,8 +78,7 @@ function G.FUNCS.mp_open_modifiers_overlay(e)
 	if not ruleset then
 		return
 	end
-	local mode = ref_table.mode or (selection.get_ruleset_selection_mode and selection.get_ruleset_selection_mode()) or "lobby"
-	local back_func = mode == "practice" and "mp_open_practice_options_overlay" or "mp_return_to_ruleset_selection_from_modifiers"
+	local back_func = "mp_return_to_ruleset_selection_from_modifiers"
 
 	local timer_cycle = MP.UI.build_timer_modifier_cycle and MP.UI.build_timer_modifier_cycle() or nil
 	local pvp_timer_toggle = MP.UI.build_pvp_timer_toggle and MP.UI.build_pvp_timer_toggle() or nil

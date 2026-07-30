@@ -38,11 +38,32 @@ local function resolve_create_lobby_type(gamemode)
 end
 
 function lobby_action_runtime.create_lobby(gamemode)
-	Client.send(MP.LOBBY_WIRE.build_create_lobby_payload(gamemode, resolve_create_lobby_type(gamemode), copy_lobby_options()))
+	local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
+	local access_mode = lobby_domain.get_creation_access_mode
+		and lobby_domain.get_creation_access_mode()
+		or "private"
+	Client.send(MP.LOBBY_WIRE.build_create_lobby_payload(
+		gamemode,
+		resolve_create_lobby_type(gamemode),
+		copy_lobby_options(),
+		access_mode
+	))
+end
+
+function lobby_action_runtime.request_lobby_list()
+	Client.send(MP.LOBBY_WIRE.build_request_lobby_list_payload())
 end
 
 function lobby_action_runtime.join_lobby(code)
 	Client.send(MP.LOBBY_WIRE.build_join_lobby_payload(code))
+end
+
+function lobby_action_runtime.respond_lobby_join_request(request_id, accepted, blocked)
+	Client.send(MP.LOBBY_WIRE.build_respond_lobby_join_request_payload(request_id, accepted, blocked))
+end
+
+function lobby_action_runtime.cancel_lobby_join_request(request_id)
+	Client.send(MP.LOBBY_WIRE.build_cancel_lobby_join_request_payload(request_id))
 end
 
 function lobby_action_runtime.rejoin_lobby(code, reconnect_token)
@@ -58,13 +79,13 @@ function lobby_action_runtime.unready_lobby()
 end
 
 function lobby_action_runtime.leave_lobby()
+	Client.send(MP.LOBBY_WIRE.build_leave_lobby_payload())
 	if MP.RESUME and MP.RESUME.clear_saved_resume then
 		MP.RESUME.clear_saved_resume()
 	end
 	if MP.CONNECTION_SESSION and MP.CONNECTION_SESSION.clear_reconnect_lobby_state then
 		MP.CONNECTION_SESSION.clear_reconnect_lobby_state()
 	end
-	Client.send(MP.LOBBY_WIRE.build_leave_lobby_payload())
 end
 
 function lobby_action_runtime.return_to_lobby()
@@ -121,7 +142,10 @@ function lobby_action_runtime.set_lobby_type(lobby_type)
 end
 
 MP.ACTIONS.create_lobby = lobby_action_runtime.create_lobby
+MP.ACTIONS.request_lobby_list = lobby_action_runtime.request_lobby_list
 MP.ACTIONS.join_lobby = lobby_action_runtime.join_lobby
+MP.ACTIONS.respond_lobby_join_request = lobby_action_runtime.respond_lobby_join_request
+MP.ACTIONS.cancel_lobby_join_request = lobby_action_runtime.cancel_lobby_join_request
 MP.ACTIONS.rejoin_lobby = lobby_action_runtime.rejoin_lobby
 MP.ACTIONS.ready_lobby = lobby_action_runtime.ready_lobby
 MP.ACTIONS.unready_lobby = lobby_action_runtime.unready_lobby

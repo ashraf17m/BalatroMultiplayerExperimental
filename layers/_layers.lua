@@ -226,21 +226,12 @@ function MP.get_active_ruleset()
 	if MP.LOBBY and MP.LOBBY.code and MP.LOBBY.config then
 		return MP.LOBBY.config.ruleset
 	end
-	if MP.is_practice_mode and MP.is_practice_mode() and MP.SP then
-		return MP.SP.ruleset
-	end
 	return nil
 end
 
 function MP.get_active_gamemode()
 	if MP.LOBBY and MP.LOBBY.code and MP.LOBBY.config then
 		return MP.LOBBY.config.gamemode
-	end
-	if MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active() and MP.GHOST.gamemode then
-		return MP.GHOST.gamemode
-	end
-	if MP.is_practice_mode and MP.is_practice_mode() and MP.SP then
-		return MP.SP.gamemode
 	end
 	return nil
 end
@@ -395,4 +386,46 @@ function MP.apply_layer_run_start_fields()
 		game_modifiers = game_modifiers,
 		starting_params = starting_params,
 	}
+end
+
+local function get_lobby_bonus_value(config, key, min_value, max_value)
+	local value = math.floor(tonumber(config and config[key]) or 0)
+	return math.max(min_value or 0, math.min(max_value or value, value))
+end
+
+function MP.apply_lobby_bonus_run_start_fields()
+	if not (G and G.GAME and MP.LOBBY and MP.LOBBY.code and MP.LOBBY.config) then
+		return nil
+	end
+	if G.GAME.mp_lobby_bonuses_applied then
+		return nil
+	end
+
+	local config = MP.LOBBY.config
+	local bonuses = {
+		hands = get_lobby_bonus_value(config, "bonus_hands", 0, 4),
+		discards = get_lobby_bonus_value(config, "bonus_discards", 0, 3),
+		consumable_slots = get_lobby_bonus_value(config, "bonus_consumable_slots", 0, 2),
+		joker_slots = get_lobby_bonus_value(config, "bonus_joker_slots", 0, 5),
+		dollars = get_lobby_bonus_value(config, "bonus_money", 0, 50),
+	}
+
+	G.GAME.starting_params = G.GAME.starting_params or {}
+	G.GAME.round_resets = G.GAME.round_resets or {}
+
+	for key, value in pairs(bonuses) do
+		if value > 0 then
+			G.GAME.starting_params[key] = (tonumber(G.GAME.starting_params[key]) or 0) + value
+			if G.GAME.round_resets[key] ~= nil then
+				G.GAME.round_resets[key] = (tonumber(G.GAME.round_resets[key]) or 0) + value
+			end
+		end
+	end
+
+	if bonuses.dollars > 0 and G.GAME.dollars ~= nil then
+		G.GAME.dollars = G.GAME.dollars + bonuses.dollars
+	end
+
+	G.GAME.mp_lobby_bonuses_applied = true
+	return bonuses
 end

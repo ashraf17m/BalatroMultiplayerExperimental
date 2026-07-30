@@ -401,5 +401,16 @@ end
 
 -- Overlay message helper
 function MP.UI.UTILS.overlay_message(message, no_back)
+	local main_menu_play_ui = MP.UI and MP.UI.MAIN_MENU_PLAY or nil
+	if
+		main_menu_play_ui
+		and main_menu_play_ui.is_browse_lobbies_overlay_open
+		and main_menu_play_ui.is_browse_lobbies_overlay_open()
+		and main_menu_play_ui.show_browse_lobbies_notice
+		and main_menu_play_ui.show_browse_lobbies_notice(message)
+	then
+		return
+	end
+
 	open_overlay_message_rows(build_overlay_message_rows(message), no_back)
 end

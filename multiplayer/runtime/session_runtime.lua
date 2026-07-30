@@ -39,6 +39,10 @@ function connection_session.refresh_connection_status_ui()
 	call_action_if_present(MP.UI, "request_connection_status_refresh")
 end
 
+function connection_session.refresh_main_menu_multiplayer_buttons()
+	call_action_if_present(MP.UI, "request_main_menu_multiplayer_buttons_refresh")
+end
+
 function connection_session.request_overlay_menu_close()
 	call_action_if_present(MP.UI, "request_overlay_menu_close")
 end
@@ -89,7 +93,11 @@ end
 function connection_session.set_client_connected(is_connected)
 	local connected = lobby_domain.set_client_connected and lobby_domain.set_client_connected(is_connected)
 		or not not is_connected
+	if not connected and MP.UI and MP.UI.MAIN_MENU_PLAY and MP.UI.MAIN_MENU_PLAY.cancel_inline_join_lobby_input then
+		MP.UI.MAIN_MENU_PLAY.cancel_inline_join_lobby_input()
+	end
 	connection_session.refresh_connection_status_ui()
+	connection_session.refresh_main_menu_multiplayer_buttons()
 	return connected
 end
 

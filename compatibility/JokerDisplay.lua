@@ -156,44 +156,6 @@ if MP.PLATFORM.SMODS.is_mod_loadable("JokerDisplay") then
 				return retriggers
 			end,
 		}
-		jd_def["j_mp_ticket"] = {
-			text = {
-				{ text = "+$" },
-				{ ref_table = "card.joker_display_values", ref_value = "dollars", retrigger_type = "mult" },
-			},
-			text_config = { colour = G.C.GOLD },
-			reminder_text = parenthesized_ref("card.joker_display_values", "localized_text", G.C.ORANGE),
-			calc_function = function(card)
-				local dollars = 0
-				local text, _, scoring_hand = JokerDisplay.evaluate_hand()
-				if text ~= "Unknown" then
-					for _, scoring_card in pairs(scoring_hand) do
-						if MP.PLATFORM.SMODS.has_enhancement(scoring_card, "m_gold") then
-							dollars = dollars
-								+ card.ability.extra.dollars
-									* JokerDisplay.calculate_card_triggers(scoring_card, scoring_hand)
-						end
-					end
-				end
-				card.joker_display_values.dollars = dollars
-				card.joker_display_values.localized_text = localize("k_gold")
-			end,
-		}
-		jd_def["j_mp_seltzer"] = {
-			reminder_text = depletion_count_reminder("hands_left"),
-			calc_function = function(card) card.joker_display_values.start_count = card.joker_display_values.start_count or card.ability.extra.hands_left end,
-			style_function = function(card, text, reminder_text, extra) style_depletion_reminder(card, reminder_text, card.ability.extra.hands_left) end,
-			retrigger_function = function(playing_card, scoring_hand, held_in_hand, joker_card)
-				if held_in_hand then return 0 end
-				return JokerDisplay.in_scoring(playing_card, scoring_hand) and JokerDisplay.calculate_joker_triggers(joker_card)
-			end,
-		}
-		jd_def["j_mp_turtle_bean"] = {
-			reminder_text = depletion_count_reminder("h_size"),
-			reminder_text_config = { scale = 0.35 },
-			calc_function = function(card) card.joker_display_values.start_count = card.joker_display_values.start_count or card.ability.extra.h_size end,
-			style_function = function(card, text, reminder_text, extra) style_depletion_reminder(card, reminder_text, card.ability.extra.h_size) end,
-		}
 		jd_def["j_mp_bloodstone"] = {
 			text = {
 				{ ref_table = "card.joker_display_values", ref_value = "count", retrigger_type = "mult" },

@@ -52,6 +52,10 @@ MP.INTEGRATIONS = MP.INTEGRATIONS or {}
 MP.CALCULATOR_LABELS = MP.CALCULATOR_LABELS or { text = "", button = "" }
 MP.EXPERIMENTAL = MP.EXPERIMENTAL or {}
 
+function MP.is_mp_or_ghost()
+	return not not (MP.LOBBY and MP.LOBBY.code)
+end
+
 local function load_platform_loader()
 	local chunk, err = SMODS.load_file("platform/smods/loader.lua", MP.BOOT_MOD_ID)
 	if not chunk then

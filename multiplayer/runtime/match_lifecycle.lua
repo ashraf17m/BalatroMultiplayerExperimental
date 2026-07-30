@@ -82,9 +82,6 @@ function match_lifecycle.prepare_end_game_view()
 end
 
 local function begin_active_match_session()
-	if MP.clear_practice_mode then
-		MP.clear_practice_mode({ clear_modifiers = false })
-	end
 	match_lifecycle.resume_team_card_sync()
 	if lobby_domain.set_match_in_progress then
 		lobby_domain.set_match_in_progress(true)

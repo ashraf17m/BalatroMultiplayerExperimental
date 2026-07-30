@@ -74,6 +74,26 @@ function action_route_runtime.build_protocol_v2_lobby_routes()
 			"lobbyType",
 			"isCoopSaveRestore",
 		}),
+		[build_protocol_route_key("lobby", "list", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_field(
+			"handle_lobby_list",
+			"lobbies"
+		),
+		[build_protocol_route_key("lobby", "joinRequest", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_field(
+			"handle_lobby_join_request_received",
+			"request"
+		),
+		[build_protocol_route_key("lobby", "joinPending", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_fields(
+			"handle_lobby_join_request_pending",
+			{ "code", "requestId", "expiresAt", "expiresInMs" }
+		),
+		[build_protocol_route_key("lobby", "joinRejected", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_fields(
+			"handle_lobby_join_request_rejected",
+			{ "code", "message", "requestId", "reason" }
+		),
+		[build_protocol_route_key("lobby", "joinRequestClosed", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_fields(
+			"handle_lobby_join_request_closed",
+			{ "code", "requestId", "reason" }
+		),
 		[build_protocol_route_key("lobby", "playerJoined", LOBBY_SNAPSHOT_SCHEMA_ID)] = route_field(
 			"handle_lobby_player_joined",
 			"player"
@@ -182,8 +202,14 @@ function action_route_runtime.build_protocol_v2_feature_routes()
 		[build_protocol_route_key("endgame", "win", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_win_game"),
 		[build_protocol_route_key("endgame", "alone", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_alone_game"),
 		[build_protocol_route_key("endgame", "lose", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_lose_game"),
-		[build_protocol_route_key("feature", "sendPhantom", FEATURE_EVENT_SCHEMA_ID)] = route_field("handle_send_phantom", "key"),
-		[build_protocol_route_key("feature", "removePhantom", FEATURE_EVENT_SCHEMA_ID)] = route_field("handle_remove_phantom", "key"),
+		[build_protocol_route_key("feature", "sendPhantom", FEATURE_EVENT_SCHEMA_ID)] = route_fields(
+			"handle_send_phantom",
+			{ "key", "playerId" }
+		),
+		[build_protocol_route_key("feature", "removePhantom", FEATURE_EVENT_SCHEMA_ID)] = route_fields(
+			"handle_remove_phantom",
+			{ "key", "playerId" }
+		),
 		[build_protocol_route_key("feature", "asteroid", FEATURE_EVENT_SCHEMA_ID)] = route_noargs("handle_asteroid"),
 		[build_protocol_route_key("feature", "letsGoGamblingNemesis", FEATURE_EVENT_SCHEMA_ID)] = route_noargs(
 			"handle_lets_go_gambling_nemesis"

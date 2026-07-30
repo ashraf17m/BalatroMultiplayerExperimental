@@ -3,6 +3,7 @@ MP.UI = MP.UI or {}
 local view_model = MP.UI
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 local pending_custom_winners_slider_count = nil
+local pending_custom_winners_slider_percent = nil
 
 local function get_cycle_next_value(spec, args)
 	local option_values = view_model.get_lobby_option_spec_values and view_model.get_lobby_option_spec_values(spec)
@@ -52,7 +53,9 @@ end
 
 function view_model.reset_custom_winners_input_state()
 	view_model.CUSTOM_WINNERS_SLIDER_LAST_SENT = nil
+	view_model.CUSTOM_WINNERS_SLIDER_PERCENT_LAST_SENT = nil
 	pending_custom_winners_slider_count = nil
+	pending_custom_winners_slider_percent = nil
 end
 
 function G.FUNCS.change_bound_lobby_option_cycle(args)
@@ -81,14 +84,23 @@ local function flush_custom_winners_slider_change()
 	end
 
 	local winner_count = pending_custom_winners_slider_count
+	local winner_percent = pending_custom_winners_slider_percent
 	pending_custom_winners_slider_count = nil
+	pending_custom_winners_slider_percent = nil
 
-	if MP.UI.CUSTOM_WINNERS_SLIDER_LAST_SENT == winner_count then
+	if
+		MP.UI.CUSTOM_WINNERS_SLIDER_LAST_SENT == winner_count
+		and MP.UI.CUSTOM_WINNERS_SLIDER_PERCENT_LAST_SENT == winner_percent
+	then
 		return false
 	end
 	MP.UI.CUSTOM_WINNERS_SLIDER_LAST_SENT = winner_count
+	MP.UI.CUSTOM_WINNERS_SLIDER_PERCENT_LAST_SENT = winner_percent
 
-	return send_group_options_update({ pvp_custom_winners = winner_count })
+	return send_group_options_update({
+		pvp_custom_winners = winner_count,
+		pvp_custom_winners_percent = winner_percent,
+	})
 end
 
 function G.FUNCS.change_custom_winners_percent(slider_config)
@@ -100,10 +112,13 @@ function G.FUNCS.change_custom_winners_percent(slider_config)
 	local percent_key = slider_config and slider_config.ref_value or nil
 	local raw_percent = slider_state and percent_key and slider_state[percent_key] or nil
 	local winner_count = view_model.get_custom_winner_count_from_percent(raw_percent)
-	local normalized_percent = view_model.get_custom_winner_percent(winner_count)
+	local normalized_percent = view_model.normalize_custom_winner_percent
+			and view_model.normalize_custom_winner_percent(raw_percent)
+		or view_model.get_custom_winner_percent(winner_count)
 
 	if MP.LOBBY and MP.LOBBY.config then
 		MP.LOBBY.config.pvp_custom_winners = winner_count
+		MP.LOBBY.config.pvp_custom_winners_percent = normalized_percent
 	end
 	if slider_state and percent_key then
 		slider_state[percent_key] = normalized_percent
@@ -119,6 +134,7 @@ function G.FUNCS.change_custom_winners_percent(slider_config)
 	end
 
 	pending_custom_winners_slider_count = winner_count
+	pending_custom_winners_slider_percent = normalized_percent
 	return flush_custom_winners_slider_change()
 end
 

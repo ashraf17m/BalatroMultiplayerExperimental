@@ -633,7 +633,6 @@ return {
 			k_opts_pvp_timer = "Đếm Ngược",
 			k_opts_showdown_starting_antes = "Showdown Bắt đầu ở Ante",
 			k_opts_pvp_timer_increment = "Tăng Đếm Ngược",
-			k_opts_pvp_countdown_seconds = "Giây Đếm Ngược Đối Đầu",
 			k_bl_life = "Sống",
 			k_bl_or = "hoặc",
 			k_bl_death = "Chết",

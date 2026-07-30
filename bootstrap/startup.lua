@@ -194,6 +194,8 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/decks/testing_deck.lua",
 	"testing_tools/decks/testing_2_deck.lua",
 	"testing_tools/notice.lua",
+	"testing_tools/fkey_utilities.lua",
+	"testing_tools/solo_pvp_launcher.lua",
 	"testing_tools/temp_username_hotkey.lua",
 	"testing_tools/dummy_players_hotkey.lua",
 	"testing_tools/slow_consumer_hotkey.lua",
@@ -253,6 +255,14 @@ local register_multiplayer_mod_icon = function()
 		path = "modicon.png",
 		px = 34,
 		py = 34,
+	})
+
+	SMODS.Atlas({
+		key = "mp_paste_icon",
+		path = "mp_paste_icon.png",
+		px = 34,
+		py = 34,
+		disable_mipmap = true,
 	})
 end
 

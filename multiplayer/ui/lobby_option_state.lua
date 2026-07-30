@@ -163,8 +163,20 @@ function view_model.get_custom_winner_max_players()
 	return view_model.normalize_group_max_players(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.max_players)
 end
 
+function view_model.get_custom_winner_player_count()
+	local max_players = view_model.get_custom_winner_max_players()
+	local lobby_context = MP.get_lobby_state_context and MP.get_lobby_state_context() or {}
+	local player_count = tonumber(lobby_context.player_count) or 0
+
+	if player_count > 0 then
+		return math.max(1, math.min(max_players, math.floor(player_count)))
+	end
+
+	return max_players
+end
+
 function view_model.get_custom_winner_limit(max_players)
-	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_max_players()
+	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_player_count()
 	return math.max(1, math.floor(resolved_max_players) - 1)
 end
 
@@ -180,7 +192,7 @@ function view_model.normalize_custom_winner_count(value, max_players)
 	local max_winners = view_model.get_custom_winner_limit(max_players)
 	local parsed = tonumber(value)
 	if not parsed then
-		parsed = view_model.get_default_custom_winner_count(max_players or view_model.get_custom_winner_max_players())
+		parsed = view_model.get_default_custom_winner_count(max_players or view_model.get_custom_winner_player_count())
 	end
 
 	return math.max(1, math.min(max_winners, math.floor(parsed)))
@@ -188,6 +200,10 @@ end
 
 function view_model.get_custom_winner_count()
 	local config = MP.LOBBY and MP.LOBBY.config or {}
+	local configured_percent = tonumber(config.pvp_custom_winners_percent)
+	if configured_percent and configured_percent > 0 then
+		return view_model.get_custom_winner_count_from_percent(configured_percent)
+	end
 	return view_model.normalize_custom_winner_count(config.pvp_custom_winners)
 end
 
@@ -196,39 +212,69 @@ function view_model.get_custom_winner_count_options()
 end
 
 function view_model.get_custom_winner_percent(winner_count, max_players)
-	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_max_players()
+	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_player_count()
 	return math.max(
 		1,
 		math.min(100, math.floor(((winner_count or 1) / resolved_max_players) * 100 + 0.5))
 	)
 end
 
+local function get_custom_winner_percent_basis(player_count)
+	return math.max(2, tonumber(player_count) or view_model.get_custom_winner_player_count())
+end
+
 function view_model.get_custom_winner_min_percent(max_players)
-	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_max_players()
+	local resolved_max_players = get_custom_winner_percent_basis(max_players)
 	return view_model.get_custom_winner_percent(1, resolved_max_players)
 end
 
 function view_model.get_custom_winner_percent_limit(max_players)
-	local resolved_max_players = tonumber(max_players) or view_model.get_custom_winner_max_players()
+	local resolved_max_players = get_custom_winner_percent_basis(max_players)
 	return view_model.get_custom_winner_percent(
 		view_model.get_custom_winner_limit(resolved_max_players),
 		resolved_max_players
 	)
 end
 
+local function snap_custom_winner_percent(percent, player_count)
+	local basis_player_count = get_custom_winner_percent_basis(player_count)
+	local min_percent = view_model.get_custom_winner_min_percent(basis_player_count)
+	local max_percent = view_model.get_custom_winner_percent_limit(basis_player_count)
+	local parsed_percent = tonumber(percent) or 50
+
+	if max_percent < min_percent then
+		min_percent, max_percent = max_percent, min_percent
+	end
+
+	parsed_percent = math.max(min_percent, math.min(max_percent, parsed_percent))
+	local winner_count = view_model.normalize_custom_winner_count(
+		math.floor((basis_player_count * parsed_percent / 100) + 0.5),
+		basis_player_count
+	)
+	return view_model.get_custom_winner_percent(winner_count, basis_player_count)
+end
+
+function view_model.normalize_custom_winner_percent(percent, player_count)
+	return snap_custom_winner_percent(percent, player_count)
+end
+
+function view_model.get_custom_winner_slider_percent(winner_count)
+	local config = MP.LOBBY and MP.LOBBY.config or {}
+	local configured_percent = tonumber(config.pvp_custom_winners_percent)
+	if configured_percent and configured_percent > 0 then
+		return view_model.normalize_custom_winner_percent(configured_percent)
+	end
+
+	return view_model.get_custom_winner_percent(winner_count)
+end
+
 function view_model.get_custom_winner_count_from_percent(percent)
-	local max_players = view_model.get_custom_winner_max_players()
-	local min_percent = view_model.get_custom_winner_min_percent(max_players)
-	local max_percent = view_model.get_custom_winner_percent_limit(max_players)
-	local default_percent = view_model.get_custom_winner_percent(
-		view_model.get_default_custom_winner_count(max_players),
-		max_players
+	local player_count = view_model.get_custom_winner_player_count()
+	local normalized_percent = view_model.normalize_custom_winner_percent(percent, player_count)
+	return view_model.normalize_custom_winner_count(
+		math.floor((player_count * normalized_percent / 100) + 0.5),
+		player_count
 	)
-	local normalized_percent = math.max(
-		min_percent,
-		math.min(max_percent, tonumber(percent) or default_percent)
-	)
-	return view_model.normalize_custom_winner_count(math.floor((max_players * normalized_percent / 100) + 0.5))
 end
 
 function view_model.get_party_mode_values()
@@ -308,6 +354,7 @@ local function apply_local_party_mode_defaults(previous_lobby_type, lobby_type)
 	if lobby_type == MP.LOBBY_TYPES.ONE_V_ONE then
 		config.max_players = 2
 		config.pvp_custom_winners = 1
+		config.pvp_custom_winners_percent = 0
 		config.pvp_score_rule = "highest"
 		return
 	end
@@ -315,6 +362,7 @@ local function apply_local_party_mode_defaults(previous_lobby_type, lobby_type)
 	if previous_lobby_type == MP.LOBBY_TYPES.ONE_V_ONE then
 		config.max_players = MP.DEFAULT_GROUP_LOBBY_PLAYERS
 		config.pvp_custom_winners = view_model.get_default_custom_winner_count(config.max_players)
+		config.pvp_custom_winners_percent = 50
 	end
 
 	if lobby_type == MP.LOBBY_TYPES.DUELS then
@@ -396,15 +444,24 @@ local function change_party_max_players(max_players)
 	local previous_max_players = view_model.normalize_group_max_players(config.max_players)
 	local previous_winners = view_model.normalize_custom_winner_count(config.pvp_custom_winners, previous_max_players)
 	local previous_default_winners = view_model.get_default_custom_winner_count(previous_max_players)
-	local normalized_winners = previous_winners == previous_default_winners
-		and view_model.get_default_custom_winner_count(normalized_max_players)
-		or view_model.normalize_custom_winner_count(previous_winners, normalized_max_players)
+	local configured_percent = tonumber(config.pvp_custom_winners_percent)
+	local percent_mode = configured_percent and configured_percent > 0
+	local normalized_percent = percent_mode and view_model.normalize_custom_winner_percent(configured_percent) or nil
+	local normalized_winners = percent_mode
+			and view_model.get_custom_winner_count_from_percent(normalized_percent)
+		or previous_winners == previous_default_winners
+				and view_model.get_default_custom_winner_count(normalized_max_players)
+			or view_model.normalize_custom_winner_count(previous_winners, normalized_max_players)
 
 	if MP.LOBBY and MP.LOBBY.config then
 		MP.LOBBY.config.max_players = normalized_max_players
 		MP.LOBBY.config.pvp_custom_winners = normalized_winners
+		if percent_mode then
+			MP.LOBBY.config.pvp_custom_winners_percent = normalized_percent
+		end
 	end
 	view_model.CUSTOM_WINNERS_SLIDER_LAST_SENT = normalized_winners
+	view_model.CUSTOM_WINNERS_SLIDER_PERCENT_LAST_SENT = normalized_percent
 	if view_model.update_custom_winners_count_cycle then
 		view_model.update_custom_winners_count_cycle(normalized_winners)
 	end
@@ -412,10 +469,14 @@ local function change_party_max_players(max_players)
 		view_model.update_custom_winners_percent_slider(normalized_winners)
 	end
 
-	return send_party_options_update({
+	local options_update = {
 		max_players = normalized_max_players,
 		pvp_custom_winners = normalized_winners,
-	})
+	}
+	if percent_mode then
+		options_update.pvp_custom_winners_percent = normalized_percent
+	end
+	return send_party_options_update(options_update)
 end
 
 local function change_custom_winner_count(winner_count)
@@ -426,23 +487,30 @@ local function change_custom_winner_count(winner_count)
 	local normalized_count = view_model.normalize_custom_winner_count(winner_count)
 	reset_custom_winners_input_state()
 	view_model.CUSTOM_WINNERS_SLIDER_LAST_SENT = normalized_count
+	view_model.CUSTOM_WINNERS_SLIDER_PERCENT_LAST_SENT = 0
 	if MP.LOBBY and MP.LOBBY.config then
 		MP.LOBBY.config.pvp_custom_winners = normalized_count
+		MP.LOBBY.config.pvp_custom_winners_percent = 0
 	end
 	if view_model.update_custom_winners_percent_slider then
 		view_model.update_custom_winners_percent_slider(normalized_count)
 	end
 	return send_party_options_update({
 		pvp_custom_winners = normalized_count,
+		pvp_custom_winners_percent = 0,
 	})
 end
 
 local starting_lives_values = build_number_range(1, 16)
+local bonus_hands_values = build_number_range(0, 4)
+local bonus_discards_values = build_number_range(0, 3)
+local bonus_consumable_slots_values = build_number_range(0, 2)
+local bonus_joker_slots_values = build_number_range(0, 5)
+local bonus_money_values = { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 }
 local coop_blind_scaling_values = { 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8 }
 local round_values = build_number_range(1, 20)
 local timer_base_values = { 30, 60, 90, 120, 150, 180, 210, 240 }
 local timer_increment_values = { 0, 30, 60, 90, 120, 150, 180 }
-local pvp_countdown_values = { 0, 3, 5, 10 }
 
 local team_options_toggle_ui = { w = 4.9 }
 local party_options_cycle_ui = {
@@ -450,6 +518,19 @@ local party_options_cycle_ui = {
 	no_pips = false,
 	cycle_shoulders = true,
 }
+local bonuses_cycle_ui = {
+	w = 4.9,
+	no_pips = false,
+	cycle_shoulders = true,
+}
+
+local function build_bonus_display_options(values, prefix)
+	local options = {}
+	for _, value in ipairs(values or {}) do
+		options[#options + 1] = value == 0 and "None" or (prefix or "") .. tostring(value)
+	end
+	return options
+end
 
 local function build_coop_blind_scaling_display_options()
 	local options = {}
@@ -621,6 +702,63 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 		},
 		{ kind = "toggle", control_id = "normal_bosses_toggle", label_key = "b_opts_normal_bosses", option_key = "normal_bosses" },
 	},
+	bonuses = {
+		{
+			kind = "cycle",
+			spec_id = "bonus_hands",
+			control_id = "bonus_hands_option",
+			label_key = "k_opts_bonus_hands",
+			option_key = "bonus_hands",
+			scale = 0.85,
+			option_values = bonus_hands_values,
+			display_options = build_bonus_display_options(bonus_hands_values),
+			ui_args = bonuses_cycle_ui,
+		},
+		{
+			kind = "cycle",
+			spec_id = "bonus_discards",
+			control_id = "bonus_discards_option",
+			label_key = "k_opts_bonus_discards",
+			option_key = "bonus_discards",
+			scale = 0.85,
+			option_values = bonus_discards_values,
+			display_options = build_bonus_display_options(bonus_discards_values),
+			ui_args = bonuses_cycle_ui,
+		},
+		{
+			kind = "cycle",
+			spec_id = "bonus_consumable_slots",
+			control_id = "bonus_consumable_slots_option",
+			label_key = "k_opts_bonus_consumables",
+			option_key = "bonus_consumable_slots",
+			scale = 0.85,
+			option_values = bonus_consumable_slots_values,
+			display_options = build_bonus_display_options(bonus_consumable_slots_values),
+			ui_args = bonuses_cycle_ui,
+		},
+		{
+			kind = "cycle",
+			spec_id = "bonus_joker_slots",
+			control_id = "bonus_joker_slots_option",
+			label_key = "k_opts_bonus_joker_slots",
+			option_key = "bonus_joker_slots",
+			scale = 0.85,
+			option_values = bonus_joker_slots_values,
+			display_options = build_bonus_display_options(bonus_joker_slots_values),
+			ui_args = bonuses_cycle_ui,
+		},
+		{
+			kind = "cycle",
+			spec_id = "bonus_money",
+			control_id = "bonus_money_option",
+			label_key = "k_opts_bonus_money",
+			option_key = "bonus_money",
+			scale = 0.85,
+			option_values = bonus_money_values,
+			display_options = build_bonus_display_options(bonus_money_values),
+			ui_args = bonuses_cycle_ui,
+		},
+	},
 	advanced = {
 		{ kind = "toggle", control_id = "preview_disabled_toggle", label_key = "b_opts_disable_preview", option_key = "preview_disabled" },
 		{ kind = "toggle", control_id = "order_toggle", label_key = "b_opts_the_order", option_key = "the_order" },
@@ -678,15 +816,6 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			option_key = "showdown_starting_antes",
 			scale = 0.85,
 			option_values = round_values,
-		},
-		{
-			kind = "cycle",
-			spec_id = "pvp_countdown_seconds",
-			control_id = "pvp_countdown_seconds_option",
-			label_key = "k_opts_pvp_countdown_seconds",
-			option_key = "pvp_countdown_seconds",
-			scale = 0.85,
-			option_values = pvp_countdown_values,
 		},
 	},
 	team_options = {

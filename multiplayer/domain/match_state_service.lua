@@ -72,6 +72,7 @@ local function build_initial_round_state(starting_lives)
 		ready_blind_text = localize("b_ready"),
 		processed_round_done = false,
 		lives = starting_lives,
+		hands = MP.DEFAULT_HANDS_PER_ROUND or 0,
 		score_text = "0",
 		score_display = MP.INSANE_INT.empty(),
 		loaded_ante = 0,
@@ -86,7 +87,6 @@ local function build_initial_round_state(starting_lives)
 		duel_blind_role = nil,
 		duel_bye_waiting = false,
 		skip_ready_blind_row = nil,
-		start_blind_skip_pvp_countdown = false,
 		pvp_reached = false,
 		pvp_reached_first = false,
 		ante_key = tostring(math.random()),
@@ -133,7 +133,6 @@ local function build_initial_timer_state()
 		timer_skip_count_for_ante = 0,
 		timer_runtime_active = false,
 		timer_runtime_generation = 0,
-		pvp_countdown = 0,
 		wait_for_enemys_furthest_blind = false,
 		disable_live_and_timer_hud = false,
 	}

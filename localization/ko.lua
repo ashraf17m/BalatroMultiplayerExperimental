@@ -829,7 +829,6 @@ return {
 			k_opts_pvp_timer = "타이머",
 			k_opts_showdown_starting_antes = "쇼다운이 앤티에서 시작",
 			k_opts_pvp_timer_increment = "타이머 증가량",
-			k_opts_pvp_countdown_seconds = "PvP 카운트다운(초)",
 			k_bl_life = "생명",
 			k_bl_or = "또는",
 			k_bl_death = "죽음",

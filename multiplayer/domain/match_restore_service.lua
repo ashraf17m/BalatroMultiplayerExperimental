@@ -50,7 +50,6 @@ function MATCH_DOMAIN.apply_saved_state(saved_state, state)
 	state.timer_skip_count_for_ante = tonumber(saved_state.timer_skip_count_for_ante) or 0
 	state.timer_runtime_active = false
 	state.timer_runtime_generation = tonumber(saved_state.timer_runtime_generation) or 0
-	state.pvp_countdown = tonumber(saved_state.pvp_countdown) or state.pvp_countdown
 	state.wait_for_enemys_furthest_blind = not not saved_state.wait_for_enemys_furthest_blind
 	state.disable_live_and_timer_hud = not not saved_state.disable_live_and_timer_hud
 	state.pincher_index = tonumber(saved_state.pincher_index) or state.pincher_index

@@ -3,7 +3,6 @@ MP.UI.MAIN_MENU_SELECTION = MP.UI.MAIN_MENU_SELECTION or {}
 
 local selection = MP.UI.MAIN_MENU_SELECTION
 local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
-local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
 local function rebuild_selection_tabs(tab_wrap, definition)
 	MP.UI.UTILS.replace_config_object(tab_wrap, UIBox({
@@ -81,9 +80,95 @@ function G.FUNCS.gamemode_switch_tabs(args)
 	switch_selection_tabs(args, "gamemode_active_tab", "gamemode", lobby_domain.set_setup_gamemode_preview, false)
 end
 
+local function get_lobby_access_mode_values()
+	return selection.LOBBY_ACCESS_MODE_VALUES or { "public", "ask_first", "private" }
+end
+
+local function get_lobby_access_mode_index()
+	if selection.get_lobby_access_mode_index then
+		return selection.get_lobby_access_mode_index()
+	end
+
+	local values = get_lobby_access_mode_values()
+	local current_mode = lobby_domain.get_creation_access_mode and lobby_domain.get_creation_access_mode() or "private"
+	for index, value in ipairs(values) do
+		if value == current_mode then
+			return index
+		end
+	end
+	return #values
+end
+
+local function refresh_lobby_access_mode_cycle_style(index)
+	local overlay = G.OVERLAY_MENU
+	if not (
+		overlay
+		and overlay.get_UIE_by_ID
+		and selection.get_lobby_access_mode_colour
+		and selection.build_lobby_access_mode_tooltip
+	) then
+		return
+	end
+
+	local cycle = overlay:get_UIE_by_ID("lobby_access_mode_tab_cycle")
+	if not cycle then
+		return
+	end
+
+	local colour = selection.get_lobby_access_mode_colour(index)
+	for _, child in ipairs(cycle.children or {}) do
+		if child.config and (child.config.button == "option_cycle" or child.config.id == "cycle_main") then
+			child.config.colour = colour
+		end
+	end
+
+	local cycle_main = overlay:get_UIE_by_ID("cycle_main", cycle)
+	if cycle_main and cycle_main.config then
+		cycle_main.config.colour = colour
+		cycle_main.config.on_demand_tooltip = {
+			text = selection.build_lobby_access_mode_tooltip(index),
+		}
+		if cycle_main.config.h_popup and cycle_main.stop_hover and cycle_main.hover and G.E_MANAGER then
+			cycle_main:stop_hover()
+			G.E_MANAGER:add_event(Event({
+				func = function()
+					cycle_main:hover()
+					return true
+				end,
+			}))
+		end
+	end
+end
+
+function G.FUNCS.change_lobby_access_mode(e)
+	local values = get_lobby_access_mode_values()
+	if #values == 0 then
+		return
+	end
+
+	local next_index = e and e.to_key
+	if not next_index then
+		local direction = tonumber(e and e.config and e.config.direction) or 1
+		next_index = get_lobby_access_mode_index() + direction
+		if next_index < 1 then
+			next_index = #values
+		elseif next_index > #values then
+			next_index = 1
+		end
+	end
+
+	local callback_values = e and e.cycle_config and e.cycle_config.mode_values or values
+	local access_mode = callback_values[next_index]
+	if not access_mode then return end
+
+	if lobby_domain.set_creation_access_mode then
+		lobby_domain.set_creation_access_mode(access_mode)
+	end
+	refresh_lobby_access_mode_cycle_style(next_index)
+end
+
 function G.FUNCS.change_ruleset_selection(e)
-	local mode = selection.get_ruleset_selection_mode and selection.get_ruleset_selection_mode() or "lobby"
-	if mode ~= "practice" and e.config.id == "weekly_ruleset_button" and G.FUNCS.weekly_interrupt(e) then
+	if e.config.id == "weekly_ruleset_button" and G.FUNCS.weekly_interrupt(e) then
 		return
 	end
 
@@ -101,11 +186,7 @@ function G.FUNCS.change_ruleset_selection(e)
 		end,
 		default_button,
 		function(ruleset_name)
-			if mode == "practice" and MP.set_practice_ruleset then
-				MP.set_practice_ruleset("ruleset_mp_" .. ruleset_name)
-			else
-				selection.apply_ruleset_selection(ruleset_name)
-			end
+			selection.apply_ruleset_selection(ruleset_name)
 		end
 	)
 

@@ -175,7 +175,7 @@ local function ruleset_key_belongs_to_tab(ruleset_key, tab_spec)
 end
 
 function selection.set_ruleset_selection_mode(mode)
-	selection.ruleset_selection_mode = mode == "practice" and "practice" or "lobby"
+	selection.ruleset_selection_mode = "lobby"
 	return selection.ruleset_selection_mode
 end
 
@@ -281,13 +281,7 @@ function selection.build_ruleset_selection_options(initial_ruleset_key, options)
 	end
 	local default_ruleset = string.sub(default_ruleset_key, 12, -1)
 
-	if mode == "practice" then
-		if MP.set_practice_ruleset then
-			MP.set_practice_ruleset(default_ruleset_key, {
-				preserve_modifiers = options.preserve_modifiers,
-			})
-		end
-	elseif options.preserve_modifiers then
+	if options.preserve_modifiers then
 		if MP.CUSTOM and MP.CUSTOM.clear_pending_lobby_options then
 			MP.CUSTOM.clear_pending_lobby_options()
 		end
@@ -319,9 +313,6 @@ function selection.build_ruleset_selection_tabs(initial_ruleset_key, options)
 	options = options or {}
 	if initial_ruleset_key == "mp" or initial_ruleset_key == "lobby" then
 		options.mode = "lobby"
-		initial_ruleset_key = nil
-	elseif initial_ruleset_key == "practice" then
-		options.mode = "practice"
 		initial_ruleset_key = nil
 	elseif initial_ruleset_key == "sp" then
 		initial_ruleset_key = nil

@@ -160,8 +160,13 @@ function connection_flow.handle_joined_lobby(code, gamemode_key, lobby_type, tok
 		return
 	end
 
+	local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or nil
+	if lobby_domain and lobby_domain.clear_pending_join_request then
+		lobby_domain.clear_pending_join_request()
+	end
 	MP.CONNECTION_RESUME.complete_manual_resume()
 	apply_server_lobby_entry_state(code, gamemode_key, lobby_type, token or reconnect_token, player_id, options, players, is_host, is_in_game, is_coop_save_restore)
+	MP.CONNECTION_SESSION.request_overlay_menu_close()
 end
 
 function connection_flow.handle_rejoined_lobby(code, gamemode_key, lobby_type, token, player_id, options, players, is_host, is_in_game, is_coop_save_restore)

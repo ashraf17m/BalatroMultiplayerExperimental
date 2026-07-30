@@ -2,6 +2,20 @@ MP.UI = MP.UI or {}
 MP.UI.MAIN_MENU_SELECTION = MP.UI.MAIN_MENU_SELECTION or {}
 
 local selection = MP.UI.MAIN_MENU_SELECTION
+local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
+local LOBBY_ACCESS_MODE_VALUES = { "public", "ask_first", "private" }
+local LOBBY_ACCESS_MODE_LABEL_KEYS = {
+	public = "k_lobby_access_public",
+	ask_first = "k_lobby_access_ask_first",
+	private = "k_lobby_access_private",
+}
+local LOBBY_ACCESS_MODE_DESCRIPTION_KEYS = {
+	public = "k_lobby_access_public_desc",
+	ask_first = "k_lobby_access_ask_first_desc",
+	private = "k_lobby_access_private_desc",
+}
+selection.LOBBY_ACCESS_MODE_VALUES = LOBBY_ACCESS_MODE_VALUES
+selection.LOBBY_ACCESS_MODE_LABEL_KEYS = LOBBY_ACCESS_MODE_LABEL_KEYS
 
 local function build_selection_info_panel(tabs_object, action_node)
 	return {
@@ -58,6 +72,65 @@ local function build_action_button(config)
 			},
 		},
 	}
+end
+
+function selection.get_lobby_access_mode_index()
+	local access_mode = lobby_domain.get_creation_access_mode
+		and lobby_domain.get_creation_access_mode()
+		or "private"
+	for index, value in ipairs(LOBBY_ACCESS_MODE_VALUES) do
+		if value == access_mode then
+			return index
+		end
+	end
+	return 3
+end
+
+function selection.get_lobby_access_mode_label(index)
+	local access_mode = LOBBY_ACCESS_MODE_VALUES[index] or "private"
+	return localize(LOBBY_ACCESS_MODE_LABEL_KEYS[access_mode])
+end
+
+function selection.get_lobby_access_mode_description(index)
+	local access_mode = LOBBY_ACCESS_MODE_VALUES[index] or "private"
+	return localize(LOBBY_ACCESS_MODE_DESCRIPTION_KEYS[access_mode])
+end
+
+function selection.get_lobby_access_mode_colour(index)
+	local access_mode = LOBBY_ACCESS_MODE_VALUES[index] or "private"
+	if access_mode == "public" then
+		return G.C.GREEN
+	elseif access_mode == "ask_first" then
+		return G.C.BLUE
+	end
+	return G.C.PURPLE
+end
+
+local function build_lobby_access_mode_labels()
+	local labels = {}
+	for index, _ in ipairs(LOBBY_ACCESS_MODE_VALUES) do
+		labels[#labels + 1] = selection.get_lobby_access_mode_label(index)
+	end
+	return labels
+end
+
+function selection.build_lobby_access_mode_tooltip(index)
+	return { selection.get_lobby_access_mode_description(index or selection.get_lobby_access_mode_index()) }
+end
+
+function selection.build_lobby_access_mode_tab_cycle(colour, width)
+	local current_index = selection.get_lobby_access_mode_index()
+	return create_option_cycle({
+		id = "lobby_access_mode_tab_cycle",
+		options = build_lobby_access_mode_labels(),
+		current_option = current_index,
+		opt_callback = "change_lobby_access_mode",
+		mode_values = LOBBY_ACCESS_MODE_VALUES,
+		w = width or 5,
+		colour = selection.get_lobby_access_mode_colour(current_index),
+		cycle_shoulders = false,
+		on_demand_tooltip = { text = selection.build_lobby_access_mode_tooltip(current_index) },
+	})
 end
 
 local function build_coop_save_tooltip(save)
@@ -168,7 +241,41 @@ local function build_gamemode_action_node(gamemode_name)
 	}
 end
 
-local function build_selection_tabs_panel(default_tabs, callback_name, opt_args, colour)
+local function should_show_lobby_access_cycle(is_ruleset)
+	return true
+end
+
+local function build_selection_tabs_panel(default_tabs, callback_name, opt_args, colour, is_ruleset)
+	local show_access_cycle = should_show_lobby_access_cycle(is_ruleset)
+	local cycle_width = show_access_cycle and 3.6 or 5
+	local cycle_columns = {
+		{
+			n = G.UIT.C,
+			config = { align = "cm", padding = 0.02 },
+			nodes = {
+				create_option_cycle({
+					options = { localize("k_info"), localize("k_bans"), localize("k_reworks") },
+					current_option = 1,
+					opt_callback = callback_name,
+					opt_args = opt_args,
+					w = cycle_width,
+					colour = colour,
+					cycle_shoulders = false,
+				}),
+			},
+		},
+	}
+
+	if show_access_cycle then
+		cycle_columns[#cycle_columns + 1] = {
+			n = G.UIT.C,
+			config = { align = "cm", padding = 0.02 },
+			nodes = {
+				selection.build_lobby_access_mode_tab_cycle(colour, cycle_width),
+			},
+		}
+	end
+
 	return {
 		n = G.UIT.ROOT,
 		config = { align = "cm", colour = G.C.L_BLACK, r = 0.1 },
@@ -187,17 +294,7 @@ local function build_selection_tabs_panel(default_tabs, callback_name, opt_args,
 					{
 						n = G.UIT.R,
 						config = { align = "bm", padding = 0.05 },
-						nodes = {
-							create_option_cycle({
-								options = { localize("k_info"), localize("k_bans"), localize("k_reworks") },
-								current_option = 1,
-								opt_callback = callback_name,
-								opt_args = opt_args,
-								w = 5,
-								colour = colour,
-								cycle_shoulders = false,
-							}),
-						},
+						nodes = cycle_columns,
 					},
 				},
 			},
@@ -215,7 +312,8 @@ local function build_selection_tabs(subject, callback_name, subject_key, colour,
 		default_tabs,
 		callback_name,
 		{ ui = default_tabs, [subject_key] = subject },
-		colour
+		colour,
+		is_ruleset
 	)
 end
 
@@ -241,15 +339,6 @@ local function get_ruleset_selection_mode(mode)
 end
 
 local function build_ruleset_button_config(ruleset, mode)
-	if get_ruleset_selection_mode(mode) == "practice" then
-		return {
-			id = "start_practice_button",
-			button = "start_practice_run",
-			label = { localize("b_practice") },
-			colour = G.C.GREEN,
-		}
-	end
-
 	return {
 		id = "select_gamemode_button",
 		button = ruleset.forced_gamemode and "force_" .. ruleset.forced_gamemode or "select_gamemode",
@@ -310,28 +399,6 @@ function selection.build_modifier_button(ruleset, mode)
 	})
 end
 
-function selection.build_practice_options_button(ruleset)
-	return MP.UI.Disableable_Button({
-		button = "mp_open_practice_options_overlay",
-		align = "cm",
-		padding = 0.05,
-		r = 0.1,
-		minw = 3.5,
-		minh = 0.8,
-		colour = G.C.ORANGE,
-		hover = true,
-		shadow = true,
-		label = { localize("k_practice_options") },
-		scale = 0.4,
-		enabled_ref_table = { val = true },
-		enabled_ref_value = "val",
-		ref_table = {
-			ruleset = ruleset,
-			mode = "practice",
-		},
-	})
-end
-
 local function build_ranked_smods_recommendation_node(ruleset)
 	if
 		not (
@@ -387,13 +454,8 @@ local function build_ruleset_action_node(ruleset)
 		nodes[#nodes + 1] = smods_recommendation_node
 	end
 
-	if get_ruleset_selection_mode() == "practice" then
-		add_column(selection.build_practice_options_button(ruleset))
-		add_column(selection.build_ruleset_continue_button(ruleset, #columns > 0 and 5 or 8, "practice"))
-	else
-		add_column(selection.build_modifier_button(ruleset))
-		add_column(selection.build_ruleset_continue_button(ruleset, #columns > 0 and 5 or 8))
-	end
+	add_column(selection.build_modifier_button(ruleset))
+	add_column(selection.build_ruleset_continue_button(ruleset, #columns > 0 and 5 or 8))
 
 	nodes[#nodes + 1] = {
 		n = G.UIT.R,

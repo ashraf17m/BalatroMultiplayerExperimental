@@ -1,8 +1,7 @@
 local teams_domain = MP.DOMAIN and MP.DOMAIN.TEAMS or {}
 
 function MP.should_use_the_order()
-	return (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.the_order and MP.LOBBY.code)
-		or (MP.is_practice_mode and MP.is_practice_mode())
+	return MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.the_order and MP.LOBBY.code
 end
 
 function MP.is_major_league_ruleset()

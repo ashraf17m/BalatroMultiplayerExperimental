@@ -160,8 +160,6 @@ local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/main_menu_selection_cardarea_view.lua",
 	"multiplayer/ui/main_menu_selection_view_model.lua",
 	"multiplayer/ui/main_menu_selection_controller.lua",
-	"multiplayer/ui/ghost_replay_picker.lua",
-	"multiplayer/ui/main_menu_practice_controller.lua",
 	"multiplayer/ui/main_menu_title_card.lua",
 	"multiplayer/ui/main_menu_shell.lua",
 	"multiplayer/ui/players_hud_shared_teammate_view.lua",

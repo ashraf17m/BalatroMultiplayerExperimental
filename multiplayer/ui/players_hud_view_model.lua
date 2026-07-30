@@ -28,7 +28,10 @@ local function get_lobby_player(player_id)
 end
 
 local function get_local_hands_left()
-	return BALATRO.get_hands_left and BALATRO.get_hands_left() or 0
+	if BALATRO.get_hands_left then
+		return BALATRO.get_hands_left()
+	end
+	return MP.GAME and MP.GAME.hands or 0
 end
 
 local function build_self_standings_player()

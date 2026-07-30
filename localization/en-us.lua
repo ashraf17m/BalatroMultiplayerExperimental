@@ -27,63 +27,6 @@ return {
 			},
 		},
 		Joker = {
-			j_mp_seltzer = {
-				name = "Seltzer",
-				text = {
-					"Retrigger all",
-					"cards played for",
-					"the next {C:attention}#1#{} hands",
-				},
-			},
-			j_mp_turtle_bean = {
-				name = "Turtle Bean",
-				text = {
-					"{C:attention}+#1#{} hand size,",
-					"reduces by",
-					"{C:red}#2#{} every round",
-				},
-			},
-			j_mp_idol = {
-				name = "The Idol",
-				text = {
-					"Each played {C:attention}#2#",
-					"of {V:1}#3#{} gives",
-					"{X:mult,C:white} X#1# {} Mult when scored",
-					"{s:0.8}Card changes every round",
-				},
-			},
-			j_mp_idol_rare = {
-				name = "The Idol",
-				text = {
-					"Each played {C:attention}#2#",
-					"of {V:1}#3#{} gives",
-					"{X:mult,C:white} X#1# {} Mult when scored",
-					"{s:0.8}Card changes every round",
-				},
-			},
-			j_mp_ticket = {
-				name = "Golden Ticket",
-				text = {
-					"Played {C:attention}Gold{} cards",
-					"earn {C:money}$#1#{} when scored",
-				},
-			},
-			j_mp_ticket_experimental = {
-				name = "Golden Ticket",
-				text = {
-					"Played {C:attention}Gold{} cards",
-					"earn {C:money}$#1#{} when scored",
-				},
-			},
-			j_mp_todo_list = {
-				name = "To Do List",
-				text = {
-					"Earn {C:money}$#1#{} if {C:attention}poker hand",
-					"played is a {C:attention}#2#{},",
-					"poker hand changes",
-					"at end of round",
-				},
-			},
 			j_broken = {
 				name = "BROKEN",
 				text = {
@@ -783,36 +726,6 @@ return {
 					"instead of first card twice",
 				},
 			},
-			mp_sticker_balanced_j_mp_ticket = {
-				name = "Balanced",
-				text = {
-					"Earns {C:money}$3{} instead of {C:money}$4{}",
-					"Now {C:green}Uncommon{}",
-					"No {C:attention}Gold{} card requirement",
-				},
-			},
-			mp_sticker_balanced_j_mp_ticket_experimental = {
-				name = "Balanced",
-				text = {
-					"Earns {C:money}$4{} instead of {C:money}$3{}",
-					"Now {C:green}Uncommon{}",
-					"No {C:attention}Gold{} card requirement",
-				},
-			},
-			mp_sticker_balanced_j_mp_seltzer = {
-				name = "Balanced",
-				text = {
-					"Lasts {C:attention}8{} hands",
-					"instead of {C:attention}10{}",
-				},
-			},
-			mp_sticker_balanced_j_mp_turtle_bean = {
-				name = "Balanced",
-				text = {
-					"{C:attention}+4{} hand size",
-					"instead of {C:attention}+5{}",
-				},
-			},
 			mp_sticker_balanced_j_mp_bloodstone = {
 				name = "Balanced",
 				text = {
@@ -820,13 +733,6 @@ return {
 					"come from a {C:attention}fixed sequence{}",
 					"shared between both players and",
 					"{C:attention}reused{} every hand of the round",
-				},
-			},
-			mp_sticker_balanced_j_mp_idol_rare = {
-				name = "Balanced",
-				text = {
-					"Now {C:red}Rare{}",
-					"instead of {C:green}Uncommon{}",
 				},
 			},
 			mp_sticker_balanced_m_glass = {
@@ -848,14 +754,6 @@ return {
 				text = {
 					"{X:mult,C:white}X1.5{} Mult instead of {X:mult,C:white}X2{}",
 					"Has a {C:green}1 in 3{} shatter chance",
-				},
-			},
-			mp_sticker_balanced_j_mp_todo_list = {
-				name = "Balanced",
-				text = {
-					"Earns {C:money}$5{} instead of {C:money}$4{}",
-					"Picks from {C:attention}all{} poker hands,",
-					"not just discovered ones",
 				},
 			},
 			mp_sticker_balanced_c_mp_ouija_standard = {
@@ -1040,15 +938,20 @@ return {
 		},
 		dictionary = {
 			b_singleplayer = "Singleplayer",
-			b_sp_with_ruleset = "Practice Mode",
-			b_practice = "Practice",
 			b_join_lobby = "Join Lobby",
+			b_enter_code = "Enter Code",
 			b_join_lobby_clipboard = "Join From Clipboard",
+			b_browse_lobbies = "Browse Lobbies",
 			b_return_lobby = "Return to Lobby",
 			b_reconnect = "Reconnect",
 			b_resume_match = "Resume the Match",
 			b_create_lobby = "Create Lobby",
-			b_create_party = "Create Party",
+			b_create_party = "Create Lobby",
+			b_refresh_lobbies = "Refresh",
+			b_accept = "Accept",
+			b_deny = "Deny",
+			b_block = "Block",
+			b_cancel = "Cancel",
 			b_start_lobby = "Start Lobby",
 			b_ready = "Ready",
 			b_unready = "Unready",
@@ -1078,19 +981,7 @@ return {
 			k_sc_title = "SHORTCUTS",
 			k_sc_hint = "Press key or release TAB to close",
 			b_sc_choose_deck = "Choose Deck/Stake",
-			k_practice_collection_hint = "Click a card and it joins your run.",
-			k_unlimited_slots = "Unlimited Slots",
-			k_edition_cycling = "Edition Cycling (Q)",
-			k_practice_options = "Practice Options...",
 			k_active = "Active",
-			k_ghost = "Ghost",
-			k_ghost_replays = "Match Replays",
-			k_no_ghost_replays = "No match replays found",
-			k_ghost_replay_hint = "Play a match, or place .log/.json in replays/",
-			k_select_match_replay = "Select a match",
-			k_unsupported_replay_ruleset = "Unsupported ruleset - cannot play this replay",
-			b_play_match = "Play Match",
-			b_clear_replay = "Clear Replay",
 			b_leave = "LEAVE",
 			b_opts_cb_money = "Give comeback $ on life loss",
 			b_opts_no_gold_on_loss = "Don't get blind rewards on round loss",
@@ -1179,6 +1070,23 @@ return {
 			k_comeback_money_sandbox = " Comeback Money ($3 × ante cleared)",
 			k_attrition_name = "Attrition",
 			k_enter_lobby_code = "Enter Lobby Code",
+			k_browse_lobbies = "Browse Lobbies",
+			k_loading_lobbies = "Loading lobbies...",
+			k_no_public_lobbies = "No lobbies found",
+			k_lobby_access = "Access",
+			k_lobby_access_public = "Public",
+			k_lobby_access_ask_first = "Ask First",
+			k_lobby_access_private = "Private",
+			k_lobby_access_public_desc = "Everyone can see and join your lobby",
+			k_lobby_access_ask_first_desc = "Players can find your lobby, but need your approval to join",
+			k_lobby_access_private_desc = "Only accessible via code and hidden from Browse Lobbies",
+			k_lobby_host = "Host",
+			k_lobby_players = "Players",
+			k_lobby_code = "Code",
+			k_join_request_sent = "Join request sent. Waiting for host.",
+			k_join_request_denied = "Join request denied.",
+			k_join_request_title = "Join Request",
+			k_wants_to_join = "wants to join",
 			k_paste = "Paste From Clipboard",
 			k_username = "Username:",
 			k_enter_username = "Enter username",
@@ -1216,12 +1124,17 @@ return {
 			k_lobby_general = "General",
 			k_lobby_gameplay = "Gameplay",
 			k_lobby_modifiers = "Modifiers",
+			k_lobby_bonuses = "Bonuses",
 			k_lobby_advanced = "Advanced",
+			k_opts_bonus_hands = "Hands",
+			k_opts_bonus_discards = "Discards",
+			k_opts_bonus_consumables = "Consumable Slots",
+			k_opts_bonus_joker_slots = "Joker Slots",
+			k_opts_bonus_money = "Money",
 			k_opts_pvp_start_round = "PVP Starts at Ante",
 			k_opts_pvp_timer = "Timer",
 			k_opts_showdown_starting_antes = "Showdown Starts at Ante",
 			k_opts_pvp_timer_increment = "Timer Increment",
-			k_opts_pvp_countdown_seconds = "PvP Countdown Seconds",
 			k_opts_modifier_timer = "Timer Implementation",
 			ml_mp_modifier_timer_opt = {
 				"Default",

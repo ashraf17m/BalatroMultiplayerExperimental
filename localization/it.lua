@@ -596,7 +596,6 @@ return {
 			k_opts_pvp_timer = "Timer",
 			k_opts_showdown_starting_antes = "La resa dei conti inizia all'ante",
 			k_opts_pvp_timer_increment = "Incremento del timer",
-			k_opts_pvp_countdown_seconds = "Secondi del countdown PvP",
 			k_bl_life = "Vita",
 			k_bl_or = "o",
 			k_bl_death = "Morte",

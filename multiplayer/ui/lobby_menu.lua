@@ -110,7 +110,7 @@ function G.UIDEF.create_UIBox_lobby_menu()
 										label = {
 											localize("b_players"),
 										},
-										scale = text_scale * 1.2,
+										scale = text_scale * 1.45,
 										col = true,
 									}),
 									MP.UI.create_spacer(),

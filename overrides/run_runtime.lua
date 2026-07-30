@@ -75,12 +75,11 @@ MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.run_runtime.start_r
 
 		suppress_original_result(ctx)
 
-		local ghost_active = MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active()
-		if not ghost_active and (not MP.LOBBY.client.connected or not MP.LOBBY.code) then return end
+		if not MP.LOBBY.client.connected or not MP.LOBBY.code then return end
 		if MP.LOBBY.config.disable_live_and_timer_hud then return end
 
 		if MP.UI and MP.UI.refresh_lives_hud_binding then
-			MP.UI.refresh_lives_hud_binding({ force = ghost_active })
+			MP.UI.refresh_lives_hud_binding()
 		end
 	end,
 })

@@ -4,6 +4,7 @@ local calculate_standings_average = shared.calculate_standings_average
 local create_compact_standings_entry = shared.create_compact_standings_entry
 local create_compact_standings_nodes = shared.create_compact_standings_nodes
 local get_eased_score_display = shared.get_eased_score_display
+local get_standings_stat_display = shared.get_standings_stat_display
 
 local function get_ffa_rank_colour(rank)
 	if rank == 1 then
@@ -45,6 +46,25 @@ function MP.UI.refresh_ffa_standings_score_targets(players)
 	end
 end
 
+function MP.UI.refresh_ffa_standings_stat_targets(players)
+	if not get_standings_stat_display then
+		return
+	end
+
+	local standings_players = players or MP.UI.get_sorted_players()
+	for _, player in ipairs(standings_players) do
+		if player.id then
+			get_standings_stat_display("player_standings_lives", player.id, player.lives)
+			get_standings_stat_display("player_standings_hands", player.id, player.hands)
+		end
+	end
+
+	local average_data = MP.UI.calculate_ffa_average(standings_players)
+	if average_data.show_average then
+		get_standings_stat_display("average_standings_hands", "ffa", average_data.total_hands)
+	end
+end
+
 local function create_ffa_compact_entry(player, pvp_col)
 	local accent = get_ffa_rank_colour(player.rank)
 	local blind_main = get_player_blind_main_colour and get_player_blind_main_colour(player, pvp_col) or pvp_col
@@ -57,11 +77,14 @@ local function create_ffa_compact_entry(player, pvp_col)
 		rank = player.rank,
 		rank_colour = accent,
 		title = player.username or "Unknown",
-		title_colour = player.is_self and G.C.GOLD or G.C.UI.TEXT_LIGHT,
+		title_colour = player.is_self and G.C.EDITION or G.C.UI.TEXT_LIGHT,
 		title_outline_colour = player.is_duels_nemesis and G.C.RED or nil,
+		is_self = player.is_self,
 		palette_colour = blind_main,
 		body_colour = pvp_col,
 		far_right_colour = pvp_col,
+		stat_bucket = "player_standings",
+		stat_key = player.id,
 		blind_player = player,
 		lives = player.lives,
 		hands = player.hands,

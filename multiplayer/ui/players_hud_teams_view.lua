@@ -4,6 +4,7 @@ local calculate_standings_average = shared.calculate_standings_average
 local create_compact_standings_entry = shared.create_compact_standings_entry
 local create_compact_standings_nodes = shared.create_compact_standings_nodes
 local get_eased_score_display = shared.get_eased_score_display
+local get_standings_stat_display = shared.get_standings_stat_display
 
 local get_team_score_display
 
@@ -104,6 +105,23 @@ function MP.UI.refresh_team_standings_score_targets(players)
 	return active_teams
 end
 
+function MP.UI.refresh_team_standings_stat_targets(players)
+	if not get_standings_stat_display then
+		return
+	end
+
+	local active_teams = build_active_teams(players or MP.UI.get_sorted_players())
+	for _, team in ipairs(active_teams) do
+		get_standings_stat_display("team_standings_lives", team.id, team.shared_lives)
+		get_standings_stat_display("team_standings_hands", team.id, team.total_hands)
+	end
+
+	local average_data = calculate_team_average(active_teams)
+	if average_data.show_average then
+		get_standings_stat_display("average_standings_hands", "teams", average_data.total_hands)
+	end
+end
+
 local function create_team_compact_entry(team, pvp_col)
 	local rank_colour = get_team_rank_colour(team.rank)
 	local representative = get_team_representative_player(team)
@@ -112,10 +130,13 @@ local function create_team_compact_entry(team, pvp_col)
 		rank = team.rank,
 		rank_colour = rank_colour,
 		title = team.name,
-		title_colour = G.C.WHITE,
+		title_colour = team.is_self_team and G.C.EDITION or G.C.WHITE,
+		is_self_team = team.is_self_team,
 		palette_colour = team.color,
 		body_colour = team.color,
 		far_right_colour = team.color,
+		stat_bucket = "team_standings",
+		stat_key = team.id,
 		blind_player = representative,
 		lives = team.shared_lives,
 		hands = team.total_hands,

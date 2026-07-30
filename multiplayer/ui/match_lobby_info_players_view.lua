@@ -8,6 +8,10 @@ local MATCH_LOBBY_INFO_PLAYERS_PAGED_PAGE_SIZE = 15
 local MATCH_LOBBY_INFO_PLAYERS_PAGED_ROW_PADDING = 0.025
 local MATCH_LOBBY_INFO_SCORE_LANE_WIDTH = 2.87
 
+local function get_team_money_ui()
+	return MP.UI and MP.UI.TEAM_MONEY or nil
+end
+
 local function get_match_lobby_info_runtime()
 	return MP.UI and MP.UI.get_match_lobby_info_runtime and MP.UI.get_match_lobby_info_runtime() or nil
 end
@@ -250,6 +254,25 @@ local function create_match_lobby_players_body_object(parent)
 	})
 end
 
+local function restore_active_money_popup(active_player_id)
+	local team_money_ui = get_team_money_ui()
+	if not (active_player_id and team_money_ui and team_money_ui.open_popup) then
+		return false
+	end
+
+	local overlay = G and G.OVERLAY_MENU
+	local anchor_id = tostring(active_player_id) .. "_view_team_money_transfer"
+	local anchor = overlay and overlay.get_UIE_by_ID and overlay:get_UIE_by_ID(anchor_id) or nil
+	if not anchor then
+		if team_money_ui.close_popup then
+			team_money_ui.close_popup()
+		end
+		return false
+	end
+
+	return team_money_ui.open_popup(active_player_id, anchor)
+end
+
 local function create_match_lobby_players_tab_definition(options)
 	local opts = options or {}
 	if opts.reset_page ~= false then
@@ -281,13 +304,28 @@ function MP.UI.refresh_match_lobby_info_players()
 		return false
 	end
 
-	return MP.UI.UTILS.replace_config_object(tab_contents, UIBox({
+	local team_money_ui = get_team_money_ui()
+	local money_state = team_money_ui and team_money_ui.get_ui_state and team_money_ui.get_ui_state() or nil
+	local active_money_player_id = money_state and money_state.active_player_id or nil
+	local should_restore_money_popup = active_money_player_id
+		and team_money_ui
+		and team_money_ui.is_popup_open
+		and team_money_ui.is_popup_open(active_money_player_id)
+	if should_restore_money_popup and team_money_ui.close_popup then
+		team_money_ui.close_popup({ clear_active = false })
+	end
+
+	local refreshed = MP.UI.UTILS.replace_config_object(tab_contents, UIBox({
 		definition = create_match_lobby_players_tab_definition({ reset_page = false }),
 		config = { offset = { x = 0, y = 0 }, parent = tab_contents, type = "cm" },
 	}), {
 		recalculate_uie = true,
 		recalculate_target = tab_contents.UIBox or G.OVERLAY_MENU,
 	})
+	if refreshed and should_restore_money_popup then
+		restore_active_money_popup(active_money_player_id)
+	end
+	return refreshed
 end
 
 function MP.UI.create_UIBox_players()

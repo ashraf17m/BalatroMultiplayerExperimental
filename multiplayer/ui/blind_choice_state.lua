@@ -276,9 +276,6 @@ end
 
 local function build_blind_name(blind_choice_config, is_pvp_blind)
 	if is_pvp_blind then
-		if MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active() and MP.GHOST.get_nemesis_name then
-			return MP.GHOST.get_nemesis_name()
-		end
 		local opponents = MP.OPPONENTS or {}
 		return ((opponents.get_nemesis_lobby_player and opponents.get_nemesis_lobby_player() or {}).username or localize("k_nemesis"))
 	end

@@ -15,6 +15,7 @@ local state_store_api_methods = {
 local refresh_api_methods = {
 	"get_refresh_runtime",
 	"request_connection_status_refresh",
+	"request_main_menu_multiplayer_buttons_refresh",
 	"request_overlay_menu_close",
 	"request_lobby_main_menu_refresh",
 	"request_pending_lobby_overlay_refresh",

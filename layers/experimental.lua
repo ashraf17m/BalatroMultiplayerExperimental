@@ -25,12 +25,8 @@ MP.Layer("experimental", {
 	standard = true,
 	banned_silent = {
 		"j_hanging_chad",
-		"j_ticket",
-		"j_selzer",
 		"j_bloodstone",
 		"c_ouija",
-		"j_todo_list",
-		"j_idol",
 	},
 	banned_jokers = {
 		"j_mp_speedrun",
@@ -43,11 +39,7 @@ MP.Layer("experimental", {
 	},
 	reworked_jokers = {
 		"j_mp_hanging_chad",
-		"j_mp_ticket_experimental",
-		"j_mp_seltzer",
-		"j_mp_todo_list",
 		"j_mp_bloodstone",
-		"j_mp_idol_rare",
 	},
 	reworked_consumables = {
 		"c_mp_ouija_standard",

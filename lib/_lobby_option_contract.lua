@@ -21,10 +21,15 @@ MP.LOBBY_OPTION_BOOLEAN_KEYS = {
 }
 
 MP.LOBBY_OPTION_NUMERIC_KEYS = {
+	bonus_consumable_slots = true,
+	bonus_discards = true,
+	bonus_hands = true,
+	bonus_joker_slots = true,
+	bonus_money = true,
 	coop_blind_scaling_per_player = true,
 	max_players = true,
-	pvp_countdown_seconds = true,
 	pvp_custom_winners = true,
+	pvp_custom_winners_percent = true,
 	pvp_start_round = true,
 	showdown_starting_antes = true,
 	stake = true,
@@ -57,6 +62,11 @@ MP.SHARED_LOBBY_DECK_OPTION_KEYS = {
 
 local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	back = "Red Deck",
+	bonus_consumable_slots = 0,
+	bonus_discards = 0,
+	bonus_hands = 0,
+	bonus_joker_slots = 0,
+	bonus_money = 0,
 	challenge = "",
 	cocktail = "",
 	custom_bans = "",
@@ -76,11 +86,11 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	preview_disabled = false,
 	random_loadout = false,
 	pvp_custom_winners = 1,
+	pvp_custom_winners_percent = 50,
 	pvp_score_rule = "highest",
 	team_card_sync = false,
 	team_hand_level_sync = true,
 	team_money_sync = true,
-	pvp_countdown_seconds = 3,
 	pvp_start_round = 2,
 	ruleset = "ruleset_mp_standard_ranked",
 	showdown_starting_antes = 3,
@@ -97,6 +107,7 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 local GROUP_LOBBY_OPTION_DEFAULT_VALUES = {
 	max_players = 16,
 	pvp_custom_winners = 8,
+	pvp_custom_winners_percent = 50,
 }
 
 local function get_lobby_type_default_option_overrides(lobby_type)

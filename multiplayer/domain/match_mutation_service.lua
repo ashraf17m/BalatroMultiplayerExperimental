@@ -169,18 +169,6 @@ function MATCH_DOMAIN.apply_timer_skip_for_ante(skip_count_delta, base_time, inc
 	}
 end
 
-function MATCH_DOMAIN.begin_pvp_countdown(seconds, state)
-	state = state or MATCH_DOMAIN.ensure_state()
-	state.pvp_countdown = normalize_nonnegative_integer(seconds)
-	return state.pvp_countdown
-end
-
-function MATCH_DOMAIN.tick_pvp_countdown(state)
-	state = state or MATCH_DOMAIN.ensure_state()
-	state.pvp_countdown = math.max(0, normalize_nonnegative_integer(state.pvp_countdown) - 1)
-	return state.pvp_countdown
-end
-
 function MATCH_DOMAIN.set_spent_before_shop(spent_before_shop, state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.spent_before_shop = spent_before_shop
@@ -231,7 +219,6 @@ function MATCH_DOMAIN.reset_ready_blind_state(state)
 	state.ready_blind_kind = nil
 	state.ready_blind_text = localize("b_ready")
 	state.skip_ready_blind_row = nil
-	state.start_blind_skip_pvp_countdown = false
 	state.location = INTERNAL.normalize_ready_location(state.location)
 	return state
 end
@@ -268,16 +255,14 @@ function MATCH_DOMAIN.set_ready_blind_state(is_ready, blind_kind, state)
 	return state.ready_blind
 end
 
-function MATCH_DOMAIN.queue_next_blind_context(context, should_skip_pvp_countdown, state)
+function MATCH_DOMAIN.queue_next_blind_context(context, state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.next_blind_context = context
-	state.start_blind_skip_pvp_countdown = not not should_skip_pvp_countdown
 	return state
 end
 
 function MATCH_DOMAIN.clear_next_blind_context(state)
 	state = state or MATCH_DOMAIN.ensure_state()
-	state.start_blind_skip_pvp_countdown = false
 	return state
 end
 
@@ -291,11 +276,14 @@ function MATCH_DOMAIN.set_location(location, state)
 	return true
 end
 
-function MATCH_DOMAIN.apply_local_hand_score(score_text, score, state)
+function MATCH_DOMAIN.apply_local_hand_score(score_text, score, hands_left, state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.score_display = state.score_display or INTERNAL.restore_insane_int(state.score_text)
 	state.force_zero_round_score = false
 	state.score_text = score_text
+	if hands_left ~= nil then
+		state.hands = normalize_nonnegative_integer(hands_left)
+	end
 
 	local highest_score_updated = false
 	if
@@ -309,6 +297,7 @@ function MATCH_DOMAIN.apply_local_hand_score(score_text, score, state)
 	return {
 		highest_score_updated = highest_score_updated,
 		score_text = state.score_text,
+		hands = state.hands,
 	}
 end
 
@@ -383,12 +372,15 @@ function MATCH_DOMAIN.mark_duplicate_end(state)
 	return true
 end
 
-local function mark_server_resolved_blind(state)
+local function mark_server_resolved_blind(state, options)
+	options = options or {}
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.end_pvp = true
-	state.timer_consumed = false
-	state.timer_started = false
-	state.nemesis_timer_started = false
+	if not options.preserve_timer_state then
+		state.timer_consumed = false
+		state.timer_started = false
+		state.nemesis_timer_started = false
+	end
 	state.pvp_reached = false
 	state.pvp_reached_first = false
 	state.duel_blind_role = nil
@@ -400,7 +392,7 @@ function MATCH_DOMAIN.mark_end_pvp(state)
 end
 
 function MATCH_DOMAIN.mark_end_coop_blind(state)
-	return mark_server_resolved_blind(state)
+	return mark_server_resolved_blind(state, { preserve_timer_state = true })
 end
 
 function MATCH_DOMAIN.mark_match_won(state)

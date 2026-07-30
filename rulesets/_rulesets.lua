@@ -68,9 +68,6 @@ function MP.is_ruleset_active(ruleset_name)
 	if MP.LOBBY.code then
 		return MP.LOBBY.config.ruleset == key
 	end
-	if MP.is_practice_mode and MP.is_practice_mode() and MP.SP then
-		return MP.SP.ruleset == key
-	end
 	return false
 end
 
@@ -150,6 +147,9 @@ function MP.ApplyBans()
 	end
 	if MP.RunLayerHooks then
 		MP.RunLayerHooks("on_apply_bans")
+	end
+	if MP.apply_lobby_bonus_run_start_fields then
+		MP.apply_lobby_bonus_run_start_fields()
 	end
 	return result
 end

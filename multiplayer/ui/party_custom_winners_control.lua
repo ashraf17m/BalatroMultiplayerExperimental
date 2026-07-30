@@ -44,7 +44,9 @@ function view_model.update_custom_winners_percent_slider(winner_count)
 
 	slider_args.min, slider_args.max = get_slider_percent_range()
 
-	local percent = view_model.get_custom_winner_percent(winner_count)
+	local percent = view_model.get_custom_winner_slider_percent
+			and view_model.get_custom_winner_slider_percent(winner_count)
+		or view_model.get_custom_winner_percent(winner_count)
 	percent = math.max(slider_args.min, math.min(slider_args.max, percent))
 	slider_args.ref_table[slider_args.ref_value] = percent
 	slider_args.text = tostring(percent) .. "%"
@@ -99,7 +101,10 @@ end
 
 function view_model.create_custom_winners_percent_slider(id)
 	local min_percent, max_percent = get_slider_percent_range()
-	local percent = view_model.get_custom_winner_percent(view_model.get_custom_winner_count())
+	local current_winner_count = view_model.get_custom_winner_count()
+	local percent = view_model.get_custom_winner_slider_percent
+			and view_model.get_custom_winner_slider_percent(current_winner_count)
+		or view_model.get_custom_winner_percent(current_winner_count)
 	percent = math.max(min_percent, math.min(max_percent, percent))
 	local slider_state = {
 		percent = percent,

@@ -11,31 +11,84 @@ local action_asteroid = action_asteroid
 		end
 	end
 
-local function action_send_phantom(key)
-	BALATRO.with_overlay_menu_guard(function()
-		local new_card = BALATRO.create_card("Joker", MP.shared, false, nil, nil, nil, key)
-		new_card:set_edition("e_mp_phantom")
-		new_card:add_to_deck()
-		MP.shared:emplace(new_card)
-	end)
+local function get_card_center_key(card)
+	if not (card and card.config) then
+		return nil
+	end
+	if type(card.config.center_key) == "string" and card.config.center_key ~= "" then
+		return card.config.center_key
+	end
+
+	local center = card.config.center
+	if center and type(center.key) == "string" and center.key ~= "" then
+		return center.key
+	end
+	return nil
 end
 
-local function get_phantom_joker(key)
+local function is_phantom_joker(card, key, player_id)
+	if
+		not (
+			card
+			and card.edition
+			and card.edition.type == "mp_phantom"
+			and get_card_center_key(card) == key
+		)
+	then
+		return false
+	end
+
+	return not player_id or card.mp_phantom_player_id == player_id
+end
+
+local function get_phantom_joker(key, player_id)
 	if not MP.shared or not MP.shared.cards then return nil end
 	for i = 1, #MP.shared.cards do
-		if
-			MP.shared.cards[i].ability.name == key
-			and MP.shared.cards[i].edition
-			and MP.shared.cards[i].edition.type == "mp_phantom"
-		then
+		if is_phantom_joker(MP.shared.cards[i], key, player_id) then
 			return MP.shared.cards[i]
 		end
 	end
 	return nil
 end
 
-local function action_remove_phantom(key)
-	local card = get_phantom_joker(key)
+local function action_send_phantom(key, player_id)
+	if not (type(key) == "string" and key ~= "" and MP.shared) then
+		return
+	end
+	if get_phantom_joker(key, player_id) then
+		return
+	end
+
+	local center = BALATRO.get_center and BALATRO.get_center(key) or nil
+	if not center then
+		sendWarnMessage("Missing phantom joker center: " .. tostring(key), "MULTIPLAYER")
+		return
+	end
+
+	BALATRO.with_overlay_menu_guard(function()
+		local new_card = BALATRO.create_card_object(
+			MP.shared.T.x + MP.shared.T.w / 2,
+			MP.shared.T.y,
+			BALATRO.get_card_width(),
+			BALATRO.get_card_height(),
+			nil,
+			center,
+			{
+				bypass_discovery_center = true,
+				bypass_discovery_ui = true,
+				discover = true,
+				bypass_back = G and G.GAME and G.GAME.selected_back and G.GAME.selected_back.pos or nil,
+			}
+		)
+		new_card.mp_phantom_player_id = player_id
+		new_card:set_edition("e_mp_phantom")
+		new_card:add_to_deck()
+		MP.shared:emplace(new_card)
+	end)
+end
+
+local function action_remove_phantom(key, player_id)
+	local card = get_phantom_joker(key, player_id)
 	if card then
 		card:remove_from_deck()
 		card:start_dissolve({ G.C.RED }, nil, 1.6)

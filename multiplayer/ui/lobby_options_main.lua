@@ -178,3 +178,9 @@ function MP.UI.create_gamemode_modifiers_tab()
 		center_controls = true,
 	})
 end
+
+function MP.UI.create_bonuses_options_tab()
+	return MP.UI.create_lobby_option_specs_page(MP.UI.LOBBY_OPTION_TAB_SPECS.bonuses, 6, {
+		center_controls = true,
+	})
+end

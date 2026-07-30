@@ -59,10 +59,17 @@ local function build_player_list_signature(mode)
 end
 
 local function refresh_score_targets(mode)
+	local players = MP.UI.get_sorted_players and MP.UI.get_sorted_players() or nil
 	if mode == "teams" and MP.UI.refresh_team_standings_score_targets then
-		MP.UI.refresh_team_standings_score_targets()
+		MP.UI.refresh_team_standings_score_targets(players)
+		if MP.UI.refresh_team_standings_stat_targets then
+			MP.UI.refresh_team_standings_stat_targets(players)
+		end
 	elseif mode == "ffa" and MP.UI.refresh_ffa_standings_score_targets then
-		MP.UI.refresh_ffa_standings_score_targets()
+		MP.UI.refresh_ffa_standings_score_targets(players)
+		if MP.UI.refresh_ffa_standings_stat_targets then
+			MP.UI.refresh_ffa_standings_stat_targets(players)
+		end
 	end
 end
 
@@ -200,6 +207,46 @@ local function center_to_internal_area(ui_box, major_area)
 	end
 end
 
+local function enable_player_list_row_clicks(node)
+	if not node then
+		return
+	end
+
+	if node.config and node.config.mp_open_full_standings_row and not node.config.mp_open_full_standings_click then
+		node.config.mp_open_full_standings_click = true
+		node.config.hover = true
+		node.config.shadow = true
+		if node.states then
+			if node.states.collide then node.states.collide.can = true end
+			if node.states.hover then node.states.hover.can = true end
+			if node.states.click then node.states.click.can = true end
+		end
+
+		function node:click()
+			if not (self.states and self.states.visible) or self.under_overlay or self.disable_button then
+				return
+			end
+			if self.mp_last_full_standings_click and self.mp_last_full_standings_click + 0.1 >= G.TIMERS.REAL then
+				return
+			end
+
+			self.mp_last_full_standings_click = G.TIMERS.REAL
+			if G.FUNCS and G.FUNCS.mp_open_full_standings then
+				G.FUNCS.mp_open_full_standings(self)
+			end
+			if play_sound then
+				play_sound("button", 1, 0.3)
+			end
+		end
+	end
+
+	if node.children then
+		for _, child in pairs(node.children) do
+			enable_player_list_row_clicks(child)
+		end
+	end
+end
+
 local function open_standings_overlay(contents, reset_existing)
 	if reset_existing and BALATRO.get_overlay_menu() then
 		BALATRO.exit_overlay_menu()
@@ -273,6 +320,7 @@ function MP.UI.create_unified_player_list()
 					},
 				})
 				center_to_internal_area(standings_ui, major_target)
+				enable_player_list_row_clicks(standings_ui.UIRoot)
 				player_list_runtime.ui = standings_ui
 			end
 

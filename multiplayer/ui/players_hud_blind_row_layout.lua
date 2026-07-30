@@ -5,56 +5,6 @@ local shared = MP.UI.PLAYERS_HUD_SHARED
 local create_text_label = shared.create_text_label
 local create_player_blind_icon_object = shared.create_player_blind_icon_object
 
-local function create_thin_button(button, label, colour, minw, disabled)
-	local button_colour = disabled and darken(colour, 0.6) or colour
-	return {
-		n = G.UIT.R,
-		config = {
-			align = "cm",
-			padding = 0.03,
-			minw = minw or 1.65,
-			minh = 0.34,
-			r = 0.11,
-			colour = button_colour,
-			emboss = 0.06,
-			shadow = true,
-			hover = true,
-			button = disabled and nil or button,
-		},
-		nodes = {
-			create_text_label(label, 0.27, disabled and G.C.UI.TEXT_INACTIVE or G.C.WHITE, false),
-		},
-	}
-end
-
-local function create_view_all_button_row(row_minw)
-	local pvp_col = G.C.MULTIPLAYER or HEX("AC3232")
-	return {
-		n = G.UIT.R,
-		config = {
-			align = "cm",
-			minw = row_minw or 4.7,
-			padding = 0,
-			no_fill = true,
-		},
-		nodes = {
-			{
-				n = G.UIT.C,
-				config = { align = "cm", padding = 0, no_fill = true },
-				nodes = {
-					create_thin_button(
-						"mp_open_full_standings",
-						localize("b_view_all"),
-						mix_colours(G.C.ORANGE, pvp_col, 0.42),
-						2.18,
-						false
-					),
-				},
-			},
-		},
-	}
-end
-
 local function create_floating_icon_anchor(player, size, offset, id)
 	local icon_size = size or 0.56
 	return {
@@ -129,29 +79,74 @@ local function create_blind_style_row(config)
 	local right_padding = config.right_padding or 0.015
 	local header_left_w = (config.header_left_nodes and (config.header_left_w or 0.6)) or 0
 	local header_right_w = (config.header_right_nodes and (config.header_right_w or 0.6)) or 0
+	local header_slot_gap = config.header_slot_gap or 0.025
+	local header_left_no_fill = config.header_left_no_fill or false
 	local header_center_nodes = config.header_center_nodes
 		or {
 			create_text_label(title_text, title_scale, G.C.UI.TEXT_LIGHT),
 		}
 	local header_nodes = config.header_nodes
+	local header_row_colour = header_colour
+	local header_row_emboss = 0.05
+	local header_row_padding = 0.008
 	if not header_nodes and (config.header_left_nodes or config.header_right_nodes) then
-		header_nodes = {
-			{
+		header_row_colour = G.C.CLEAR
+		header_row_emboss = 0
+		header_row_padding = 0
+		header_nodes = {}
+		local header_center_w = math.max(0.8, lane_width - header_left_w - header_right_w - header_slot_gap)
+
+		if config.header_left_nodes then
+			header_nodes[#header_nodes + 1] = {
 				n = G.UIT.C,
-				config = { align = "cm", minw = header_left_w, padding = 0.005, no_fill = true },
-				nodes = config.header_left_nodes or {},
+				config = {
+					align = "cm",
+					minw = header_left_w,
+					minh = header_height,
+					padding = 0.005,
+					r = 0.1,
+					colour = config.header_left_colour or (header_left_no_fill and G.C.CLEAR or G.C.BLACK),
+					emboss = config.header_left_emboss == nil and (header_left_no_fill and 0 or 0.04) or config.header_left_emboss,
+					shadow = false,
+					no_fill = header_left_no_fill,
+				},
+				nodes = config.header_left_nodes,
+			}
+			header_nodes[#header_nodes + 1] = { n = G.UIT.C, config = { minw = header_slot_gap, no_fill = true }, nodes = {} }
+		end
+
+		header_nodes[#header_nodes + 1] = {
+			n = G.UIT.C,
+			config = {
+				align = config.header_center_align or "cl",
+				minw = header_center_w,
+				minh = header_height,
+				padding = 0.008,
+				r = 0.1,
+				colour = header_colour,
+				emboss = 0.05,
+				shadow = false,
 			},
-			{
-				n = G.UIT.C,
-				config = { align = config.header_center_align or "cl", minw = math.max(0.8, lane_width - header_left_w - header_right_w), padding = 0.005, no_fill = true },
-				nodes = header_center_nodes,
-			},
-			{
-				n = G.UIT.C,
-				config = { align = "cr", minw = header_right_w, padding = 0.005, no_fill = true },
-				nodes = config.header_right_nodes or {},
-			},
+			nodes = header_center_nodes,
 		}
+
+		if config.header_right_nodes then
+			header_nodes[#header_nodes + 1] = { n = G.UIT.C, config = { minw = header_slot_gap, no_fill = true }, nodes = {} }
+			header_nodes[#header_nodes + 1] = {
+				n = G.UIT.C,
+				config = {
+					align = "cr",
+					minw = header_right_w,
+					minh = header_height,
+					padding = 0.005,
+					r = 0.1,
+					colour = config.header_right_colour or G.C.BLACK,
+					emboss = 0.04,
+					shadow = false,
+				},
+				nodes = config.header_right_nodes,
+			}
+		end
 	elseif not header_nodes then
 		header_nodes = header_center_nodes
 	end
@@ -188,10 +183,10 @@ local function create_blind_style_row(config)
 							align = "cm",
 							minw = lane_width,
 							minh = header_height,
-							padding = 0.008,
+							padding = header_row_padding,
 							r = 0.1,
-							colour = header_colour,
-							emboss = 0.05,
+							colour = header_row_colour,
+							emboss = header_row_emboss,
 							shadow = false,
 						},
 						nodes = header_nodes,
@@ -250,7 +245,5 @@ local function create_blind_style_row(config)
 	}
 end
 
-shared.create_thin_button = create_thin_button
-shared.create_view_all_button_row = create_view_all_button_row
 shared.create_floating_icon_anchor = create_floating_icon_anchor
 shared.create_blind_style_row = create_blind_style_row

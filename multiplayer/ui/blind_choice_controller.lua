@@ -208,16 +208,6 @@ BALATRO.set_ui_function("select_blind", function(e)
 		if MP.UI.hide_enemy_location then
 			MP.UI.hide_enemy_location()
 		end
-	elseif MP.GHOST and MP.GHOST.is_active and MP.GHOST.is_active() then
-		if MP.GAME then
-			MP.GAME.ante_key = tostring(math.random())
-		end
-		if MP.GHOST.init_playback and BALATRO.get_ante then
-			MP.GHOST.init_playback(BALATRO.get_ante())
-		end
-		if MP.UI.hide_enemy_location then
-			MP.UI.hide_enemy_location()
-		end
 	end
 end)
 

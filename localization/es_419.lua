@@ -780,7 +780,6 @@ return {
 			k_opts_pvp_timer = "Temporizador",
 			k_opts_showdown_starting_antes = "Showdown empieza en apuesta",
 			k_opts_pvp_timer_increment = "Incremento del temporizador",
-			k_opts_pvp_countdown_seconds = "Cuenta regresiva JcJ (segundos)",
 			k_bl_life = "VIDA",
 			k_bl_or = "o",
 			k_bl_death = "MUERTE", -- ElTioRata: En mayúsculas tiene más gancho ;)

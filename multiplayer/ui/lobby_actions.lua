@@ -79,12 +79,12 @@ local function finalize_lobby_leave()
 	if MP.MATCH_LIFECYCLE and MP.MATCH_LIFECYCLE.suspend_team_card_sync then
 		MP.MATCH_LIFECYCLE.suspend_team_card_sync()
 	end
+	MP.ACTIONS.leave_lobby()
 	if MP.CONNECTION_SESSION and MP.CONNECTION_SESSION.clear_local_lobby_session then
 		MP.CONNECTION_SESSION.clear_local_lobby_session({
 			clear_reconnect = false,
 		})
 	end
-	MP.ACTIONS.leave_lobby()
 
 	if G.STAGE ~= G.STAGES.MAIN_MENU then
 		G.FUNCS.go_to_menu()
