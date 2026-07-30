@@ -4,6 +4,7 @@ MP.UI.BLIND_CHOICE_STATE = MP.UI.BLIND_CHOICE_STATE or {}
 local blind_choice_state = MP.UI.BLIND_CHOICE_STATE
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 local PREVIEW_BLIND_ROWS = { "Small", "Big", "Boss" }
+local NO_NEMESIS_LABEL = "No Nemesis"
 
 local function can_sync_coop_blind_preview()
 	return MP.LOBBY
@@ -277,7 +278,8 @@ end
 local function build_blind_name(blind_choice_config, is_pvp_blind)
 	if is_pvp_blind then
 		local opponents = MP.OPPONENTS or {}
-		return ((opponents.get_nemesis_lobby_player and opponents.get_nemesis_lobby_player() or {}).username or localize("k_nemesis"))
+		local nemesis = opponents.get_nemesis_lobby_player and opponents.get_nemesis_lobby_player() or nil
+		return (nemesis and nemesis.username) or NO_NEMESIS_LABEL
 	end
 
 	return localize({ type = "name_text", key = blind_choice_config.key, set = "Blind" })

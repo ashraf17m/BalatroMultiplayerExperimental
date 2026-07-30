@@ -1,5 +1,6 @@
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 local OPPONENTS = MP.OPPONENTS or {}
+local NO_NEMESIS_PLAYER = { username = "No Nemesis" }
 
 local function use_standings_hud()
 	return (MP.is_ffa_mode and MP.is_ffa_mode())
@@ -27,7 +28,7 @@ function MP.UI.update_primary_opponent_blind_name(pop_in)
 
 	return BALATRO.set_text_object_ref(
 		blind_name,
-		(OPPONENTS.get_primary_lobby_player and OPPONENTS.get_primary_lobby_player()) or {},
+		(OPPONENTS.get_primary_lobby_player and OPPONENTS.get_primary_lobby_player()) or NO_NEMESIS_PLAYER,
 		"username",
 		pop_in
 	)
