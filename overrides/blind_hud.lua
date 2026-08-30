@@ -134,8 +134,27 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "change_colour", "mp.blind_hud.nem
 	end,
 })
 
+MP.HOOKS.register_method_hook(Blind, "Blind", "alert_debuff", "mp.spectator.skip_switch_debuff_alert", {
+	before = function(ctx)
+		-- Snapshot set_blind always calls alert_debuff (silent only skips juice).
+		-- That queues the big "Face another player / boss effect" attention_text
+		-- over the play area. Spectators must not see it on a target switch.
+		if MP.SPECTATOR and MP.SPECTATOR.is_spectating and MP.SPECTATOR.applying_snapshot then
+			ctx.skip_original = true
+			ctx.results = { n = 0 }
+		end
+	end,
+})
+
 MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis_state", {
 	after = function(ctx, self)
+		if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+			if MP.SPECTATOR.applying_snapshot then
+				MP.SPECTATOR.hide_blind_loc_debuff = true
+			else
+				MP.SPECTATOR.hide_blind_loc_debuff = false
+			end
+		end
 		local blind = ctx.args and ctx.args[1] or nil
 		local reset = ctx.args and ctx.args[2] or nil
 		local blind_key = (blind and blind.key) or (self and self.name) or nil
@@ -149,7 +168,8 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis
 				clear_coop_blind_base(self)
 			end
 			self.hide_floating_icon = false
-			if has_blind_hud_context() and MP.UI.reset_blind_HUD then
+			if has_blind_hud_context() and MP.UI.reset_blind_HUD
+				and not (MP.SPECTATOR and MP.SPECTATOR.applying_snapshot) then
 				MP.UI.reset_blind_HUD()
 			end
 			ctx.results = { n = 0 }
@@ -201,7 +221,7 @@ end
 local add_round_eval_row_ref = add_round_eval_row
 function add_round_eval_row(config)
 	local current_blind_key = BALATRO.get_current_blind_key and BALATRO.get_current_blind_key() or nil
-	if config.name == "blind1" and current_blind_key == "bl_mp_nemesis" then
+	if config.name == "blind1" and current_blind_key == "bl_mp_nemesis" and not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
 		local opponents = MP.OPPONENTS or {}
 		local enemy_view = opponents.get_primary_enemy_state and opponents.get_primary_enemy_state()
 		local current_blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
@@ -238,3 +258,98 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "disable", "mp.blind_hud.pvp_disab
 		ctx.results = { n = 0 }
 	end,
 })
+
+-- Fix SMODS src/overrides.lua:46 crash (assert(G.HUD_blind == e.UIBox)) during profile switches / menu transitions
+G.FUNCS = G.FUNCS or {}
+G.FUNCS.HUD_blind_debuff = function(e)
+	-- Spectators only see boss loc_debuff if they watched set_blind live.
+	-- Switching onto a player who is already in the blind must not show it,
+	-- and delayed HUD pop-in from snapshot set_blind must not stick it.
+	if MP and MP.SPECTATOR and MP.SPECTATOR.is_spectating and MP.SPECTATOR.hide_blind_loc_debuff then
+		if e and e.children then
+			for i = 1, #e.children do
+				local child = e.children[i]
+				if child and child.states then
+					child.states.visible = false
+				end
+			end
+		end
+		if e and e.config then
+			e.config.minh = 0
+			e.config.padding = 0
+		end
+		return
+	end
+	if not (G and G.GAME and G.GAME.blind and G.GAME.blind.loc_debuff_lines) then
+		return
+	end
+	if not e or not e.UIBox or not e.children then
+		return
+	end
+	local scale = 0.4
+	local num_lines = #G.GAME.blind.loc_debuff_lines
+	while num_lines > 0 and G.GAME.blind.loc_debuff_lines[num_lines] == "" do
+		num_lines = num_lines - 1
+	end
+	local padding = 0.05
+	if num_lines > 5 then
+		local excess_height = (0.3 + padding) * (num_lines - 5)
+		padding = padding - excess_height / (num_lines + 1)
+	end
+	e.config = e.config or {}
+	e.config.padding = padding
+	if G.GAME.blind.update_loc_debuff_lines then
+		for i = 1, #e.children do
+			if e.children[i] then
+				e.children[i]:remove()
+				e.children[i] = nil
+			end
+		end
+		G.GAME.blind.update_loc_debuff_lines = nil
+	end
+	if num_lines > #e.children then
+		for i = #e.children + 1, num_lines do
+			local node_def = nil
+			if type(G.GAME.blind.loc_debuff_lines[i]) == "string" then
+				node_def = {
+					n = G.UIT.R,
+					config = { align = "cm", minh = 0.3, maxw = 4.2 },
+					nodes = {
+						{
+							n = G.UIT.T,
+							config = {
+								ref_table = G.GAME.blind.loc_debuff_lines,
+								ref_value = i,
+								scale = scale * 0.9,
+								colour = G.C.UI.TEXT_LIGHT,
+							},
+						},
+					},
+				}
+			elseif SMODS and SMODS.localize_box then
+				node_def = {
+					n = G.UIT.R,
+					config = { align = "cm", minh = 0.3, maxw = 4.2 },
+					nodes = SMODS.localize_box(G.GAME.blind.loc_debuff_lines[i], {
+						default_col = G.GAME.blind.loc_debuff_lines.text_colour or G.C.UI.TEXT_LIGHT,
+						scale = 1.125 * (G.GAME.blind.loc_debuff_lines.scale or 1),
+						vars = G.GAME.blind.loc_debuff_lines.vars or {},
+					}),
+				}
+			end
+			if node_def and e.UIBox and e.UIBox.set_parent_child then
+				e.UIBox:set_parent_child(node_def, e)
+			end
+		end
+	elseif num_lines < #e.children then
+		for i = num_lines + 1, #e.children do
+			if e.children[i] then
+				e.children[i]:remove()
+				e.children[i] = nil
+			end
+		end
+	end
+	if e.UIBox and e.UIBox.recalculate then
+		e.UIBox:recalculate()
+	end
+end

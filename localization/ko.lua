@@ -701,9 +701,7 @@ return {
 		},
 
 		dictionary = {
-			b_singleplayer = "싱글플레이",
 			b_join_lobby = "로비 참가",
-			b_join_lobby_clipboard = "클립보드로 참가",
 			b_return_lobby = "로비로 돌아가기",
 			b_reconnect = "재접속",
 			b_create_lobby = "로비 생성",
@@ -757,7 +755,6 @@ return {
 			b_preview_integration = "점수 미리보기 활성화",
 			b_view_nemesis_deck = "덱 보기",
 			b_toggle_jokers = "조커 토글",
-			b_skip_tutorial = "튜토리얼 건너뛰기",
 
 			k_yes = "예",
 			k_no = "아니요",
@@ -905,7 +902,6 @@ return {
 			k_ruleset_disabled_the_order_required = "The Order 필요",
 			k_ruleset_disabled_the_order_banned = "The Order 금지됨",
 			k_ruleset_not_found = "알 수 없는 룰셋",
-			k_tutorial_not_complete = "멀티플레이어를 플레이하려면 튜토리얼을 완료해야 합니다",
 			k_created_by = "제작",
 			k_major_contributors = "주요 기여자",
 			ml_enemy_loc = {

@@ -166,7 +166,6 @@ return {
 			mp_phantom = "Mariko",
 		},
 		dictionary = {
-			b_singleplayer = "Takitahi",
 			b_join_lobby = "Kuhu i te Rūma",
 			b_return_lobby = "Hoki ki te Rūma",
 			b_reconnect = "Hono ki te Ipurangi",

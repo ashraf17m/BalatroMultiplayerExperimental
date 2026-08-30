@@ -151,7 +151,16 @@ function match_flow_runtime.start_match_runtime(seed, stake_str, deck_state)
 	if not MP.LOBBY.config.different_seeds and MP.LOBBY.config.custom_seed ~= "random" then
 		seed = MP.LOBBY.config.custom_seed
 	end
+	if not (MP.SPECTATOR and (MP.SPECTATOR.is_spectator_role or MP.SPECTATOR.is_spectating)) then
+		if MP.RECORDER and MP.RECORDER.reset then
+			MP.RECORDER.reset()
+		end
+	end
 	BALATRO.start_lobby_run({ seed = seed, stake = stake })
+
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectator_role then
+		return
+	end
 	sync_initial_shared_playing_cards()
 	sync_local_blind_target_scale()
 	if MP.LOBBY.config.ruleset == "ruleset_mp_speedlatro" then
@@ -389,6 +398,19 @@ function match_flow_runtime.handle_match_loss_runtime()
 	BALATRO.call_ui_function("overlay_endgame_menu")
 end
 
+-- Spectator: the watched match finished. Leaves the board (spectator state
+-- is cleared by MP.SPECTATOR.handle_match_ended before this runs) and shows
+-- the endgame overlay, which offers Spectate-again and Return to Lobby.
+function match_flow_runtime.handle_match_ended_runtime()
+	prepare_terminal_match_outcome()
+	if match_domain.mark_match_abandoned then
+		match_domain.mark_match_abandoned()
+	end
+	log_terminal_match_memory()
+	BALATRO.set_paused(true)
+	BALATRO.call_ui_function("overlay_endgame_menu")
+end
+
 MP.NETWORKING_INTERNAL.sync_resume_enemies_from_lobby = match_flow_runtime.sync_resume_enemies_from_lobby
 MP.NETWORKING_INTERNAL.start_match_runtime = match_flow_runtime.start_match_runtime
 MP.NETWORKING_INTERNAL.resume_match_runtime = match_flow_runtime.resume_match_runtime
@@ -399,5 +421,6 @@ MP.NETWORKING_INTERNAL.end_current_coop_blind_runtime = match_flow_runtime.end_c
 MP.NETWORKING_INTERNAL.handle_match_win_runtime = match_flow_runtime.handle_match_win_runtime
 MP.NETWORKING_INTERNAL.handle_match_alone_runtime = match_flow_runtime.handle_match_alone_runtime
 MP.NETWORKING_INTERNAL.handle_match_loss_runtime = match_flow_runtime.handle_match_loss_runtime
+MP.NETWORKING_INTERNAL.handle_match_ended_runtime = match_flow_runtime.handle_match_ended_runtime
 
 return match_flow_runtime

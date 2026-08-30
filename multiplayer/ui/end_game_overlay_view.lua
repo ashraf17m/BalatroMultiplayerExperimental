@@ -897,6 +897,16 @@ function MP.UI.create_UIBox_mp_game_end(has_won)
 												config = { align = "cm", minh = 0.4, minw = 0.1 },
 												nodes = {},
 											},
+											(not screen_style.win_like and MP.is_mp_or_ghost and MP.is_mp_or_ghost()) and UIBox_button({
+												id = "mp_spectate_match_button",
+												button = "mp_spectate_match",
+												label = { localize("b_spectate_match") },
+												colour = G.C.BLUE,
+												minw = 2.5,
+												maxw = 2.5,
+												minh = 0.8,
+												focus_args = { nav = "wide" },
+											}) or nil,
 											UIBox_button({
 												id = "from_game_won",
 												button = "mp_end_game_return_to_lobby",
@@ -950,4 +960,16 @@ function MP.UI.create_UIBox_mp_game_end(has_won)
 	if screen_style.win_like then t.config.id = "you_win_UI" end
 
 	return t
+end
+
+if BALATRO.set_ui_function then
+	BALATRO.set_ui_function("mp_spectate_match", function()
+		local spectatable = (MP.SPECTATOR and MP.SPECTATOR.get_spectatable_players)
+			and MP.SPECTATOR.get_spectatable_players()
+			or {}
+		local target = spectatable[1]
+		if target and MP.SPECTATOR and MP.SPECTATOR.start_spectating then
+			MP.SPECTATOR.start_spectating(target.id, target.username)
+		end
+	end)
 end

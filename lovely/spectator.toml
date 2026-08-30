@@ -1,0 +1,60 @@
+[manifest]
+version = "1.0.0"
+dump_lua = true
+priority = 2147483600
+
+# Spectator mode safety guards.
+#
+# When a spectator switches targets, the mod tears down and rebuilds the
+# game's blind-select UI. Vanilla queues immediate events that index
+# G.blind_select / G.blind_prompt_box at execution time; if the spectator
+# transition removed them in between, those events would crash on nil.
+# These patches make every such access nil-safe so a transition can never
+# crash the game loop.
+
+[[patches]]
+[patches.pattern]
+target = "functions/UI_definitions.lua"
+pattern = "G.blind_prompt_box.alignment.offset.y = 0"
+position = "at"
+payload = "if G.blind_prompt_box then G.blind_prompt_box.alignment.offset.y = 0 end"
+match_indent = true
+times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = "if G.blind_select then "
+position = "at"
+payload = "if G.blind_select and G.blind_prompt_box then "
+match_indent = true
+times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = "G.blind_prompt_box.alignment.offset.y = -10"
+position = "at"
+payload = "if G.blind_prompt_box then G.blind_prompt_box.alignment.offset.y = -10 end"
+match_indent = true
+times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = "G.blind_select.alignment.offset.y = 40"
+position = "at"
+payload = "if G.blind_select then G.blind_select.alignment.offset.y = 40 end"
+match_indent = true
+times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = '''G.blind_select:remove()
+            G.blind_prompt_box:remove()'''
+position = "at"
+payload = '''if G.blind_select then G.blind_select:remove() end
+            if G.blind_prompt_box then G.blind_prompt_box:remove() end'''
+match_indent = true
+times = 1

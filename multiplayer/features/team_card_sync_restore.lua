@@ -117,14 +117,16 @@ function team_card_sync.ensure_team_card_ids_for_existing_run()
 	local cards = get_playing_cards_or_empty()
 	local has_existing_ids, next_card_id = scan_existing_card_ids(cards)
 
-	local uses_shared_card_sync = MP.is_shared_card_sync_enabled and MP.is_shared_card_sync_enabled()
-	local prefix = (uses_shared_card_sync and not has_existing_ids) and "TEAM"
+	-- Same rule as assign_initial_team_card_ids: any lobby run uses the
+	-- deterministic TEAM prefix so spectator boards can match card ids.
+	local in_lobby = not not (MP.LOBBY and MP.LOBBY.code)
+	local prefix = (in_lobby and not has_existing_ids) and "TEAM"
 		or get_local_card_id_prefix()
 
 	for index, card in ipairs(cards) do
 		local resolved_id = card.mp_card_id
 		if not is_valid_card_id(resolved_id) then
-			if uses_shared_card_sync and not has_existing_ids then
+			if in_lobby and not has_existing_ids then
 				resolved_id = "TEAM_" .. (index - 1)
 				if index > next_card_id then
 					next_card_id = index

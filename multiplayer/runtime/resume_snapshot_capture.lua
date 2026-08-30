@@ -163,6 +163,7 @@ local function build_resume_match_state()
 		force_zero_round_score = not not MP.GAME.force_zero_round_score,
 		comeback_bonus_given = not not MP.GAME.comeback_bonus_given,
 		comeback_bonus = tonumber(MP.GAME.comeback_bonus) or 0,
+		comeback_eval_pending = not not MP.GAME.comeback_eval_pending,
 		end_pvp = not not MP.GAME.end_pvp,
 		enemies = enemies,
 		location = MP.GAME.location or "loc_selecting",

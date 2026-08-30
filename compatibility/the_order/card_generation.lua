@@ -54,7 +54,7 @@ MP.PLATFORM.SMODS.take_booster_ownership_by_kind("Standard", {
 		local b_append = MP.ante_based() .. s_append
 
 		local _edition = poll_edition("standard_edition" .. b_append, 2, true)
-		local _seal = MP.PLATFORM.SMODS.poll_seal({ mod = 10, key = "stdseal" .. b_append })
+		local _seal = SMODS.poll_seal({ mod = 10 })
 
 		return {
 			set = (pseudorandom(pseudoseed("stdset" .. b_append)) > 0.6) and "Enhanced" or "Base",
@@ -64,6 +64,7 @@ MP.PLATFORM.SMODS.take_booster_ownership_by_kind("Standard", {
 			skip_materialize = true,
 			soulable = true,
 			key_append = "sta" .. s_append,
+			front = false,
 		}
 	end,
 }, true)

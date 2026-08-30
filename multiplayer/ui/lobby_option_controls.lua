@@ -177,14 +177,54 @@ function view_model.create_group_mode_host_notice()
 	}
 end
 
+local function add_cycle_jump_buttons(cycle, step)
+	local row = cycle and cycle.nodes and cycle.nodes[2]
+	row = row and row.nodes and row.nodes[2]
+	row = row and row.nodes and row.nodes[1]
+	if not (row and row.nodes and row.nodes[1] and row.nodes[3]) then
+		return
+	end
+
+	local function clone_side(src, text, dir)
+		local config = {}
+		for key, value in pairs(src.config) do
+			config[key] = value
+		end
+		if config.button then
+			config.button = "mp_option_cycle_jump"
+			config.jump_step = dir
+		end
+		local src_text = src.nodes[1].config
+		return {
+			n = src.n,
+			config = config,
+			nodes = {
+				{
+					n = src.nodes[1].n,
+					config = {
+						text = text,
+						scale = src_text.scale,
+						colour = src_text.colour,
+					},
+				},
+			},
+		}
+	end
+
+	local left, right = row.nodes[1], row.nodes[3]
+	table.insert(row.nodes, 1, clone_side(left, "<<", -step))
+	row.nodes[#row.nodes + 1] = clone_side(right, ">>", step)
+end
+
 function view_model.create_lobby_option_cycle(id, label_key, scale, options, current_option, callback, opt_args, ui_args)
 	local Disableable_Option_Cycle = MP.UI.Disableable_Option_Cycle
 	ui_args = ui_args or {}
+	opt_args = opt_args or {}
 	local cycle_args = {
 		id = id,
-		enabled_ref_table = MP.LOBBY,
-		enabled_ref_value = "is_host",
-		label = localize(label_key),
+		enabled_ref_table = opt_args.enabled_ref_table or MP.LOBBY,
+		enabled_ref_value = opt_args.enabled_ref_value or "is_host",
+		label = opt_args.label or (label_key and localize(label_key)) or "",
 		scale = scale,
 		options = options,
 		current_option = current_option,
@@ -198,6 +238,9 @@ function view_model.create_lobby_option_cycle(id, label_key, scale, options, cur
 	local cycle = Disableable_Option_Cycle(cycle_args)
 	if id then
 		view_model.LOBBY_OPTION_CYCLE_UI_STATES[id] = cycle_args._mp_effective_cycle_args or cycle_args
+	end
+	if ui_args.jump_step then
+		add_cycle_jump_buttons(cycle, ui_args.jump_step)
 	end
 	return cycle
 end
@@ -253,7 +296,12 @@ function view_model.create_bound_lobby_option_cycle(spec)
 		get_cycle_display_options(spec),
 		get_cycle_current_index(spec),
 		"change_bound_lobby_option_cycle",
-		{ spec_id = spec_id },
+		{
+			spec_id = spec_id,
+			label = spec.label,
+			enabled_ref_table = spec.enabled_ref_table,
+			enabled_ref_value = spec.enabled_ref_value,
+		},
 		spec.ui_args
 	)
 	if view_model.LOBBY_OPTION_CYCLE_UI_STATES and view_model.LOBBY_OPTION_CYCLE_UI_STATES[control_id] then

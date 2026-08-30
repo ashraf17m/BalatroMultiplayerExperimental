@@ -250,6 +250,23 @@ function match_action_runtime.fail_round(hands_used)
 	if MP.LOBBY.config.no_gold_on_round_loss then
 		BALATRO.set_current_blind_dollars(0)
 	end
+	-- Live spectation: the simulated run already failed locally (chips <
+	-- blind). Arm comeback the same way a real life packet would, then let
+	-- vanilla evaluate_round add the row. Do not send fail_round or stamp
+	-- the target's network result.
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		if
+			not (MP.is_pvp_boss and MP.is_pvp_boss())
+			and MP.LOBBY.config.death_on_round_loss
+			and MP.LOBBY.config.gold_on_life_loss
+			and MP.GAME
+		then
+			MP.GAME.comeback_bonus_given = false
+			MP.GAME.comeback_eval_pending = true
+			MP.GAME.comeback_bonus = (tonumber(MP.GAME.comeback_bonus) or 0) + 1
+		end
+		return
+	end
 	if hands_used == 0 then
 		return
 	end
@@ -264,6 +281,9 @@ end
 function match_action_runtime.set_location(location, blind)
 	location = normalize_location(location, blind)
 	if match_domain.set_location and not match_domain.set_location(location) then
+		return
+	end
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
 		return
 	end
 	request_match_lobby_info_refresh()
@@ -295,6 +315,12 @@ function match_action_runtime.play_hand(score, hands_left, options)
 		teams_domain.recalculate_state()
 	end
 	request_match_lobby_info_refresh()
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		if MP.UI and MP.UI.refresh_active_pvp_player_list then
+			MP.UI.refresh_active_pvp_player_list()
+		end
+		return
+	end
 	Client.queue_send(payload)
 	if MP.UI and MP.UI.refresh_active_pvp_player_list then
 		MP.UI.refresh_active_pvp_player_list()
@@ -309,6 +335,9 @@ end
 function match_action_runtime.new_round()
 	if match_domain.begin_new_round then
 		match_domain.begin_new_round()
+	end
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return
 	end
 	Client.queue_send(MP.MATCH_WIRE.build_new_round_payload())
 end

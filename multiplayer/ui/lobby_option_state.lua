@@ -124,6 +124,7 @@ local function get_group_max_player_floor()
 	local player_count = lobby_context.player_count or 0
 	return math.max(MP.MIN_GROUP_LOBBY_PLAYERS, player_count)
 end
+view_model.get_group_max_player_floor = get_group_max_player_floor
 
 function view_model.get_group_scoring_options()
 	local options = {}
@@ -478,6 +479,7 @@ local function change_party_max_players(max_players)
 	end
 	return send_party_options_update(options_update)
 end
+view_model.change_party_max_players = change_party_max_players
 
 local function change_custom_winner_count(winner_count)
 	if is_party_scoring_locked() then
@@ -517,6 +519,13 @@ local party_options_cycle_ui = {
 	w = 4.9,
 	no_pips = false,
 	cycle_shoulders = true,
+}
+-- The player range spans up to ~100 values, so a pip row would not fit.
+local party_max_players_cycle_ui = {
+	w = 4.9,
+	no_pips = true,
+	cycle_shoulders = true,
+	jump_step = 10,
 }
 local bonuses_cycle_ui = {
 	w = 4.9,
@@ -558,8 +567,55 @@ local function build_timer_base_display_options()
 	return options
 end
 
+local function safe_localize(key, fallback)
+	local ok, result = pcall(localize, key)
+	if ok and type(result) == "string" and result ~= "" and result ~= key and result ~= "ERROR" then
+		return result
+	end
+	return fallback
+end
+
+local function build_timer_ownership_display_options()
+	return {
+		safe_localize("k_opts_timer_ownership_anyone", "First Ready"),
+		safe_localize("k_opts_timer_ownership_host", "Host Only"),
+	}
+end
+
 view_model.PARTY_OPTION_TAB_SPECS = {
 	general = {
+		{
+			kind = "cycle",
+			spec_id = "player_role",
+			control_id = "player_role_cycle",
+			label_key = "k_role",
+			option_values = { "player", "spectator" },
+			display_options = function()
+				return {
+					safe_localize("k_role_player", "Player"),
+					safe_localize("k_role_spectator", "Spectator"),
+				}
+			end,
+			current_value = function()
+				return (MP.SPECTATOR and MP.SPECTATOR.is_spectator_role) and "spectator" or "player"
+			end,
+			on_change = function(value)
+				-- Role switching is only allowed between matches; the server
+				-- rejects mid-match changes as well.
+				if G and G.STAGE == G.STAGES.RUN then
+					return
+				end
+				if MP.SPECTATOR and MP.SPECTATOR.set_lobby_role then
+					MP.SPECTATOR.set_lobby_role(value)
+				end
+				if MP.ACTIONS and MP.ACTIONS.spectator_set_role then
+					MP.ACTIONS.spectator_set_role(value)
+				end
+			end,
+			enabled_ref_table = { always_enabled = true },
+			enabled_ref_value = "always_enabled",
+			ui_args = party_options_cycle_ui,
+		},
 		{
 			kind = "cycle",
 			spec_id = "party_mode",
@@ -610,13 +666,18 @@ view_model.PARTY_OPTION_TAB_SPECS = {
 				return view_model.get_group_max_player_options()
 			end,
 			current_value = function()
-				return view_model.normalize_group_max_players(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.max_players)
+				return view_model.normalize_group_max_players(
+					MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.max_players
+				)
 			end,
 			normalize = function(value)
 				return view_model.normalize_group_max_players(value)
 			end,
 			on_change = change_party_max_players,
-			ui_args = party_options_cycle_ui,
+			ui_args = party_max_players_cycle_ui,
+			when = function()
+				return not is_head_to_head_lobby_selected()
+			end,
 		},
 		{
 			kind = "cycle",
@@ -658,6 +719,7 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 		{ kind = "toggle", control_id = "no_gold_on_round_loss_toggle", label_key = "b_opts_no_gold_on_loss", option_key = "no_gold_on_round_loss" },
 		{ kind = "toggle", control_id = "death_on_round_loss_toggle", label_key = "b_opts_death_on_loss", option_key = "death_on_round_loss" },
 		{ kind = "toggle", control_id = "timer_toggle", label_key = "b_opts_timer", option_key = "timer" },
+		{ kind = "toggle", control_id = "disable_asteroid_toggle", label_key = "k_opts_disable_asteroid", option_key = "disable_asteroid" },
 	},
 	options = {
 		{
@@ -798,6 +860,16 @@ view_model.LOBBY_OPTION_TAB_SPECS = {
 			scale = 0.85,
 			option_values = timer_increment_values,
 			display_options = { "0s", "30s", "60s", "90s", "120s", "150s", "180s" },
+		},
+		{
+			kind = "cycle",
+			spec_id = "timer_ownership",
+			control_id = "timer_ownership_option",
+			label_key = "k_opts_timer_ownership",
+			option_key = "timer_ownership",
+			scale = 0.85,
+			option_values = { "anyone", "host" },
+			display_options = build_timer_ownership_display_options,
 		},
 		{
 			kind = "cycle",

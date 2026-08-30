@@ -6,6 +6,53 @@ function lobby_players_ui.get_overlay_runtime()
 	return MP.UI and MP.UI.get_lobby_overlay_runtime and MP.UI.get_lobby_overlay_runtime() or nil
 end
 
+local function get_players_page_size()
+	return lobby_players_ui.PLAYER_COLUMN_LIMIT * 2
+end
+
+local function get_players_page_count(player_count)
+	local page_size = get_players_page_size()
+	return math.max(1, math.ceil((tonumber(player_count) or 0) / page_size)), page_size
+end
+
+local function get_players_page()
+	local overlay_runtime = lobby_players_ui.get_overlay_runtime()
+	return math.max(1, math.floor(tonumber(overlay_runtime and overlay_runtime.players_page) or 1))
+end
+
+local function set_players_page(page)
+	local overlay_runtime = lobby_players_ui.get_overlay_runtime()
+	if overlay_runtime then
+		overlay_runtime.players_page = math.max(1, math.floor(tonumber(page) or 1))
+	end
+end
+
+local function clamp_players_page(page_count)
+	local page = math.min(get_players_page(), page_count)
+	set_players_page(page)
+	return page
+end
+
+local function wrap_players_page(page, page_count)
+	if page_count <= 1 then
+		return 1
+	end
+	return ((page - 1) % page_count) + 1
+end
+
+local function slice_players_page(players, page, page_size)
+	local player_count = #players
+	local first_index = ((page - 1) * page_size) + 1
+	local last_index = player_count > 0 and math.min(player_count, first_index + page_size - 1) or 0
+	local page_players = {}
+	if last_index >= first_index then
+		for idx = first_index, last_index do
+			page_players[#page_players + 1] = players[idx]
+		end
+	end
+	return page_players, first_index
+end
+
 local function get_lobby_overlay_list_width(lobby_context)
 	local width = 8.8
 	if lobby_context and lobby_context.uses_lobby_ready then
@@ -25,14 +72,65 @@ local function get_lobby_overlay_table_width(players, lobby_context)
 	return column_width
 end
 
+local function create_players_pager(page, page_count)
+	if page_count <= 1 then
+		return nil
+	end
+
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.02, colour = G.C.CLEAR },
+		nodes = {
+			MP.UI.ROW_LAYOUT.create_button_from_spec({
+				label = "<",
+				button = "mp_lobby_players_prev_page",
+				minw = 0.52,
+				minh = 0.34,
+				scale = 0.38,
+				colour = G.C.RED,
+			}),
+			{ n = G.UIT.B, config = { w = 0.08, h = 0.01 } },
+			{
+				n = G.UIT.C,
+				config = { align = "cm", minw = 1.0, padding = 0.02, colour = G.C.CLEAR },
+				nodes = {
+					{
+						n = G.UIT.T,
+						config = {
+							text = tostring(page) .. "/" .. tostring(page_count),
+							scale = 0.35,
+							colour = G.C.UI.TEXT_LIGHT,
+							shadow = true,
+						},
+					},
+				},
+			},
+			{ n = G.UIT.B, config = { w = 0.08, h = 0.01 } },
+			MP.UI.ROW_LAYOUT.create_button_from_spec({
+				label = ">",
+				button = "mp_lobby_players_next_page",
+				minw = 0.52,
+				minh = 0.34,
+				scale = 0.38,
+				colour = G.C.GREEN,
+			}),
+		},
+	}
+end
+
 local function create_lobby_overlay_contents()
 	local players, lobby_context = MP.get_lobby_view_players({
 		lobby_context = MP.get_lobby_state_context and MP.get_lobby_state_context() or nil,
 		sort_by_team = true,
 	})
+	local player_count = #players
+	local page_count, page_size = get_players_page_count(player_count)
+	local page = clamp_players_page(page_count)
+	local page_players, page_first_index = slice_players_page(players, page, page_size)
 	local column_width = get_lobby_overlay_list_width(lobby_context)
-	local rows = lobby_players_ui.create_player_row_columns(players, lobby_context, column_width)
-	local list_width = get_lobby_overlay_table_width(players, lobby_context)
+	local rows = lobby_players_ui.create_player_row_columns(page_players, lobby_context, column_width, page_first_index)
+	local list_width = get_lobby_overlay_table_width(page_players, lobby_context)
+	local pager = create_players_pager(page, page_count)
 
 	local contents = {
 		{
@@ -54,6 +152,10 @@ local function create_lobby_overlay_contents()
 			},
 		},
 	}
+
+	if pager then
+		contents[#contents + 1] = pager
+	end
 
 	return contents
 end
@@ -170,7 +272,26 @@ function G.UIDEF.create_UIBox_players_list()
 	})
 end
 
+local function change_players_page(delta)
+	local players = MP.get_lobby_view_players and select(1, MP.get_lobby_view_players({
+		lobby_context = MP.get_lobby_state_context and MP.get_lobby_state_context() or nil,
+		sort_by_team = true,
+	})) or {}
+	local page_count = get_players_page_count(#players)
+	set_players_page(wrap_players_page(get_players_page() + delta, page_count))
+	return lobby_players_ui.request_lobby_overlay_refresh("players")
+end
+
+G.FUNCS.mp_lobby_players_prev_page = function()
+	return change_players_page(-1)
+end
+
+G.FUNCS.mp_lobby_players_next_page = function()
+	return change_players_page(1)
+end
+
 function G.FUNCS.view_players_list(e)
 	lobby_players_ui.clear_pending_overlay_refresh()
+	set_players_page(1)
 	lobby_players_ui.open_overlay("players")
 end

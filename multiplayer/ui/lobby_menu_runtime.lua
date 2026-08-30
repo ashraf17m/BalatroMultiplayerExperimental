@@ -65,6 +65,8 @@ local function build_lobby_main_menu_snapshot()
 			is_owner = player.is_owner,
 			is_ready = player.is_ready,
 			is_in_match = player.is_in_match,
+			is_spectator = player.is_spectator,
+			role = player.role,
 			config = player.config or {},
 		}
 	end
@@ -76,6 +78,8 @@ local function build_lobby_main_menu_snapshot()
 		match_in_progress = lobby_context.match_in_progress,
 		is_saved_coop_restore = lobby_context.is_saved_coop_restore,
 		username = lobby_context.client and lobby_context.client.username,
+		role = lobby_context.client and lobby_context.client.role,
+		is_spectator = (MP.SPECTATOR and MP.SPECTATOR.is_spectator_role) or (lobby_context.client and lobby_context.client.is_spectator),
 		config = lobby_context.config or {},
 		run_deck = lobby_context.run_deck or {},
 		players = players,

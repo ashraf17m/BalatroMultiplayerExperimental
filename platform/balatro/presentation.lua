@@ -171,6 +171,26 @@ function MPPlayerBlindIcon:init(player, size)
 	sprite.states.release_on.can = false
 end
 
+local blind_align = Blind.align
+
+function MPPlayerBlindIcon:align_to_major()
+	Moveable.align_to_major(self)
+	-- The drawn sprite is the child, whose VT starts at (0,0). Snap it once, the
+	-- first time the UI box seats this icon, so it spawns in its row; after that
+	-- the vanilla Blind easing owns the movement (float, drift between slots).
+	if self.spawn_snapped then return end
+	self.spawn_snapped = true
+	local sprite = self.children and self.children.animatedSprite
+	if sprite then
+		blind_align(self)
+		sprite:hard_set_VT()
+	end
+end
+
+if sendDebugMessage then
+	sendDebugMessage("MPPlayerBlindIcon floating icons: position pin active", "MULTIPLAYER")
+end
+
 function BALATRO.create_player_blind_icon_object(player, size)
 	return MPPlayerBlindIcon(player, size or 0.56)
 end

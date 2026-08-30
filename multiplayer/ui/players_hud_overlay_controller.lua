@@ -46,6 +46,8 @@ local function build_player_list_signature(mode)
 			stringify_signature_value(player.team),
 			stringify_signature_value(player.blind_col),
 			stringify_signature_value(player.is_self),
+			stringify_signature_value(player.is_spectator),
+			stringify_signature_value(player.role),
 		}, "|")
 	end
 
@@ -259,6 +261,10 @@ local function open_standings_overlay(contents, reset_existing)
 		definition = create_UIBox_generic_options({
 			contents = contents,
 		}),
+		-- Page flips rebuild this overlay; without an explicit offset, vanilla
+		-- restarts its slide-up entrance every flip and the just-seated icons
+		-- lag behind the moving rows mid-slide.
+		config = reset_existing and { offset = { x = 0, y = 0 } } or nil,
 	})
 end
 
@@ -388,7 +394,38 @@ function MP.UI.remove_player_list(skip_theme_restore)
 	BALATRO.recalculate_hud_blind()
 end
 
+local function change_full_standings_page(delta)
+	local player_list_runtime = MP.UI.get_player_list_runtime()
+	local page = math.max(1, math.floor(tonumber(player_list_runtime and player_list_runtime.full_standings_page) or 1))
+	local page_count = math.max(1, math.floor(tonumber(player_list_runtime and player_list_runtime.full_standings_page_count) or 1))
+	if page_count > 1 then
+		page = ((page - 1 + delta) % page_count) + 1
+	end
+	if player_list_runtime then
+		player_list_runtime.full_standings_page = page
+	end
+
+	if MP.is_teams_mode() then
+		open_standings_overlay(MP.UI.create_teams_standings_nodes(true), true)
+		return
+	end
+
+	open_standings_overlay(MP.UI.create_ffa_standings_nodes(true), true)
+end
+
+G.FUNCS.mp_full_standings_prev_page = function()
+	return change_full_standings_page(-1)
+end
+
+G.FUNCS.mp_full_standings_next_page = function()
+	return change_full_standings_page(1)
+end
+
 BALATRO.set_ui_function("mp_open_full_standings", function()
+	local player_list_runtime = MP.UI.get_player_list_runtime()
+	if player_list_runtime then
+		player_list_runtime.full_standings_page = 1
+	end
 	if MP.is_teams_mode() then
 		open_standings_overlay(MP.UI.create_teams_standings_nodes(true), false)
 		return

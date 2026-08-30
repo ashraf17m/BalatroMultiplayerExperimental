@@ -8,16 +8,26 @@ function feature_action_runtime.modded(modId, modAction, params, target)
 	Client.queue_send(MP.FEATURE_WIRE.build_modded_action_payload(modId, modAction, params, target))
 end
 
+-- A spectating client's board is a replay simulation; its card mutations are
+-- local-only and must never relay to teammates as if they were real changes.
+local function is_spectator_client()
+	return not not (MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role))
+end
+
 function feature_action_runtime.team_card_sync(card_key, action_type, card_data)
-	if not (MP.is_shared_card_sync_enabled and MP.is_shared_card_sync_enabled()) then
+	if is_spectator_client() then
 		return false
+	end
+
+	if MP.TESTING and MP.TESTING.log_team_card then
+		MP.TESTING.log_team_card("SEND", string.format("%s %s", tostring(action_type), tostring(card_key)))
 	end
 
 	return Client.queue_send(MP.FEATURE_WIRE.build_team_card_sync_payload(card_key, action_type, card_data))
 end
 
 function feature_action_runtime.team_hand_level_sync(hand, level)
-	if not (MP.is_shared_hand_level_sync_enabled and MP.is_shared_hand_level_sync_enabled()) then
+	if is_spectator_client() then
 		return false
 	end
 
@@ -54,6 +64,9 @@ function feature_action_runtime.eat_pizza(discards)
 end
 
 function feature_action_runtime.spent_last_shop(amount)
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return
+	end
 	Client.queue_send(MP.FEATURE_WIRE.build_spent_last_shop_payload(amount))
 end
 
@@ -97,6 +110,26 @@ function feature_action_runtime.send_end_game_summary(summary)
 	return Client.queue_send(MP.FEATURE_WIRE.build_receive_end_game_summary_payload(summary))
 end
 
+function feature_action_runtime.spectator_action_stream(action_data, step_index)
+	return Client.queue_send(MP.FEATURE_WIRE.build_spectator_action_stream_payload(action_data, step_index))
+end
+
+function feature_action_runtime.spectator_watch_target(target_player_id)
+	return Client.queue_send(MP.FEATURE_WIRE.build_spectator_watch_target_payload(target_player_id))
+end
+
+function feature_action_runtime.spectator_provide_snapshot(spectator_player_id, target_player_id, snapshot_data)
+	return Client.queue_send(MP.FEATURE_WIRE.build_spectator_provide_snapshot_payload(spectator_player_id, target_player_id, snapshot_data))
+end
+
+function feature_action_runtime.spectator_request_snapshot(target_player_id)
+	return Client.queue_send(MP.FEATURE_WIRE.build_spectator_request_snapshot_payload(target_player_id))
+end
+
+function feature_action_runtime.spectator_set_role(role)
+	return Client.queue_send(MP.FEATURE_WIRE.build_spectator_set_role_payload(role))
+end
+
 function feature_action_runtime.cache_end_game_state()
 	MP.NETWORKING_INTERNAL.cache_local_end_game_state()
 end
@@ -117,4 +150,9 @@ MP.ACTIONS.get_end_game_jokers = feature_action_runtime.get_end_game_jokers
 MP.ACTIONS.get_nemesis_deck = feature_action_runtime.get_nemesis_deck
 MP.ACTIONS.get_end_game_summary = feature_action_runtime.get_end_game_summary
 MP.ACTIONS.send_end_game_summary = feature_action_runtime.send_end_game_summary
+MP.ACTIONS.spectator_action_stream = feature_action_runtime.spectator_action_stream
+MP.ACTIONS.spectator_watch_target = feature_action_runtime.spectator_watch_target
+MP.ACTIONS.spectator_provide_snapshot = feature_action_runtime.spectator_provide_snapshot
+MP.ACTIONS.spectator_request_snapshot = feature_action_runtime.spectator_request_snapshot
+MP.ACTIONS.spectator_set_role = feature_action_runtime.spectator_set_role
 MP.ACTIONS.cache_end_game_state = feature_action_runtime.cache_end_game_state

@@ -21,7 +21,15 @@ SMODS.Consumable({
 		MP.UTILS.add_nemesis_info(info_queue)
 		return { vars = { 1 } }
 	end,
-	mp_include = content_runtime.include_multiplayer_jokers,
+	mp_include = function()
+		-- Option-gated: when the lobby has "Disable Asteroid" on, never let this card
+		-- enter the consumable pool, regardless of ruleset. Mirrors how multiplayer_jokers
+		-- gates mod cards via content_runtime.include_multiplayer_jokers.
+		if content_runtime.get_lobby_config_value("disable_asteroid", false) then
+			return false
+		end
+		return content_runtime.include_multiplayer_jokers()
+	end,
 	can_use = function(self, card)
 		return true
 	end,

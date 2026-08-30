@@ -478,9 +478,7 @@ return {
 			mp_phantom = "Fantasma",
 		},
 		dictionary = {
-			b_singleplayer = "Giocatore singolo",
 			b_join_lobby = "Unisciti ad una Lobby",
-			b_join_lobby_clipboard = "Unisciti dagli appunti",
 			b_return_lobby = "Ritorna alla Lobby",
 			b_reconnect = "Riconnettiti",
 			b_create_lobby = "Crea una Lobby",
@@ -532,7 +530,6 @@ return {
 			b_preview_integration = "Abilita l'anteprima del punteggio",
 			b_view_nemesis_deck = "Guarda mazzo",
 			b_toggle_jokers = "Mostra Jolly Nemesi",
-			b_skip_tutorial = "Salta Tutorial",
 			k_yes = "Sì",
 			k_no = "No",
 			k_are_you_sure = "Sei sicuro?",
@@ -653,7 +650,6 @@ return {
 			k_ruleset_disabled_the_order_required = '"L\'ordine" è necessario',
 			k_ruleset_disabled_the_order_banned = '"L\'ordine" è bandito',
 			k_ruleset_not_found = "Regole sconosciute",
-			k_tutorial_not_complete = "Devi completare il tutorial prima di poter giocare il Multigiocatore",
 			k_created_by = "Creato da",
 			k_major_contributors = "Maggiori contribuzioni da",
 			ml_enemy_loc = {

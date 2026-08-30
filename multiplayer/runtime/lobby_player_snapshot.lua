@@ -150,6 +150,21 @@ function lobby_player_snapshot.normalize_player_payload(player_wire, is_host, us
 	local location = MP.UI and MP.UI.localize_location and MP.UI.localize_location(raw_location) or raw_location
 	local lives = tonumber(player_wire.lives)
 	local blind_target_scale = tonumber(player_wire.blindTargetScale)
+	local role = player_wire.role or (player_wire.isSpectator and "spectator") or "player"
+	local is_spectator = not not (player_wire.isSpectator or player_wire.role == "spectator")
+
+	-- Keep local spectator role in sync with the authoritative server state.
+	if is_self and MP.SPECTATOR then
+		local role_is_authoritative = (player_wire.role ~= nil or player_wire.isSpectator ~= nil)
+		if role == "spectator" then
+			MP.SPECTATOR.is_spectator_role = true
+		elseif role_is_authoritative then
+			MP.SPECTATOR.is_spectator_role = false
+			if MP.SPECTATOR.is_spectating and MP.SPECTATOR.stop_spectating then
+				MP.SPECTATOR.stop_spectating()
+			end
+		end
+	end
 
 	return {
 		id = player_wire.id,
@@ -171,6 +186,8 @@ function lobby_player_snapshot.normalize_player_payload(player_wire, is_host, us
 		is_team_locked = not not player_wire.isTeamLocked,
 		is_self = is_self,
 		lives = lives,
+		role = role,
+		is_spectator = is_spectator,
 		status_text = uses_lobby_ready and (is_ready and localize("b_ready") or localize("b_unready")) or nil,
 		status_kind = status_kind,
 		can_kick = can_manage,

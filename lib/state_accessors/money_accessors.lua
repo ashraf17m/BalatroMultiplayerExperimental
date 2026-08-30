@@ -61,6 +61,10 @@ function MP.sync_local_money_state(options)
 		return true
 	end
 
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return true
+	end
+
 	if not (MP.LOBBY and MP.LOBBY.code and MP.ACTIONS and MP.ACTIONS.sync_money) then
 		return true
 	end

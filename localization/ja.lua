@@ -503,9 +503,7 @@ return {
 			mp_phantom = "ファントム",
 		},
 		dictionary = {
-			b_singleplayer = "シングルプレイ",
 			b_join_lobby = "ロビーに参加",
-			b_join_lobby_clipboard = "クリップボードから参加",
 			b_return_lobby = "ロビーに戻る",
 			b_reconnect = "再接続",
 			b_create_lobby = "ロビーの作成",
@@ -556,7 +554,6 @@ return {
 			b_preview_integration = "電卓MODを有効",
 			b_view_nemesis_deck = "デッキを見る",
 			b_toggle_jokers = "ジョーカー切替",
-			b_skip_tutorial = "チュートリアルをスキップ",
 			k_yes = "はい",
 			k_no = "いいえ",
 			k_are_you_sure = "本当によろしいですか?",
@@ -679,7 +676,6 @@ return {
 			k_ruleset_disabled_the_order_required = "The Order MOD必須のモードです",
 			k_ruleset_disabled_the_order_banned = "The Order MOD禁止のモードです",
 			k_ruleset_not_found = "不明なルールセット",
-			k_tutorial_not_complete = "マルチプレイヤーをプレイするためには、チュートリアルを完了させる必要があります",
 			k_created_by = "製作 ",
 			k_major_contributors = "協力 ",
 			ml_enemy_loc = {

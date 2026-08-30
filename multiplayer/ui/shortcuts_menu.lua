@@ -68,7 +68,7 @@ local function get_shortcuts()
 			call_ui_function("lobby_leave")
 		end)
 	elseif connected then
-		add_shortcut(shortcuts, "b_join_lobby_clipboard", "V", function()
+		add_shortcut(shortcuts, "k_paste", "V", function()
 			call_ui_function("join_from_clipboard")
 		end)
 		add_shortcut(shortcuts, "b_join_lobby", "J", function()

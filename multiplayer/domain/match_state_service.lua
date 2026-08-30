@@ -80,6 +80,7 @@ local function build_initial_round_state(starting_lives)
 		force_zero_round_score = true,
 		comeback_bonus_given = true,
 		comeback_bonus = 0,
+		comeback_eval_pending = false,
 		end_pvp = false,
 		enemies = {},
 		location = "loc_selecting",

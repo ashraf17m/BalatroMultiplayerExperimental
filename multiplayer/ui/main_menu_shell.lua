@@ -204,7 +204,6 @@ for _, button_name in ipairs({
 	"browse_lobbies",
 	"join_from_clipboard",
 	"play_options",
-	"skip_tutorial",
 	"reconnect",
 	"options",
 	"quit",

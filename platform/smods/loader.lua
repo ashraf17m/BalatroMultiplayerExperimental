@@ -83,6 +83,9 @@ function MP.PLATFORM.SMODS.load_mod_file(file, options)
 		end
 	else
 		local summary = "Failed to find or compile multiplayer file: " .. tostring(file)
+		if err then
+			summary = summary .. " (" .. tostring(err) .. ")"
+		end
 		local details = tostring(err)
 		handle_load_failure(file, options, summary, details)
 	end
@@ -208,6 +211,12 @@ local PLATFORM_BOOTSTRAP_MODULES = {
 		path = "platform/hooks/round_hooks.lua",
 		ready = function()
 			return MP.PLATFORM and MP.PLATFORM.HOOKS and MP.PLATFORM.HOOKS.round_hooks_installed
+		end,
+	},
+	{
+		path = "platform/hooks/spectator_record_hooks.lua",
+		ready = function()
+			return MP.PLATFORM and MP.PLATFORM.HOOKS and MP.PLATFORM.HOOKS.spectator_record_hooks_installed
 		end,
 	},
 }

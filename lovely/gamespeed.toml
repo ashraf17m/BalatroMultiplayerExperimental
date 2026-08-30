@@ -1,0 +1,17 @@
+[manifest]
+version = "1.0.0"
+dump_lua = true
+priority = 2147483600
+
+# Apply after vanilla SPEEDFACTOR (and Handy, if present) and before TIMERS.TOTAL.
+# High G.SETTINGS.GAMESPEED cancels delay * GAMESPEED events; we multiply SPEEDFACTOR instead.
+[[patches]]
+[patches.pattern]
+target = "game.lua"
+pattern = '''self.TIMERS.TOTAL = self.TIMERS.TOTAL + dt*(self.SPEEDFACTOR)'''
+position = "before"
+payload = '''
+if MP and MP.apply_game_speed_factor then MP.apply_game_speed_factor(self) end
+'''
+match_indent = true
+times = 1

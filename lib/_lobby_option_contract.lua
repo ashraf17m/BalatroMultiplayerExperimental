@@ -13,6 +13,7 @@ MP.LOBBY_OPTION_BOOLEAN_KEYS = {
 	normal_bosses = true,
 	preview_disabled = true,
 	random_loadout = true,
+	disable_asteroid = true,
 	team_card_sync = true,
 	team_hand_level_sync = true,
 	team_money_sync = true,
@@ -48,6 +49,7 @@ MP.LOBBY_OPTION_STRING_KEYS = {
 	modifier_layers = true,
 	pvp_score_rule = true,
 	ruleset = true,
+	timer_ownership = true,
 	sleeve = true,
 	weekly = true,
 }
@@ -85,6 +87,7 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	normal_bosses = false,
 	preview_disabled = false,
 	random_loadout = false,
+	disable_asteroid = false,
 	pvp_custom_winners = 1,
 	pvp_custom_winners_percent = 50,
 	pvp_score_rule = "highest",
@@ -102,6 +105,7 @@ local BASE_DEFAULT_LOBBY_OPTION_VALUES = {
 	timer_base_seconds = 150,
 	timer_forgiveness = 0,
 	timer_increment_seconds = 60,
+	timer_ownership = "anyone",
 }
 
 local GROUP_LOBBY_OPTION_DEFAULT_VALUES = {

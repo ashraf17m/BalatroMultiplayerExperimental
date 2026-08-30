@@ -452,6 +452,9 @@ end
 
 function end_game_message_runtime.send_end_game_summary_update(force, options)
 	options = options or {}
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return false
+	end
 	local source_player_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
 	local summary = build_local_end_game_summary()
 	local summary_encoded = encode_local_end_game_summary(summary)
@@ -467,6 +470,7 @@ function end_game_message_runtime.send_end_game_summary_update(force, options)
 	if
 		changed
 		and options.cache_only ~= true
+		and not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
 		and has_summary_channel()
 		and MP.ACTIONS
 		and MP.ACTIONS.send_end_game_summary

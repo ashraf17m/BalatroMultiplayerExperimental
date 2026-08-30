@@ -123,9 +123,11 @@ local function subtract_game_numbers(left, right)
 end
 
 local function is_team_hand_level_sync_active()
+	-- Not gated on the shared hand-level option: that option only controls
+	-- teammate routing (owned by the server). Spectators of this player rely
+	-- on these syncs reaching the server.
 	return BALATRO.is_run_stage and BALATRO.is_run_stage()
 		and BALATRO.get_hands and BALATRO.get_hands()
-		and MP.is_shared_hand_level_sync_enabled()
 		and MP.LOBBY
 		and MP.LOBBY.code
 		and BALATRO.is_game_over_or_win and not BALATRO.is_game_over_or_win()

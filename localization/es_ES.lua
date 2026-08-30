@@ -167,7 +167,6 @@ return {
 			mp_phantom = "Fantasma",
 		},
 		dictionary = {
-			b_singleplayer = "Un jugador",
 			b_join_lobby = "Unirse a la Sala",
 			b_return_lobby = "Volver a la Sala",
 			b_reconnect = "Reconectarse",

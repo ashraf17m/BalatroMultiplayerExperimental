@@ -194,7 +194,6 @@ return {
 			mp_phantom = "幻影",
 		},
 		dictionary = {
-			b_singleplayer = "单人游戏",
 			b_join_lobby = "加入房间",
 			b_return_lobby = "回到房间",
 			b_reconnect = "重新连接",
@@ -243,7 +242,6 @@ return {
 			b_the_order_integration = "启用 The Order 集成",
 			b_view_nemesis_deck = "查看牌组",
 			b_toggle_jokers = "切换小丑牌",
-			b_skip_tutorial = "跳过教程",
 			k_yes = "是",
 			k_no = "否",
 			k_has_multiplayer_content = "包含多人模式内容",
@@ -355,7 +353,6 @@ return {
 			k_ruleset_disabled_the_order_required = "需要 The Order",
 			k_ruleset_disabled_the_order_banned = "禁用 The Order",
 			k_ruleset_not_found = "未知规则集",
-			k_tutorial_not_complete = "你必须完成教程之后才能进行多人游戏",
 			k_created_by = "创作者：",
 			k_major_contributors = "主要贡献由：",
 			ml_enemy_loc = {

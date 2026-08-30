@@ -19,7 +19,7 @@ SMODS.Booster({
 		local b_append = MP.ante_based()
 
 		local _edition = poll_edition("standard_edition" .. b_append, 2, true)
-		local _seal = SMODS.poll_seal({ mod = 10, key = "stdseal" .. b_append })
+		local _seal = SMODS.poll_seal({ mod = 10 })
 
 		return {
 			set = (pseudorandom(pseudoseed("stdset" .. b_append)) > 0.6) and "Enhanced" or "Base",

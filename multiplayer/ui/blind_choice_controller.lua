@@ -52,37 +52,21 @@ local function any_other_player_ready()
 	return false
 end
 
-local function hide_finished_blind_skip_tag(e, row)
+local function remove_finished_blind_skip_tag(e, row)
+	if e.mp_removed_finished_skip_tag == row then
+		return
+	end
+
 	local blind_state = BALATRO.get_blind_state and BALATRO.get_blind_state(row) or nil
 	if blind_state ~= "Skipped" and blind_state ~= "Defeated" then
 		return
 	end
 
-	local tag = e.UIBox and e.UIBox:get_UIE_by_ID("tag_" .. row)
+	e.mp_removed_finished_skip_tag = row
+
 	local tag_container = e.UIBox and e.UIBox:get_UIE_by_ID("tag_container")
-	local button = tag and tag.children and tag.children[2]
-	if button and button.config then
-		button.config.button = nil
-		button.config.hover = false
-		button.config.colour = G.C.UI.BACKGROUND_INACTIVE
-		if button.children and button.children[1] and button.children[1].config then
-			button.children[1].config.colour = G.C.UI.TEXT_INACTIVE
-		end
-	end
-	if tag and tag.config then
-		tag.config.outline_colour = G.C.UI.BACKGROUND_INACTIVE
-	end
-	if tag_container and tag_container.children then
-		local heading = tag_container.children[1]
-		local skip_button = tag_container.children[2]
-		if skip_button and skip_button.set_role then
-			skip_button:set_role({ xy_bond = "Weak" })
-			skip_button:align(0, 10)
-		end
-		if heading and heading.set_role then
-			heading:set_role({ xy_bond = "Weak" })
-			heading:align(0, 10)
-		end
+	if tag_container and tag_container.remove then
+		tag_container:remove()
 	end
 end
 
@@ -130,6 +114,10 @@ local blind_choice_handler_ref = BALATRO.get_ui_function("blind_choice_handler")
 BALATRO.set_ui_function("blind_choice_handler", function(e)
 	blind_choice_handler_ref(e)
 
+	if not (G and G.blind_select and G.blind_select.VT and G.blind_select.VT.y < 10) then
+		return
+	end
+
 	local blind_on_deck = BALATRO.get_blind_on_deck and BALATRO.get_blind_on_deck() or nil
 	if not MP.LOBBY.code or not e or not e.config or not blind_on_deck or e.config.ref_table.run_info then
 		return
@@ -138,9 +126,16 @@ BALATRO.set_ui_function("blind_choice_handler", function(e)
 	local row = e.config.id
 	if row ~= blind_on_deck then
 		INTERNAL.restore_blind_select_label(e, row)
-		hide_finished_blind_skip_tag(e, row)
+		remove_finished_blind_skip_tag(e, row)
+		return
 	end
-	if row ~= blind_on_deck or not INTERNAL.is_team_skip_ready_row(row) then
+
+	if not INTERNAL.is_team_skip_ready_row(row) then
+		return
+	end
+
+	local blind_state = BALATRO.get_blind_state and BALATRO.get_blind_state(row) or nil
+	if blind_state ~= "Select" then
 		return
 	end
 
@@ -196,6 +191,9 @@ BALATRO.set_ui_function("select_blind", function(e)
 	if teams_domain.recalculate_state then
 		teams_domain.recalculate_state()
 	end
+	-- Blind selection recording happens in spectator_record_hooks.lua
+	-- (single source of truth) when G.FUNCS.select_blind itself runs.
+
 	select_blind_ref(e)
 	if MP.LOBBY.code then
 		local is_cooperative_blind = (teams_domain.is_cooperative_blind and teams_domain.is_cooperative_blind())
@@ -213,6 +211,9 @@ end)
 
 BALATRO.set_ui_function("skip_blind", function(e)
 	local row = INTERNAL.get_blind_choice_row_type(e) or (BALATRO.get_blind_on_deck and BALATRO.get_blind_on_deck() or nil)
+	-- Skip-blind recording happens in spectator_record_hooks.lua
+	-- (single source of truth) when G.FUNCS.skip_blind itself runs.
+
 	if INTERNAL.is_team_skip_ready_row(row) then
 		if MP.GAME.skip_ready_blind_row == row then
 			INTERNAL.clear_skip_ready_for_blind_toggle(true)

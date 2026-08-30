@@ -89,6 +89,13 @@ local function enter_pvp_new_round(options)
 
 	transition_to_state(G.STATES.NEW_ROUND, options.state_complete)
 	trace_runtime_event("run_flow.enter_pvp_new_round", { draw_to_deck = options.draw_to_deck == true, end_pvp = not not MP.GAME.end_pvp, hands_left = G.GAME.current_round.hands_left, state_complete = G.STATE_COMPLETE, unhighlight_hand = options.unhighlight_hand == true })
+	if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) and MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
+		MP.SPECTATOR_LOG.emit("enter_pvp_new_round", {
+			draw_to_deck = options.draw_to_deck == true,
+			unhighlight_hand = options.unhighlight_hand == true,
+			from = "run_flow",
+		})
+	end
 
 	if match_domain.clear_end_pvp then
 		match_domain.clear_end_pvp()
@@ -400,7 +407,10 @@ local function queue_server_hand_played_event()
 end
 
 local function should_enter_new_round_from_resolved_hand()
-	return MP.GAME.end_pvp and MP.is_server_resolved_blind() and not (G.GAME.STOP_USE and G.GAME.STOP_USE > 0)
+	if not (MP.GAME.end_pvp and MP.is_server_resolved_blind()) then
+		return false
+	end
+	return not (G.GAME.STOP_USE and G.GAME.STOP_USE > 0)
 end
 
 local update_hand_played_ref = Game.update_hand_played
@@ -415,10 +425,16 @@ function Game:update_hand_played(dt)
 
 	if not G.STATE_COMPLETE then
 		set_state_complete(true)
+		if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) and MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
+			MP.SPECTATOR_LOG.emit("hand_played_queue_server_event")
+		end
 		queue_server_hand_played_event()
 	end
 
 	if should_enter_new_round_from_resolved_hand() then
+		if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) and MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
+			MP.SPECTATOR_LOG.emit("hand_played_enter_new_round")
+		end
 		enter_pvp_new_round({ state_complete = false })
 	end
 end
@@ -709,11 +725,26 @@ function Game:update_selecting_hand(dt)
 	update_selecting_hand_ref(self, dt)
 
 	if should_enter_new_round_after_selecting_hand() then
+		if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) and MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
+			MP.SPECTATOR_LOG.emit("selecting_hand_enter_new_round")
+		end
 		enter_pvp_new_round({ unhighlight_hand = true, state_complete = false })
 	end
 end
 
 function MP.handle_duplicate_end()
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		-- round_ended is a local-client latch. Spectators keep it after the
+		-- previous target (or previous blind) cashes out, which then aborts
+		-- this target's end_round and leaves NEW_ROUND with no cash-out screen.
+		if G and G.round_eval then
+			return true
+		end
+		if MP.GAME then
+			MP.GAME.round_ended = false
+		end
+		return false
+	end
 	if MP.LOBBY.code then
 		if MP.GAME.round_ended then
 			if match_domain.mark_duplicate_end and match_domain.mark_duplicate_end() then

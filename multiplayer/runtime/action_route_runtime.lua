@@ -202,6 +202,7 @@ function action_route_runtime.build_protocol_v2_feature_routes()
 		[build_protocol_route_key("endgame", "win", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_win_game"),
 		[build_protocol_route_key("endgame", "alone", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_alone_game"),
 		[build_protocol_route_key("endgame", "lose", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_lose_game"),
+		[build_protocol_route_key("endgame", "spectatorEnd", ENDGAME_STATE_SCHEMA_ID)] = route_noargs("handle_match_ended"),
 		[build_protocol_route_key("feature", "sendPhantom", FEATURE_EVENT_SCHEMA_ID)] = route_fields(
 			"handle_send_phantom",
 			{ "key", "playerId" }
@@ -257,6 +258,18 @@ function action_route_runtime.build_protocol_v2_feature_routes()
 		[build_protocol_route_key("feature", "jimboTalk", FEATURE_EVENT_SCHEMA_ID)] = route_field("handle_jimbo_talk", "text"),
 		[build_protocol_route_key("feature", "jimboMove", FEATURE_EVENT_SCHEMA_ID)] = route_field("handle_jimbo_move", "pos"),
 		[build_protocol_route_key("feature", "jimboRemove", FEATURE_EVENT_SCHEMA_ID)] = route_noargs("handle_jimbo_remove"),
+		[build_protocol_route_key("feature", "spectatorActionStream", FEATURE_EVENT_SCHEMA_ID)] = route_action(
+			"handle_spectator_action_stream"
+		),
+		[build_protocol_route_key("feature", "spectatorHistory", FEATURE_EVENT_SCHEMA_ID)] = route_action(
+			"handle_spectator_history"
+		),
+		[build_protocol_route_key("feature", "spectatorRequestSnapshot", FEATURE_EVENT_SCHEMA_ID)] = route_action(
+			"handle_spectator_request_snapshot"
+		),
+		[build_protocol_route_key("feature", "spectatorReceiveSnapshot", FEATURE_EVENT_SCHEMA_ID)] = route_action(
+			"handle_spectator_receive_snapshot"
+		),
 	}
 end
 

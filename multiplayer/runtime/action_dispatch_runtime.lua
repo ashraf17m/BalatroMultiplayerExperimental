@@ -55,8 +55,8 @@ function action_dispatch_runtime.route_fields(handler_name, field_names)
 end
 
 function action_dispatch_runtime.route_action(handler_name)
-	return function(action)
-		return MP.NETWORKING_INTERNAL[handler_name](action)
+	return function(action, envelope)
+		return MP.NETWORKING_INTERNAL[handler_name](action, envelope)
 	end
 end
 

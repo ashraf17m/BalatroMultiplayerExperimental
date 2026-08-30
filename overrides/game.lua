@@ -11,7 +11,14 @@ local function trace_client_action(action, suffix)
 	sendTraceMessage(message, "MULTIPLAYER")
 end
 
+local function is_spectating()
+	return not not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
+end
+
 local function send_end_game_summary_update()
+	if is_spectating() then
+		return false
+	end
 	if not (MP.LOBBY and MP.LOBBY.code and MP.GAME) then
 		return false
 	end
@@ -124,6 +131,9 @@ end
 
 MP.HOOKS.register_method_hook(Card, "Card", "sell_card", "mp.game.trace_sold_card", {
 	before = function(ctx, self)
+		if is_spectating() then
+			return
+		end
 		if MP.LOBBY.code and MP.ACTIONS and MP.ACTIONS.sold_joker then
 			MP.ACTIONS.sold_joker()
 		end
@@ -137,6 +147,9 @@ MP.HOOKS.register_method_hook(Card, "Card", "sell_card", "mp.game.trace_sold_car
 
 MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "reroll_shop", "mp.game.trace_reroll_shop", {
 	before = function(ctx, e)
+		if is_spectating() then
+			return
+		end
 		local cost = G.GAME and G.GAME.current_round and tonumber(G.GAME.current_round.reroll_cost) or 0
 		trace_client_action("rerollShop", "cost:" .. tostring(cost))
 
@@ -145,13 +158,15 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "reroll_shop", "mp.game.trace_
 			stats.reroll_count = stats.reroll_count + 1
 			stats.reroll_cost_total = stats.reroll_cost_total + cost
 			if cost > 0 then stats.total_money_spent = stats.total_money_spent + cost end
-			send_end_game_summary_update()
+			-- Keep times-rerolled locally. Do not gzip-fanout an end-game
+			-- summary on every shop reroll — spectators simulate the reroll.
 		end
 	end,
 })
 
 MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "buy_from_shop", "mp.game.trace_buy_from_shop", {
 	after = function(ctx, e)
+		if is_spectating() then return end
 		if original_returned_false(ctx) then return end
 
 		local c1 = e and e.config and e.config.ref_table
@@ -171,6 +186,7 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "buy_from_shop", "mp.game.trac
 
 MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "use_card", "mp.game.trace_use_card", {
 	before = function(ctx, e)
+		if is_spectating() then return end
 		local ref_card = e and e.config and e.config.ref_table or nil
 		local card_name = get_card_ability_name(ref_card)
 		if card_name then

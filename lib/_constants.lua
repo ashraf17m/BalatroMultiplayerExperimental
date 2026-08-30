@@ -15,7 +15,7 @@ MP.LOBBY_TYPE_SPECS = {
 		lobby_options_button = {
 			button = "view_group_options",
 			label_key = "k_group_options",
-			colour = G.C.BLUE,
+			colour = G.C.GREEN,
 		},
 	},
 	[MP.LOBBY_TYPES.FFA] = {
@@ -26,7 +26,7 @@ MP.LOBBY_TYPE_SPECS = {
 		lobby_options_button = {
 			button = "view_group_options",
 			label_key = "k_group_options",
-			colour = G.C.BLUE,
+			colour = G.C.GREEN,
 		},
 	},
 	[MP.LOBBY_TYPES.TEAMS] = {
@@ -37,7 +37,7 @@ MP.LOBBY_TYPE_SPECS = {
 		lobby_options_button = {
 			button = "view_group_options",
 			label_key = "k_group_options",
-			colour = G.C.BLUE,
+			colour = G.C.GREEN,
 		},
 	},
 	[MP.LOBBY_TYPES.DUELS] = {
@@ -48,7 +48,7 @@ MP.LOBBY_TYPE_SPECS = {
 		lobby_options_button = {
 			button = "view_group_options",
 			label_key = "k_group_options",
-			colour = G.C.BLUE,
+			colour = G.C.GREEN,
 		},
 	},
 	[MP.LOBBY_TYPES.COOP] = {
@@ -59,7 +59,7 @@ MP.LOBBY_TYPE_SPECS = {
 		lobby_options_button = {
 			button = "view_group_options",
 			label_key = "k_group_options",
-			colour = G.C.BLUE,
+			colour = G.C.GREEN,
 		},
 	},
 }
@@ -98,7 +98,7 @@ MP.TEAM_NAMES = {
 MP.MAX_TEAMS = #MP.TEAM_NAMES
 MP.MIN_GROUP_LOBBY_PLAYERS = 3
 MP.DEFAULT_GROUP_LOBBY_PLAYERS = 16
-MP.MAX_GROUP_LOBBY_PLAYERS = 32
+MP.MAX_GROUP_LOBBY_PLAYERS = 100
 MP.DEFAULT_STARTING_LIVES = 4
 MP.DEFAULT_HANDS_PER_ROUND = 4
 MP.DEFAULT_LOBBY_CREATION_RULESET = "ruleset_mp_standard_ranked"

@@ -515,9 +515,7 @@ return {
 			mp_phantom = "Bóng Ma",
 		},
 		dictionary = {
-			b_singleplayer = "Chơi Đơn",
 			b_join_lobby = "Vào Phòng",
-			b_join_lobby_clipboard = "Vào Từ Bộ Nhớ Đệm",
 			b_return_lobby = "Quay lại Phòng",
 			b_reconnect = "Kết nối lại",
 			b_create_lobby = "Tạo Phòng",
@@ -569,7 +567,6 @@ return {
 			b_preview_integration = "Bật Xem Trước Điểm",
 			b_view_nemesis_deck = "Xem Bộ Bài",
 			b_toggle_jokers = "Bật Joker",
-			b_skip_tutorial = "Bỏ Qua Hướng Dẫn",
 			k_yes = "Có",
 			k_no = "Không",
 			k_are_you_sure = "Bạn chắc chứ?",
@@ -691,7 +688,6 @@ return {
 			k_ruleset_disabled_the_order_required = "Bắt Buộc dùng The Order",
 			k_ruleset_disabled_the_order_banned = "Cấm dùng The Order",
 			k_ruleset_not_found = "Thể thức chưa rõ",
-			k_tutorial_not_complete = "Bạn phải hoàn thành màn hướng dẫn trước khi chơi Multiplayer",
 			k_created_by = "Tạo nởi",
 			k_major_contributors = "Đóng góp chính bởi",
 			ml_enemy_loc = {

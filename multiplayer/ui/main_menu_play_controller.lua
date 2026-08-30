@@ -188,7 +188,9 @@ local function open_multiplayer_lobby_creation(lobby_type)
 		lobby_domain.set_lobby_type(lobby_type)
 	end
 
-	open_paused_overlay(create_ruleset_selection_overlay(), nil, {
+	local ruleset_key = lobby_domain.get_creation_ruleset and lobby_domain.get_creation_ruleset()
+		or MP.DEFAULT_LOBBY_CREATION_RULESET
+	open_paused_overlay(create_ruleset_selection_overlay(ruleset_key), nil, {
 		refresh_initial_tab_contents = true,
 	})
 end
@@ -350,12 +352,6 @@ BALATRO.set_ui_function("set_weekly", function()
 	MP.PLATFORM.SMODS.set_config_value("weekly", MP.LOBBY.setup.fetched_weekly, MP)
 	MP.save_current_config()
 	MP.PLATFORM.SMODS.restart_game()
-end)
-
-BALATRO.set_ui_function("skip_tutorial", function(e)
-	BALATRO.set_setting_value("tutorial_complete", true)
-	BALATRO.set_setting_value("tutorial_progress", nil)
-	BALATRO.call_ui_function("play_options", e)
 end)
 
 BALATRO.set_ui_function("join_from_clipboard", function()

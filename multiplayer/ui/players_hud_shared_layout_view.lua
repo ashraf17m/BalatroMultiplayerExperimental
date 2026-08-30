@@ -41,6 +41,7 @@ local COMPACT_STANDINGS_STYLE = {
 	score_box_w = 3.06,
 	full_list_column_size = 8,
 	full_list_column_gap = 0.08,
+	full_list_page_columns = 4,
 }
 
 local function create_compact_score_row(config)
@@ -191,6 +192,44 @@ local function create_full_list_columns(entries, create_entry, column_size, colu
 		n = G.UIT.R,
 		config = { align = "tm", padding = 0.0, colour = G.C.CLEAR },
 		nodes = columns,
+	}
+end
+
+local function create_full_standings_pager(page, page_count)
+	if not (page_count and page_count > 1) then
+		return nil
+	end
+
+	return {
+		n = G.UIT.R,
+		config = { align = "cm", padding = 0.02, colour = G.C.CLEAR },
+		nodes = {
+			MP.UI.ROW_LAYOUT.create_button_from_spec({
+				label = "<",
+				button = "mp_full_standings_prev_page",
+				minw = 0.52,
+				minh = 0.34,
+				scale = 0.38,
+				colour = G.C.RED,
+			}),
+			{ n = G.UIT.B, config = { w = 0.08, h = 0.01 } },
+			{
+				n = G.UIT.C,
+				config = { align = "cm", minw = 1.0, padding = 0.02, colour = G.C.CLEAR },
+				nodes = {
+					create_text_label(tostring(page) .. "/" .. tostring(page_count), 0.35, G.C.UI.TEXT_LIGHT),
+				},
+			},
+			{ n = G.UIT.B, config = { w = 0.08, h = 0.01 } },
+			MP.UI.ROW_LAYOUT.create_button_from_spec({
+				label = ">",
+				button = "mp_full_standings_next_page",
+				minw = 0.52,
+				minh = 0.34,
+				scale = 0.38,
+				colour = G.C.GREEN,
+			}),
+		},
 	}
 end
 
@@ -418,6 +457,28 @@ local function create_compact_standings_nodes(config)
 		or config.display_entries
 		or select_compact_standings_entries(entries, average_data, config)
 
+	local page_entries = display_entries
+	local page = 1
+	local page_count = 1
+	if config.full_list then
+		local column_size = config.full_list_column_size or COMPACT_STANDINGS_STYLE.full_list_column_size
+		local page_columns = config.full_list_page_columns or COMPACT_STANDINGS_STYLE.full_list_page_columns
+		local page_size = math.max(1, page_columns * math.max(1, column_size))
+		page_count = math.max(1, math.ceil(#display_entries / page_size))
+		local runtime = MP.UI.get_player_list_runtime and MP.UI.get_player_list_runtime() or nil
+		page = runtime and math.max(1, math.min(math.floor(tonumber(runtime.full_standings_page) or 1), page_count)) or 1
+		if runtime then
+			runtime.full_standings_page = page
+			runtime.full_standings_page_count = page_count
+		end
+		local first_index = ((page - 1) * page_size) + 1
+		local last_index = math.min(#display_entries, first_index + page_size - 1)
+		page_entries = {}
+		for idx = first_index, last_index do
+			page_entries[#page_entries + 1] = display_entries[idx]
+		end
+	end
+
 	local function mark_open_standings_row(row)
 		if not config.full_list and row and row.config then
 			row.config.mp_open_full_standings_row = true
@@ -440,11 +501,15 @@ local function create_compact_standings_nodes(config)
 
 	if config.full_list then
 		rows[#rows + 1] = create_full_list_columns(
-			display_entries,
+			page_entries,
 			config.create_entry,
 			config.full_list_column_size or COMPACT_STANDINGS_STYLE.full_list_column_size,
 			panel_minw
 		)
+		local pager = create_full_standings_pager(page, page_count)
+		if pager then
+			rows[#rows + 1] = pager
+		end
 	else
 		append_spaced_stack_nodes(rows, display_entries, function(entry)
 			return mark_open_standings_row(config.create_entry(entry))
@@ -452,7 +517,7 @@ local function create_compact_standings_nodes(config)
 	end
 
 	local column_count = config.full_list
-		and math.max(1, math.ceil(#display_entries / (config.full_list_column_size or COMPACT_STANDINGS_STYLE.full_list_column_size)))
+		and math.max(1, math.ceil(#page_entries / (config.full_list_column_size or COMPACT_STANDINGS_STYLE.full_list_column_size)))
 		or 1
 	local full_list_minw = panel_minw * column_count
 		+ (COMPACT_STANDINGS_STYLE.full_list_column_gap * math.max(0, column_count - 1))

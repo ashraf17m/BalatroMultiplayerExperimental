@@ -150,3 +150,38 @@ function MP.FEATURE_WIRE.build_receive_end_game_summary_payload(summary, source_
 		requesterPlayerId = requester_player_id,
 	})
 end
+
+function MP.FEATURE_WIRE.build_spectator_action_stream_payload(action_data, step_index)
+	return build_feature_event("spectatorActionStream", {
+		actionData = tostring(action_data or ""),
+		stepIndex = normalize_non_negative_integer(step_index) or 0,
+	})
+end
+
+function MP.FEATURE_WIRE.build_spectator_watch_target_payload(target_player_id)
+	return build_feature_event("spectatorWatchTarget", {
+		targetPlayerId = tostring(target_player_id or ""),
+	})
+end
+
+function MP.FEATURE_WIRE.build_spectator_provide_snapshot_payload(spectator_player_id, target_player_id, snapshot_data)
+	return build_feature_event("spectatorProvideSnapshot", {
+		spectatorPlayerId = tostring(spectator_player_id or ""),
+		targetPlayerId = tostring(target_player_id or ""),
+		snapshotData = tostring(snapshot_data or ""),
+	})
+end
+
+function MP.FEATURE_WIRE.build_spectator_request_snapshot_payload(target_player_id)
+	return build_feature_event("spectatorRequestSnapshot", {
+		targetPlayerId = tostring(target_player_id or ""),
+	})
+end
+
+function MP.FEATURE_WIRE.build_spectator_set_role_payload(role)
+	return build_feature_event("spectatorSetRole", {
+		role = tostring(role or "player"),
+	})
+end
+
+return MP.FEATURE_WIRE

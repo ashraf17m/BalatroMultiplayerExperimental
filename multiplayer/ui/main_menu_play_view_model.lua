@@ -205,7 +205,7 @@ local function create_paste_icon_button()
 					minh = MAIN_MENU_BUTTON_HEIGHT,
 					shadow = true,
 					on_demand_tooltip = {
-						text = { try_localize("k_paste") or try_localize("b_join_lobby_clipboard") or "Paste Code" },
+						text = { try_localize("k_paste") or "Paste Code" },
 					},
 				},
 				nodes = {
@@ -354,36 +354,7 @@ local function append_resume_match_button(contents)
 end
 
 function view_model.build_play_options_contents()
-	if
-		not (BALATRO.get_setting_value and BALATRO.get_setting_value("tutorial_complete", false))
-		or (BALATRO.get_setting_value and BALATRO.get_setting_value("tutorial_progress", nil) ~= nil)
-	then
-		return {
-			create_play_button("b_singleplayer", G.C.BLUE, "start_vanilla_sp"),
-			{
-				n = G.UIT.R,
-				config = {
-					align = "cm",
-					padding = 0.5,
-				},
-				nodes = {
-					{
-						n = G.UIT.T,
-						config = {
-							text = localize("k_tutorial_not_complete"),
-							colour = G.C.UI.TEXT_LIGHT,
-							scale = 0.45,
-						},
-					},
-				},
-			},
-			create_play_button("b_skip_tutorial", G.C.RED, "skip_tutorial"),
-		}
-	end
-
-	local contents = {
-		create_play_button("b_singleplayer", G.C.BLUE, "start_vanilla_sp"),
-	}
+	local contents = {}
 
 	append_resume_match_button(contents)
 	append_multiplayer_lobby_create_buttons(contents)
@@ -391,28 +362,12 @@ function view_model.build_play_options_contents()
 	local is_connected = MP.LOBBY.client.connected
 	append_play_button_if(contents, is_connected, "b_browse_lobbies", G.C.BLUE, "browse_lobbies", 0.7)
 	append_play_button_if(contents, is_connected, "b_join_lobby", G.C.RED, "join_lobby", 0.7)
-	append_play_button_if(contents, is_connected, "b_join_lobby_clipboard", G.C.PURPLE, "join_from_clipboard", 0.7)
 	append_play_button_if(contents, not is_connected, "b_reconnect", G.C.RED, "reconnect")
 
 	return contents
 end
 
 function view_model.build_main_menu_button_nodes()
-	if
-		not (BALATRO.get_setting_value and BALATRO.get_setting_value("tutorial_complete", false))
-		or (BALATRO.get_setting_value and BALATRO.get_setting_value("tutorial_progress", nil) ~= nil)
-	then
-		return {
-			create_main_menu_button({
-				id = "mp_main_skip_tutorial",
-				label_key = "b_skip_tutorial",
-				colour = G.C.RED,
-				button = "skip_tutorial",
-				minw = 3.7,
-			}),
-		}
-	end
-
 	local buttons = {}
 
 	if MP.RESUME and MP.RESUME.has_saved_resume and MP.RESUME.has_saved_resume() then

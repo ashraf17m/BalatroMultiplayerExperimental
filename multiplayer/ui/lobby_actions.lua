@@ -286,6 +286,7 @@ function G.FUNCS.lobby_start_run(e, args)
 		challenge = challenge,
 		stake = tonumber(run_deck.stake),
 		seed = args.seed,
+		savetext = args.savetext,
 	})
 end
 

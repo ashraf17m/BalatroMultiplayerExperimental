@@ -84,7 +84,16 @@ function match_message_runtime.handle_team_skip_blind(blind_row, ante)
 end
 
 function match_message_runtime.handle_end_pvp(lost, pvp_timer_lost)
+	if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		MP.SPECTATOR_LOG.emit("end_pvp_packet", {
+			lost = not not lost,
+			pvp_timer_lost = not not pvp_timer_lost,
+		})
+	end
 	if buffer_resume_method("buffer_runtime_match_outcome", "endPvP", lost, pvp_timer_lost) then
+		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+			MP.SPECTATOR_LOG.emit("end_pvp_buffered_resume")
+		end
 		return
 	end
 
@@ -164,6 +173,13 @@ function match_message_runtime.handle_lose_game()
 	call_match_flow_runtime("handle_match_loss_runtime")
 end
 
+-- The watched match finished (spectators only).
+function match_message_runtime.handle_match_ended()
+	if MP.SPECTATOR and MP.SPECTATOR.handle_match_ended then
+		MP.SPECTATOR.handle_match_ended()
+	end
+end
+
 function match_message_runtime.handle_enemy_info(enemy_info)
 	if buffer_resume_method("buffer_runtime_enemy_info", enemy_info) then
 		return
@@ -210,6 +226,7 @@ MP.NETWORKING_INTERNAL.handle_money_update = match_message_runtime.handle_money_
 MP.NETWORKING_INTERNAL.handle_win_game = match_message_runtime.handle_win_game
 MP.NETWORKING_INTERNAL.handle_alone_game = match_message_runtime.handle_alone_game
 MP.NETWORKING_INTERNAL.handle_lose_game = match_message_runtime.handle_lose_game
+MP.NETWORKING_INTERNAL.handle_match_ended = match_message_runtime.handle_match_ended
 MP.NETWORKING_INTERNAL.handle_enemy_info = match_message_runtime.handle_enemy_info
 MP.NETWORKING_INTERNAL.handle_enemy_location = match_message_runtime.handle_enemy_location
 MP.NETWORKING_INTERNAL.handle_coop_blind_preview = match_message_runtime.handle_coop_blind_preview

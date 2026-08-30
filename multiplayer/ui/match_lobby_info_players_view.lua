@@ -145,6 +145,12 @@ local function create_match_lobby_player_row(lobby_player, row_index, lobby_cont
 
 	ROW_LAYOUT.append_row_slot(
 		row_nodes,
+		ROW_LAYOUT.create_spectator_chip(model.is_spectator or model.role == "spectator"),
+		1.05
+	)
+
+	ROW_LAYOUT.append_row_slot(
+		row_nodes,
 		ROW_LAYOUT.create_action_button_from_spec(model.kick_match_action),
 		0.65,
 		0.42

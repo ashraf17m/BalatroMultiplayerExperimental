@@ -74,6 +74,24 @@ function G.FUNCS.change_bound_lobby_option_cycle(args)
 	end
 end
 
+function G.FUNCS.mp_option_cycle_jump(e)
+	local cfg = e.config.ref_table
+	local from = cfg.current_option
+	local to = math.max(1, math.min(#cfg.options, from + e.config.jump_step))
+	if to == from then
+		return
+	end
+	cfg.current_option = to
+	cfg.current_option_val = cfg.options[to]
+	G.FUNCS[cfg.opt_callback]({
+		from_val = cfg.options[from],
+		to_val = cfg.current_option_val,
+		from_key = from,
+		to_key = to,
+		cycle_config = cfg,
+	})
+end
+
 local function flush_custom_winners_slider_change()
 	if not pending_custom_winners_slider_count then
 		return false

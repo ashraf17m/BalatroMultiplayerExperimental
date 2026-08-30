@@ -170,7 +170,6 @@ return {
 			mp_phantom = "Spook",
 		},
 		dictionary = {
-			b_singleplayer = "Singleplayer",
 			b_join_lobby = "Sluit je aan bij een lobby",
 			b_return_lobby = "Ga terug naar lobby",
 			b_reconnect = "Opnieuw verbinding maken",

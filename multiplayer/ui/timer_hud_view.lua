@@ -29,6 +29,15 @@ local function get_low_timer_colour(default_colour)
 	return is_timer_warning() and G.C.RED or default_colour
 end
 
+local function is_timer_host_only_locked()
+	return not not (
+		MP.LOBBY
+		and MP.LOBBY.config
+		and MP.LOBBY.config.timer_ownership == "host"
+		and not MP.LOBBY.is_host
+	)
+end
+
 local function get_timer_display_ref()
 	return setmetatable({}, {
 		__index = function()
@@ -80,6 +89,9 @@ function MP.UI.cam_timer_opponent()
 end
 
 BALATRO.set_ui_function("mp_timer_button", function(e)
+	if is_timer_host_only_locked() then
+		return
+	end
 	if not (MP.UI.cam_timer_opponent and MP.UI.cam_timer_opponent()) then
 		return
 	end
@@ -211,12 +223,19 @@ BALATRO.set_ui_function("set_timer_box", function(e)
 	if MP.UI.cam_timer_opponent then
 		allow_interaction = MP.UI.cam_timer_opponent()
 	end
+	if is_timer_host_only_locked() then
+		allow_interaction = false
+	end
 	e.config.button = allow_interaction and "mp_timer_button" or nil
 	e.config.hover = nil
 	e.config.outline_colour = nil
 
 	if MP.GAME.timer_started or MP.GAME.nemesis_timer_started then
 		e.config.colour = G.C.DYN_UI.BOSS_DARK
+		if is_timer_host_only_locked() then
+			e.children[1].config.object.colours = { G.C.UI.TEXT_DARK }
+			return
+		end
 		e.children[1].config.object.colours = { get_low_timer_colour(G.C.IMPORTANT) }
 		return
 	end

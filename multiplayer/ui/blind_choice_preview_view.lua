@@ -8,6 +8,12 @@ local function should_show_blind_tag(type, run_info)
 	if type ~= "Small" and type ~= "Big" then
 		return false
 	end
+
+	local blind_state = BALATRO.get_blind_state and BALATRO.get_blind_state(type) or nil
+	if blind_state == "Skipped" or blind_state == "Defeated" then
+		return false
+	end
+
 	return true
 end
 

@@ -304,7 +304,31 @@ function feature_message_runtime.handle_modded_action(parsed_action)
 	end
 end
 
-function feature_message_runtime.handle_team_card_sync(parsed_action)
+function feature_message_runtime.handle_team_card_sync(parsed_action, envelope)
+	if type(parsed_action) == "table" and parsed_action.playerId == nil and type(envelope) == "table" then
+		parsed_action.playerId = envelope.playerId
+			or (envelope.payload and envelope.payload.playerId)
+	end
+	if MP.TESTING and MP.TESTING.log_team_card then
+		local from_id = parsed_action and parsed_action.playerId
+		local watch = MP.SPECTATOR and MP.SPECTATOR.target_player_id
+		MP.TESTING.log_team_card("RECV", string.format(
+			"from=%s watch=%s %s %s spec=%s",
+			tostring(from_id and string.sub(tostring(from_id), 1, 8) or "nil"),
+			tostring(watch and string.sub(tostring(watch), 1, 8) or "nil"),
+			tostring(parsed_action and parsed_action.actionType or "?"),
+			tostring(parsed_action and parsed_action.cardKey or "?"),
+			tostring(not not (MP.SPECTATOR and MP.SPECTATOR.is_spectating))
+		))
+	end
+	-- Spectating clients are not in the resume-buffer path. Buffering here
+	-- swallowed teammate card syncs and never applied them to the board.
+	if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) then
+		if MP.SYNC and MP.SYNC.TEAM_CARD and MP.SYNC.TEAM_CARD.handle_sync then
+			MP.SYNC.TEAM_CARD.handle_sync(parsed_action)
+		end
+		return
+	end
 	handle_buffered_team_sync(parsed_action, "buffer_runtime_team_card_sync", MP.SYNC and MP.SYNC.TEAM_CARD)
 end
 
@@ -320,6 +344,30 @@ feature_message_runtime.handle_jimbo_appear = action_jimbo_appear
 feature_message_runtime.handle_jimbo_talk = action_jimbo_talk
 feature_message_runtime.handle_jimbo_move = action_jimbo_move
 feature_message_runtime.handle_jimbo_remove = action_jimbo_remove
+
+function feature_message_runtime.handle_spectator_action_stream(parsed_action)
+	if MP.SPECTATOR and MP.SPECTATOR.handle_spectator_action_stream then
+		MP.SPECTATOR.handle_spectator_action_stream(parsed_action)
+	end
+end
+
+function feature_message_runtime.handle_spectator_history(parsed_action)
+	if MP.SPECTATOR and MP.SPECTATOR.handle_spectator_history then
+		MP.SPECTATOR.handle_spectator_history(parsed_action)
+	end
+end
+
+function feature_message_runtime.handle_spectator_request_snapshot(parsed_action)
+	if MP.RECORDER and MP.RECORDER.handle_spectator_request_snapshot then
+		MP.RECORDER.handle_spectator_request_snapshot(parsed_action)
+	end
+end
+
+function feature_message_runtime.handle_spectator_receive_snapshot(parsed_action)
+	if MP.SPECTATOR and MP.SPECTATOR.handle_spectator_receive_snapshot then
+		MP.SPECTATOR.handle_spectator_receive_snapshot(parsed_action)
+	end
+end
 
 MP.NETWORKING_INTERNAL.report_feature_runtime_issue = feature_message_runtime.report_feature_runtime_issue
 MP.NETWORKING_INTERNAL.handle_version = feature_message_runtime.handle_version
@@ -340,3 +388,7 @@ MP.NETWORKING_INTERNAL.handle_jimbo_appear = feature_message_runtime.handle_jimb
 MP.NETWORKING_INTERNAL.handle_jimbo_talk = feature_message_runtime.handle_jimbo_talk
 MP.NETWORKING_INTERNAL.handle_jimbo_move = feature_message_runtime.handle_jimbo_move
 MP.NETWORKING_INTERNAL.handle_jimbo_remove = feature_message_runtime.handle_jimbo_remove
+MP.NETWORKING_INTERNAL.handle_spectator_action_stream = feature_message_runtime.handle_spectator_action_stream
+MP.NETWORKING_INTERNAL.handle_spectator_history = feature_message_runtime.handle_spectator_history
+MP.NETWORKING_INTERNAL.handle_spectator_request_snapshot = feature_message_runtime.handle_spectator_request_snapshot
+MP.NETWORKING_INTERNAL.handle_spectator_receive_snapshot = feature_message_runtime.handle_spectator_receive_snapshot

@@ -52,6 +52,12 @@ function lobby_players_ui.create_lobby_player_row(player, surface, index, lobby_
 		1.05
 	)
 
+	ROW_LAYOUT.append_row_slot(
+		row_nodes,
+		ROW_LAYOUT.create_spectator_chip(model.is_spectator or model.role == "spectator"),
+		1.05
+	)
+
 	if model.show_kick_slot then
 		ROW_LAYOUT.append_row_slot(
 			row_nodes,
@@ -92,9 +98,10 @@ function lobby_players_ui.should_split_player_rows(players)
 	return #players > lobby_players_ui.PLAYER_COLUMN_LIMIT
 end
 
-function lobby_players_ui.create_player_row_columns(players, lobby_context, column_width)
+function lobby_players_ui.create_player_row_columns(players, lobby_context, column_width, start_index)
+	local first_index = (start_index or 1)
 	if not lobby_players_ui.should_split_player_rows(players) then
-		return lobby_players_ui.create_flat_player_rows(players, "players", lobby_context)
+		return lobby_players_ui.create_flat_player_rows(players, "players", lobby_context, first_index)
 	end
 
 	local first_column_players = {}
@@ -115,13 +122,13 @@ function lobby_players_ui.create_player_row_columns(players, lobby_context, colu
 				{
 					n = G.UIT.C,
 					config = { align = "tm", minw = column_width, padding = 0.02 },
-					nodes = lobby_players_ui.create_flat_player_rows(first_column_players, "players", lobby_context, 1),
+					nodes = lobby_players_ui.create_flat_player_rows(first_column_players, "players", lobby_context, first_index),
 				},
 				{ n = G.UIT.B, config = { w = lobby_players_ui.PLAYER_COLUMN_GAP, h = 0.01 } },
 				{
 					n = G.UIT.C,
 					config = { align = "tm", minw = column_width, padding = 0.02 },
-					nodes = lobby_players_ui.create_flat_player_rows(second_column_players, "players", lobby_context, lobby_players_ui.PLAYER_COLUMN_LIMIT + 1),
+					nodes = lobby_players_ui.create_flat_player_rows(second_column_players, "players", lobby_context, first_index + lobby_players_ui.PLAYER_COLUMN_LIMIT),
 				},
 			},
 		},

@@ -34,11 +34,28 @@ function team_card_sync.is_main_team_area(area)
 end
 
 function team_card_sync.get_card_by_id(id)
+	if id == nil then
+		return nil
+	end
+	local want = tostring(id)
 	local playing_cards = BALATRO.get_playing_cards()
-	if not playing_cards then return nil end
-	for _, card in ipairs(playing_cards) do
-		if card.mp_card_id == id then
-			return card
+	if playing_cards then
+		for _, card in ipairs(playing_cards) do
+			if card and card.mp_card_id and tostring(card.mp_card_id) == want then
+				return card
+			end
+		end
+	end
+	local G = _G.G
+	if G then
+		for _, area in ipairs({ G.hand, G.deck, G.discard, G.play }) do
+			if area and area.cards then
+				for _, card in ipairs(area.cards) do
+					if card and card.mp_card_id and tostring(card.mp_card_id) == want then
+						return card
+					end
+				end
+			end
 		end
 	end
 	return nil
@@ -72,7 +89,10 @@ end
 
 function team_card_sync.assign_initial_team_card_ids()
 	local playing_cards = BALATRO.get_playing_cards() or {}
-	local prefix = (MP.is_shared_card_sync_enabled and MP.is_shared_card_sync_enabled()) and "TEAM"
+	-- Index-based TEAM ids are deterministic across clients in the same
+	-- lobby regardless of the shared-deck option; spectator boards rely on
+	-- that to resolve sync deltas against the watched player's deck.
+	local prefix = (MP.LOBBY and MP.LOBBY.code) and "TEAM"
 		or (BALATRO.get_player_id() or "LOCAL")
 	for index, card in ipairs(playing_cards) do
 		team_card_sync.mark_card_ready_for_team_sync(card, prefix .. "_" .. (index - 1))

@@ -193,6 +193,7 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/rulesets/testing.lua",
 	"testing_tools/decks/testing_deck.lua",
 	"testing_tools/decks/testing_2_deck.lua",
+	"testing_tools/decks/erratic_15.lua",
 	"testing_tools/notice.lua",
 	"testing_tools/fkey_utilities.lua",
 	"testing_tools/solo_pvp_launcher.lua",
@@ -202,6 +203,9 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/stress_oversized_hotkey.lua",
 	"testing_tools/stress_spam_hotkey.lua",
 	"testing_tools/stress_info_hotkey.lua",
+	"testing_tools/ui_mover_hotkey.lua",
+	"testing_tools/spectator_debugger_hotkey.lua",
+	"testing_tools/rng_tracer.lua",
 }
 
 local DIAGNOSTIC_TOOL_FILES = {
@@ -209,7 +213,7 @@ local DIAGNOSTIC_TOOL_FILES = {
 }
 
 local load_testing_tools = function()
-	local enabled_by_config = platform_loader.get_config_value("testing_tools", false, MP) == true
+	local enabled_by_config = platform_loader.get_config_value("testing_tools", true, MP) ~= false
 	local enabled_by_env = MP.EXPERIMENTAL and MP.EXPERIMENTAL.testing_tools == true
 	if not (enabled_by_config or enabled_by_env) then
 		return true

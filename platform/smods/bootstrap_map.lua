@@ -56,6 +56,7 @@ local OBJECT_DIRECTORIES = {
 
 local CORE_RUNTIME_FILES = {
 	"platform/hooks/local_feature_hooks.lua",
+	"platform/hooks/spectator_record_hooks.lua",
 	"multiplayer/runtime/runtime_policy.lua",
 	"multiplayer/runtime/game_update_cycle.lua",
 	"multiplayer/runtime/coop_boss_blind_runtime.lua",
@@ -70,6 +71,9 @@ local CORE_RUNTIME_FILES = {
 	"multiplayer/runtime/match_lifecycle.lua",
 	"multiplayer/runtime/network_state_apply.lua",
 	"multiplayer/runtime/resume_runtime.lua",
+	"multiplayer/runtime/action_recorder.lua",
+	"multiplayer/runtime/spectator_log.lua",
+	"multiplayer/runtime/action_playback.lua",
 	"multiplayer/coop_save_persistence.lua",
 }
 
@@ -146,6 +150,7 @@ local UI_BOUNDARY_FILES = {
 	"multiplayer/ui/end_game_overlay_controller.lua",
 	"multiplayer/ui/end_game_overlay_hooks.lua",
 	"multiplayer/ui/end_game_deck_overlay.lua",
+	"multiplayer/ui/spectator_viewport_view.lua",
 	"multiplayer/ui/lobby_option_state.lua",
 	"multiplayer/ui/lobby_option_controls.lua",
 	"multiplayer/ui/party_custom_winners_control.lua",

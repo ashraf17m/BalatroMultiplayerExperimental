@@ -23,6 +23,7 @@ local decode_snapshot_data = require_snapshot_api("decode_snapshot_data")
 local apply_snapshot_to_card = require_snapshot_api("apply_snapshot_to_card")
 local get_card_snapshot = require_snapshot_api("get_card_snapshot")
 local snapshot_to_center_key = require_snapshot_api("snapshot_to_center_key")
+local snapshot_to_base_key = require_snapshot_api("snapshot_to_base_key")
 local assign_card_id = require_snapshot_api("assign_card_id")
 local mark_card_ready_for_team_sync = require_snapshot_api("mark_card_ready_for_team_sync")
 local ensure_card_base_runtime = require_snapshot_api("ensure_card_base_runtime")
@@ -30,8 +31,11 @@ local ensure_card_base_runtime = require_snapshot_api("ensure_card_base_runtime"
 local SHARED_INITIAL_CARD_ID_PATTERN = "^TEAM_%d+$"
 
 local function is_team_card_sync_active()
+	-- NOTE: deliberately NOT gated on MP.is_shared_card_sync_enabled().
+	-- That option only decides whether teammates share deck state (the
+	-- server owns that routing decision). Card relays must keep flowing so
+	-- spectators of this player can apply deck mutations to their boards.
 	return BALATRO.is_run_stage()
-		and MP.is_shared_card_sync_enabled()
 		and MP.LOBBY
 		and MP.LOBBY.code
 		and not MP.TEAM_CARD_INITIALIZING
@@ -68,6 +72,52 @@ end
 
 function team_card_sync.is_applying_remote_change()
 	return is_applying_remote_change
+end
+
+local function spec_team_log(kind, details)
+	if MP.TESTING and MP.TESTING.log_team_card then
+		MP.TESTING.log_team_card(kind, details)
+	end
+end
+
+local function is_spectating_board()
+	return not not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
+end
+
+local function relay_teammate_sync_into_action_stream(data)
+	-- Spectators of this player only see recorded actions. A teammate's
+	-- Strength never becomes a local USE_CARD, so it must be streamed here
+	-- or the spectator board never changes. Server fan-out to spectators is
+	-- a separate path and has not been reaching this client.
+	if is_spectating_board() then
+		return
+	end
+	if not (MP.RECORDER and MP.RECORDER.record_action) then
+		return
+	end
+	local source = data and (data.playerId or data.sourcePlayerId)
+	if source == nil or tostring(source) == "SERVER" then
+		return
+	end
+	local self_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	if self_id and tostring(source) == tostring(self_id) then
+		return
+	end
+	MP.RECORDER.record_action("TEAM_CARD_SYNC", {
+		cardKey = data.cardKey,
+		actionType = data.actionType,
+		cardData = data.cardData,
+		sourcePlayerId = tostring(source),
+	})
+end
+
+local function spectator_should_ignore_source(data)
+	local spec = MP.SPECTATOR
+	if not (spec and spec.is_spectating and spec.target_player_id) then
+		return false
+	end
+	local source = data and (data.playerId or data.sourcePlayerId)
+	return source ~= nil and tostring(source) == tostring(spec.target_player_id)
 end
 
 local function is_card_in_play_area(card)
@@ -337,10 +387,68 @@ local function create_remote_team_card_target(card_id, snapshot)
 	return target
 end
 
+-- A spectator's replay sim already created its own version of cards the
+-- target added or modified (same shared seed -> same content). When a sync
+-- names an id we do not know, claim the matching local card instead of
+-- creating a duplicate next to it. Unclaimed cards are preferred; cards
+-- holding some other id may still be claimed because the whole spectated
+-- board is disposable simulation state.
+local function try_claim_matching_unsynced_card(card_id, snapshot)
+	if not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
+		return nil
+	end
+
+	local playing_cards = BALATRO.get_playing_cards()
+	if not playing_cards then
+		return nil
+	end
+
+	local incoming_compare = encode_snapshot_for_compare(snapshot)
+	if not incoming_compare then
+		return nil
+	end
+
+	local claimed_card = nil
+	for _, card in ipairs(playing_cards) do
+		if not is_card_removed_or_destroyed(card) and card.mp_card_id ~= card_id then
+			local current_snapshot = get_card_snapshot(card)
+			if current_snapshot then
+				local current_compare = encode_snapshot_for_compare(current_snapshot)
+				if current_compare == incoming_compare then
+					if not card.mp_card_id then
+						mark_card_ready_for_team_sync(card, card_id)
+						trace_team_card(card, "remote_claim_matched", { card_id = tostring(card_id) })
+						return card
+					elseif not claimed_card then
+						claimed_card = card
+					end
+				end
+			end
+		end
+	end
+
+	if claimed_card then
+		mark_card_ready_for_team_sync(claimed_card, card_id)
+		trace_team_card(claimed_card, "remote_claim_reassigned", { card_id = tostring(card_id) })
+	end
+	return claimed_card
+end
+
 local function ensure_remote_team_card_target(card_id, snapshot)
 	local target = get_card_by_id(card_id)
 	if target then
 		return target
+	end
+
+	-- Spectator boards already simulate the watched player. Claiming a
+	-- teammate's unknown card onto a look-alike in that sim hides the
+	-- teammate change. Only the watched player's own syncs used to need
+	-- this, and those are ignored while spectating.
+	if not is_spectating_board() then
+		local claimed = try_claim_matching_unsynced_card(card_id, snapshot)
+		if claimed then
+			return claimed
+		end
 	end
 
 	return create_remote_team_card_target(card_id, snapshot)
@@ -379,10 +487,12 @@ local function apply_remote_team_card_snapshot_now(card_id, snapshot)
 		target_exists = not not get_card_by_id(card_id),
 	})
 	local target = ensure_remote_team_card_target(card_id, snapshot)
+	local existed = not not get_card_by_id(card_id)
 	if target and target.area and target.base then
 		local already_matches, compare_data = card_already_matches_snapshot(target, snapshot)
 		if already_matches then
 			target.mp_last_sync_raw = compare_data
+			spec_team_log("SAME", tostring(card_id))
 			trace_team_card_sync("remote_snapshot_apply_skipped", {
 				card_id = tostring(card_id or "nil"),
 				reason = "already_matches",
@@ -391,9 +501,12 @@ local function apply_remote_team_card_snapshot_now(card_id, snapshot)
 		end
 
 		apply_snapshot_to_card(target, snapshot)
+		spec_team_log(existed and "APPLY" or "CREATE", tostring(card_id))
 		trace_team_card(target, "remote_snapshot_applied")
 		return true
 	end
+
+	spec_team_log("FAIL", tostring(card_id))
 
 	trace_team_card_sync("remote_snapshot_apply_blocked", {
 		card_id = tostring(card_id or "nil"),
@@ -434,6 +547,19 @@ end
 local function enqueue_remote_team_card_change(change)
 	if not (change and change.card_id and change.action_type) then
 		return false
+	end
+
+	if is_spectating_board() then
+		if MP.SPECTATOR.applying_snapshot then
+			if team_card_sync.defer_remote_change_until_active then
+				return team_card_sync.defer_remote_change_until_active(change)
+			end
+			return false
+		end
+		apply_remote_change(function()
+			apply_remote_team_card_change_now(change)
+		end)
+		return true
 	end
 
 	if team_card_sync.defer_remote_change and team_card_sync.defer_remote_change(change) then
@@ -529,6 +655,17 @@ function team_card_sync.sync_full_deck()
 end
 
 function team_card_sync.handle_sync(data)
+	if spectator_should_ignore_source(data) then
+		spec_team_log("SKIP_A", string.format("%s %s", tostring(data and data.actionType), tostring(data and data.cardKey)))
+		trace_team_card_sync("remote_sync_ignored", {
+			card_id = data and tostring(data.cardKey or "nil") or "nil",
+			reason = "spectated_target_uses_action_stream",
+		})
+		return
+	end
+
+	relay_teammate_sync_into_action_stream(data)
+
 	trace_team_card_sync("remote_sync_received", {
 		card_id = data and tostring(data.cardKey or "nil") or "nil",
 		action_type = data and tostring(data.actionType or "nil") or "nil",
@@ -540,6 +677,10 @@ function team_card_sync.handle_sync(data)
 
 	if data.actionType == "removed" then
 		mark_removed_card_id(id)
+		if is_spectating_board() then
+			apply_remote_team_card_removal(id)
+			return
+		end
 		if not is_team_card_sync_active() then
 			if team_card_sync.defer_remote_change_until_active then
 				team_card_sync.defer_remote_change_until_active({
@@ -575,6 +716,10 @@ function team_card_sync.handle_sync(data)
 		action_type = "sync",
 		snapshot = snapshot,
 	}
+	if is_spectating_board() then
+		apply_remote_team_card_snapshot(id, snapshot)
+		return
+	end
 	if not is_team_card_sync_active() then
 		if team_card_sync.defer_remote_change_until_active then
 			team_card_sync.defer_remote_change_until_active(change)

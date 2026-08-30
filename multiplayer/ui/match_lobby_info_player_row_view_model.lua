@@ -99,6 +99,14 @@ local function build_match_lobby_player_row_model(player, index, opts)
 		row_model[key] = value
 	end
 
+	-- Spectator means spectator; eliminated players are conveyed by lives = 0
+	-- in the lives lane, not by a spectator chip.
+	row_model.is_spectator = not not (
+		row_model.is_spectator
+		or player.is_spectator
+		or player.role == "spectator"
+	)
+
 	row_model.show_lives_lane = not lobby_context.is_coop_gamemode
 	if row_model.show_lives_lane then
 		row_model.lives_lane_spec = {

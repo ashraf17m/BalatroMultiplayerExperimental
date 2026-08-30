@@ -201,6 +201,9 @@ build_lobby_player_row_model = function(player, index, opts)
 		is_duels_nemesis = is_duels_nemesis,
 		is_team_locked = not not player.is_team_locked,
 		can_change_team = not not can_change_team,
+		role = player.role or (player.is_spectator and "spectator") or "player",
+		is_spectator = not not (player.is_spectator or player.role == "spectator"),
+		lives = player.lives,
 	}
 end
 ROW_VIEW_MODEL.build_lobby_player_row_model = build_lobby_player_row_model

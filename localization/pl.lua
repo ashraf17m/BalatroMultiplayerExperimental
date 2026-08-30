@@ -267,7 +267,6 @@ return {
 			mp_phantom = "Widmo",
 		},
 		dictionary = {
-			b_singleplayer = "Tryb Jednoosobowy",
 			b_join_lobby = "Dołącz do Lobby",
 			b_return_lobby = "Powrót do Lobby",
 			b_reconnect = "Połącz ponownie",

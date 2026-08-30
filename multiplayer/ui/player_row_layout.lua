@@ -165,6 +165,7 @@ function ROW_LAYOUT.create_name_lane(model)
 	local name_level = model.is_self and 5 or 1
 	local name_colour = model.is_duels_nemesis and G.C.RED
 		or get_hand_level_colour(name_level, model.is_self and G.C.ORANGE or G.C.BLUE)
+	local name_text_colour = model.name_text_colour or G.C.UI.TEXT_DARK
 
 	return {
 		n = G.UIT.C,
@@ -185,7 +186,7 @@ function ROW_LAYOUT.create_name_lane(model)
 				config = {
 					text = name,
 					scale = 0.45,
-					colour = model.name_text_colour or G.C.UI.TEXT_DARK,
+					colour = name_text_colour,
 					maxw = name_maxw,
 				},
 			},
@@ -240,6 +241,14 @@ function ROW_LAYOUT.create_host_chip(is_owner)
 	end
 
 	return ROW_LAYOUT.create_row_chip("HOST", G.C.ORANGE, 1.05, 0.45)
+end
+
+function ROW_LAYOUT.create_spectator_chip(is_spectator)
+	if not is_spectator then
+		return nil
+	end
+
+	return ROW_LAYOUT.create_row_chip("SPEC", G.C.PURPLE, 1.05, 0.45)
 end
 
 function ROW_LAYOUT.create_mod_lane(model)

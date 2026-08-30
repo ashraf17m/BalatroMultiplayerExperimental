@@ -188,10 +188,8 @@ return {
 			mp_phantom = "Фантомный",
 		},
 		dictionary = {
-			b_singleplayer = "Одиночная Игра",
 			b_join_lobby = "Подключиться к лобби",
 			b_enter_code = "Enter Code",
-			b_join_lobby_clipboard = "Join From Clipboard",
 			b_browse_lobbies = "Browse Lobbies",
 			b_return_lobby = "Вернуться в лобби",
 			b_reconnect = "Переподключиться",

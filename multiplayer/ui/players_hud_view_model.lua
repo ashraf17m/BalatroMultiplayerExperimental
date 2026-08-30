@@ -34,8 +34,23 @@ local function get_local_hands_left()
 	return MP.GAME and MP.GAME.hands or 0
 end
 
+local function player_is_spectator(player)
+	return not not (player and (player.is_spectator or player.role == "spectator"))
+end
+
+local function client_is_spectator()
+	if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) then
+		return true
+	end
+	local lobby_client = MP.LOBBY and MP.LOBBY.client
+	if lobby_client and (lobby_client.is_spectator or lobby_client.role == "spectator") then
+		return true
+	end
+	return player_is_spectator(MP.get_self_lobby_player and MP.get_self_lobby_player() or nil)
+end
+
 local function build_self_standings_player()
-	if not MP.GAME then
+	if not MP.GAME or client_is_spectator() then
 		return nil
 	end
 
@@ -84,6 +99,9 @@ end
 
 local function add_enemy_standings_player(players, included_ids, player_id, enemy, opts)
 	if player_id == nil or included_ids[player_id] then
+		return
+	end
+	if player_is_spectator(get_lobby_player(player_id)) then
 		return
 	end
 
@@ -149,7 +167,9 @@ function MP.UI.get_live_match_standings_players()
 	end
 
 	for _, lobby_player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
-		add_enemy_standings_player(players, included_ids, lobby_player.id, enemies[lobby_player.id])
+		if not player_is_spectator(lobby_player) then
+			add_enemy_standings_player(players, included_ids, lobby_player.id, enemies[lobby_player.id])
+		end
 	end
 
 	for player_id, enemy in pairs(enemies) do

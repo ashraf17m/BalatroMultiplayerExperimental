@@ -52,6 +52,7 @@ function MATCH_DOMAIN.apply_local_player_info(lives, life_loss_reason, server_pr
 
 	if changed and previous_lives ~= 0 and MP.LOBBY.config.gold_on_life_loss then
 		state.comeback_bonus_given = false
+		state.comeback_eval_pending = true
 		state.comeback_bonus = state.comeback_bonus + 1
 		granted_comeback_bonus = true
 	end
@@ -306,6 +307,7 @@ function MATCH_DOMAIN.begin_new_round(state)
 	state.duplicate_end = false
 	state.round_failed = false
 	state.round_ended = false
+	state.comeback_eval_pending = false
 	state.coop_deck_out_waiting = false
 	state.coop_deck_out_resolved = false
 	return state
@@ -324,6 +326,7 @@ function MATCH_DOMAIN.prepare_blind_selection(state)
 	state.duel_bye_waiting = false
 	state.prevent_eval = false
 	state.round_failed = false
+	state.comeback_eval_pending = false
 	state.coop_deck_out_waiting = false
 	state.coop_deck_out_resolved = false
 	state.wait_for_enemys_furthest_blind = false

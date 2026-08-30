@@ -227,6 +227,28 @@ end
 
 local function get_enemy_location_display()
 	local enemy = MP.GAME and MP.GAME.enemy or {}
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating and MP.SPECTATOR.target_player_id and MP.GAME then
+		local nemesis_id
+		for _, player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
+			if player.id == MP.SPECTATOR.target_player_id then
+				nemesis_id = player.nemesis_player_id
+				break
+			end
+		end
+		if nemesis_id and MP.GAME.enemies and MP.GAME.enemies[nemesis_id] then
+			enemy = MP.GAME.enemies[nemesis_id]
+		elseif nemesis_id then
+			for _, player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
+				if player.id == nemesis_id then
+					enemy = {
+						raw_location = player.raw_location,
+						location = player.location,
+					}
+					break
+				end
+			end
+		end
+	end
 	return MP.UI
 		and MP.UI.UTILS
 		and MP.UI.UTILS.resolve_location_display

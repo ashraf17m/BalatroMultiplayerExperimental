@@ -174,7 +174,6 @@ return {
 			c_mp_vanilla = "Vanilla",
 		},
 		dictionary = {
-			b_singleplayer = "Einzelspieler",
 			b_join_lobby = "Lobby Beitreten",
 			b_return_lobby = "Zurück zur Lobby",
 			b_reconnect = "Wiederverbinden",

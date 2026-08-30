@@ -55,6 +55,8 @@ function ui_state_store.get_player_list_runtime()
 		ffa_standings = {
 			scroll_index = 1,
 		},
+		full_standings_page = 1,
+		full_standings_page_count = 1,
 	}
 	return runtime.player_list
 end

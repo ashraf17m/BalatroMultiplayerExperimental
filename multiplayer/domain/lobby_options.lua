@@ -3,6 +3,9 @@ MP.DOMAIN.LOBBY = MP.DOMAIN.LOBBY or {}
 
 local LOBBY_DOMAIN = MP.DOMAIN.LOBBY
 
+local CREATION_RULESET_CONFIG_PATH = { "lobby", "creation_ruleset" }
+local CREATION_GAMEMODE_CONFIG_PATH = { "lobby", "creation_gamemode" }
+
 function LOBBY_DOMAIN.normalize_gamemode(gamemode)
 	local normalized_gamemode = tostring(gamemode or "")
 	if normalized_gamemode ~= "" and string.sub(normalized_gamemode, 1, 12) ~= "gamemode_mp_" then
@@ -18,6 +21,17 @@ local function get_valid_gamemode(gamemode)
 	end
 
 	return "gamemode_mp_attrition"
+end
+
+local function save_creation_pref(path, value)
+	local smods = MP.PLATFORM and MP.PLATFORM.SMODS or nil
+	if not (smods and type(smods.set_config_value) == "function") then
+		return
+	end
+	smods.set_config_value(path, value, MP)
+	if MP.save_current_config then
+		MP.save_current_config()
+	end
 end
 
 function LOBBY_DOMAIN.get_lobby_type_for_gamemode(gamemode, current_lobby_type)
@@ -41,7 +55,13 @@ local function apply_lobby_type_for_gamemode(gamemode, state)
 end
 
 function LOBBY_DOMAIN.set_creation_ruleset(ruleset_key, state)
-	return LOBBY_DOMAIN.set_setup_field("creation_ruleset", ruleset_key, state)
+	local saved_ruleset = LOBBY_DOMAIN.set_setup_field("creation_ruleset", ruleset_key, state)
+	save_creation_pref(CREATION_RULESET_CONFIG_PATH, saved_ruleset)
+	local ruleset = MP.Rulesets and MP.Rulesets[saved_ruleset]
+	if ruleset and ruleset.forced_gamemode then
+		LOBBY_DOMAIN.set_creation_gamemode(ruleset.forced_gamemode, state)
+	end
+	return saved_ruleset
 end
 
 function LOBBY_DOMAIN.get_creation_ruleset(state)
@@ -53,7 +73,9 @@ function LOBBY_DOMAIN.set_creation_gamemode(gamemode_key, state)
 	state = state or LOBBY_DOMAIN.ensure_state()
 	local normalized_gamemode = LOBBY_DOMAIN.normalize_gamemode(gamemode_key)
 	apply_lobby_type_for_gamemode(normalized_gamemode, state)
-	return LOBBY_DOMAIN.set_setup_field("creation_gamemode", normalized_gamemode, state)
+	local saved_gamemode = LOBBY_DOMAIN.set_setup_field("creation_gamemode", normalized_gamemode, state)
+	save_creation_pref(CREATION_GAMEMODE_CONFIG_PATH, saved_gamemode)
+	return saved_gamemode
 end
 
 function LOBBY_DOMAIN.get_creation_gamemode(state)

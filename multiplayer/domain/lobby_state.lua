@@ -4,6 +4,8 @@ MP.DOMAIN.LOBBY = MP.DOMAIN.LOBBY or {}
 local LOBBY_DOMAIN = MP.DOMAIN.LOBBY
 local DEFAULT_LOBBY_ACCESS_MODE = "private"
 local LOBBY_ACCESS_MODE_CONFIG_PATH = { "lobby", "creation_access_mode" }
+local CREATION_RULESET_CONFIG_PATH = { "lobby", "creation_ruleset" }
+local CREATION_GAMEMODE_CONFIG_PATH = { "lobby", "creation_gamemode" }
 local VALID_LOBBY_ACCESS_MODES = {
 	public = true,
 	ask_first = true,
@@ -18,16 +20,22 @@ local function normalize_lobby_access_mode(access_mode)
 	return DEFAULT_LOBBY_ACCESS_MODE
 end
 
-local function get_saved_lobby_access_mode()
+local function get_saved_config_value(path, default)
 	local smods = MP.PLATFORM and MP.PLATFORM.SMODS or nil
 	if smods and type(smods.get_config_value) == "function" then
-		return normalize_lobby_access_mode(smods.get_config_value(
-			LOBBY_ACCESS_MODE_CONFIG_PATH,
-			DEFAULT_LOBBY_ACCESS_MODE,
-			MP
-		))
+		local saved = smods.get_config_value(path, default, MP)
+		if type(saved) == "string" and saved ~= "" then
+			return saved
+		end
 	end
-	return DEFAULT_LOBBY_ACCESS_MODE
+	return default
+end
+
+local function get_saved_lobby_access_mode()
+	return normalize_lobby_access_mode(get_saved_config_value(
+		LOBBY_ACCESS_MODE_CONFIG_PATH,
+		DEFAULT_LOBBY_ACCESS_MODE
+	))
 end
 
 local function save_lobby_access_mode(access_mode)
@@ -106,8 +114,14 @@ local function build_initial_setup_state()
 	return {
 		temp_code = "",
 		temp_seed = "",
-		creation_ruleset = MP.DEFAULT_LOBBY_CREATION_RULESET,
-		creation_gamemode = MP.DEFAULT_LOBBY_CREATION_GAMEMODE,
+		creation_ruleset = get_saved_config_value(
+			CREATION_RULESET_CONFIG_PATH,
+			MP.DEFAULT_LOBBY_CREATION_RULESET
+		),
+		creation_gamemode = get_saved_config_value(
+			CREATION_GAMEMODE_CONFIG_PATH,
+			MP.DEFAULT_LOBBY_CREATION_GAMEMODE
+		),
 		creation_access_mode = get_saved_lobby_access_mode(),
 		browser_lobbies = {},
 		browser_pending = false,

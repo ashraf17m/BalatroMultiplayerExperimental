@@ -103,11 +103,15 @@ function MATCH_DOMAIN.prune_stale_enemies(tracked_enemy_ids, self_player_id, sta
 	return enemies
 end
 
+local function player_is_spectator(player)
+	return not not (player and (player.is_spectator or player.role == "spectator"))
+end
+
 function MATCH_DOMAIN.sync_resume_enemies_from_lobby_players(players, self_player_id, state)
 	local tracked_enemy_ids = {}
 
 	for _, player in ipairs(players or {}) do
-		if player.id ~= self_player_id then
+		if player.id ~= self_player_id and not player_is_spectator(player) then
 			local enemy = MATCH_DOMAIN.get_or_create_enemy_state(player.id, player.username, state)
 			apply_enemy_presence(
 				enemy,
@@ -128,7 +132,7 @@ end
 
 function MATCH_DOMAIN.seed_enemies_from_lobby_players(players, self_player_id, state)
 	for _, player in ipairs(players or {}) do
-		if player.id ~= self_player_id then
+		if player.id ~= self_player_id and not player_is_spectator(player) then
 			local enemy = MATCH_DOMAIN.get_or_create_enemy_state(player.id, player.username, state)
 			apply_enemy_presence(enemy, player.team, true)
 			apply_enemy_lobby_lives(enemy, player)
@@ -139,7 +143,7 @@ function MATCH_DOMAIN.seed_enemies_from_lobby_players(players, self_player_id, s
 end
 
 function MATCH_DOMAIN.sync_enemy_from_lobby_snapshot_player(player_state, is_in_game, local_player_in_match, tracked_enemy_ids, state)
-	if not player_state or player_state.is_self then
+	if not player_state or player_state.is_self or player_is_spectator(player_state) then
 		return nil
 	end
 

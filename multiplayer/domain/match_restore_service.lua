@@ -23,6 +23,7 @@ function MATCH_DOMAIN.apply_saved_state(saved_state, state)
 	state.force_zero_round_score = not not saved_state.force_zero_round_score
 	state.comeback_bonus_given = not not saved_state.comeback_bonus_given
 	state.comeback_bonus = tonumber(saved_state.comeback_bonus) or state.comeback_bonus
+	state.comeback_eval_pending = not not saved_state.comeback_eval_pending
 	state.end_pvp = not not saved_state.end_pvp
 	state.location = INTERNAL.normalize_ready_location(saved_state.location or state.location)
 	state.duel_bye_waiting = not not saved_state.duel_bye_waiting
