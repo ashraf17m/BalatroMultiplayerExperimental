@@ -30,7 +30,7 @@ end
 local function is_current_pvp_blind()
 	if MP and type(MP.is_pvp_boss) == "function" and MP.is_pvp_boss() then return true end
 
-	local blind = BALATRO and BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = BALATRO and (G and G.GAME and G.GAME.blind) or nil
 	if not blind then return false end
 
 	local blind_key = blind.config and blind.config.blind and blind.config.blind.key or blind.name
@@ -48,7 +48,7 @@ function FN.PRE.start_calculation_event()
 	if MP and MP.CALCULATOR and type(MP.CALCULATOR.calculation_start_delay) == "function" then
 		delay = MP.CALCULATOR.calculation_start_delay(is_pvp_blind)
 	elseif MP and MP.LOBBY and MP.LOBBY.code and not is_pvp_blind then
-		delay = 3 * G.SETTINGS.GAMESPEED
+		delay = 3
 	end
 	local func = function()
 		FN.PRE.simulate()
@@ -60,7 +60,7 @@ function FN.PRE.start_calculation_event()
 		FN.PRE.add_update_event("immediate") -- Refresh UI again
 		return true
 	end
-	G.E_MANAGER:add_event(Event({ trigger = "after", blockable = false, blocking = false, delay = delay, func = func }))
+	G.E_MANAGER:add_event(Event({ trigger = "after", blockable = false, blocking = false, timer = "REAL", delay = delay, func = func }))
 end
 
 FN.PRE._start_up = Game.start_up

@@ -104,16 +104,6 @@ function Gradient.matches_any_rank(card, ranks, options)
 	return false
 end
 
-function Gradient.matches_rank_predicate(card, predicate, options)
-	for _, rank in ipairs(Gradient.ranks(card, options)) do
-		if predicate(rank) then
-			return true
-		end
-	end
-
-	return false
-end
-
 function Gradient.is_face(card, from_boss, options)
 	if card and card.debuff and not from_boss then
 		return false
@@ -297,9 +287,15 @@ MP.HOOKS.register_method_hook(Card, "Card", "get_id", "mp.gradient.virtual_rank_
 
 MP.HOOKS.register_method_hook(Card, "Card", "is_face", "mp.gradient.effective_face_ranks", {
 	after = function(ctx, self)
-		local from_boss = ctx.args[1]
+		if not gradient_active() then
+			return
+		end
 		local existing = ctx.results and ctx.results[1]
-		if gradient_active() and not existing and Gradient.is_face(self, from_boss, { gradient_only = true }) then
+		if existing then
+			return
+		end
+		local from_boss = ctx.args and ctx.args[1]
+		if Gradient.is_face(self, from_boss, { gradient_only = true }) then
 			ctx.results = { true, n = 1 }
 		end
 	end,
@@ -307,8 +303,11 @@ MP.HOOKS.register_method_hook(Card, "Card", "is_face", "mp.gradient.effective_fa
 
 MP.HOOKS.register_method_hook(Card, "Card", "calculate_joker", "mp.gradient.generic_virtual_rank_replay", {
 	before = function(ctx, self)
-		local context = ctx.args[1]
-		if not (gradient_active() and context and self and self.ability) then
+		if not gradient_active() then
+			return
+		end
+		local context = ctx.args and ctx.args[1]
+		if not (context and self and self.ability) then
 			return
 		end
 

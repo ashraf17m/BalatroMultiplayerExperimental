@@ -1,6 +1,5 @@
 local team_card_sync = MP.SYNC and MP.SYNC.TEAM_CARD or {}
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
-local diagnostics = team_card_sync.diagnostics or {}
 local TEAM_CARD_POST_SCORE_NETWORK_GRACE_DELAY = 0.12
 local resuming_play_discard = false
 
@@ -25,14 +24,6 @@ local animate_pending_remote_changes_for_played_hand = require_apply_api("animat
 
 local function is_calculator_dry_run()
 	return MP and MP.CALCULATOR_V2 and MP.CALCULATOR_V2.dry_run_active
-end
-
-local function trace_team_card_sync(event, fields)
-	return diagnostics.trace_event and diagnostics.trace_event(event, fields)
-end
-
-local function trace_team_card(card, event, fields, area)
-	return diagnostics.trace_card and diagnostics.trace_card(event, card, area, fields)
 end
 
 local function process_arrived_network_messages()
@@ -67,29 +58,16 @@ local function animate_or_resume_play_discard()
 end
 
 local function queue_new_card_sync_after_emplace(card)
-	if not card then
-		trace_team_card_sync("new_card_sync_not_queued", { reason = "missing_card" })
-		return
-	end
-	if card.mp_synced_as_added then
-		trace_team_card(card, "new_card_sync_not_queued", { reason = "already_synced" })
-		return
-	end
-	if card.mp_team_card_add_sync_pending then
-		trace_team_card(card, "new_card_sync_not_queued", { reason = "already_pending" })
+	if not card or card.mp_synced_as_added or card.mp_team_card_add_sync_pending then
 		return
 	end
 
 	card.mp_team_card_add_sync_pending = true
-	trace_team_card(card, "new_card_sync_queued")
 	local function sync_after_addition_settles()
 		card.mp_team_card_add_sync_pending = nil
-		trace_team_card(card, "new_card_sync_execute")
-		local sent = false
 		if not card.mp_synced_as_added then
-			sent = sync_new_card(card)
+			sync_new_card(card)
 		end
-		trace_team_card(card, "new_card_sync_complete", { sent = sent })
 		return true
 	end
 
@@ -108,12 +86,6 @@ local function handle_team_card_emplace(area, card)
 	if is_calculator_dry_run() then return end
 	local main_area = is_main_team_area(area)
 	local syncable = is_syncable_playing_card(card)
-	if main_area or syncable then
-		trace_team_card(card, "emplace_observed", {
-			main_area = main_area,
-			syncable = syncable,
-		}, area)
-	end
 	if not main_area or not syncable then
 		return
 	end
@@ -121,8 +93,6 @@ local function handle_team_card_emplace(area, card)
 	ensure_card_base_runtime(card)
 	if is_team_card_sync_active() then
 		queue_new_card_sync_after_emplace(card)
-	else
-		trace_team_card(card, "new_card_sync_not_queued", { reason = "inactive" }, area)
 	end
 end
 
@@ -171,9 +141,6 @@ local function install_team_card_sync_hooks()
 		end,
 	})
 
-	if diagnostics.install_observer_hooks then
-		diagnostics.install_observer_hooks()
-	end
 
 	MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "play_cards_from_highlighted", "mp.team_card_sync.ensure_play_runtime", {
 		before = function(ctx)
@@ -184,22 +151,22 @@ local function install_team_card_sync_hooks()
 
 	MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "evaluate_play", "mp.team_card_sync.evaluate_play", {
 		before = function(ctx)
-			if is_calculator_dry_run() then return end
+			if is_calculator_dry_run() or not is_team_card_sync_active() then return end
 			ctx.mp_team_card_sync_played_cards = collect_played_team_cards()
 		end,
 		after = function(ctx)
-			if is_calculator_dry_run() then return end
+			if is_calculator_dry_run() or not is_team_card_sync_active() then return end
 			sync_card_list(ctx.mp_team_card_sync_played_cards or {})
 		end,
 	})
 
 	MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "discard_cards_from_highlighted", "mp.team_card_sync.discard_cards", {
 		before = function(ctx)
-			if is_calculator_dry_run() then return end
+			if is_calculator_dry_run() or not is_team_card_sync_active() then return end
 			ctx.mp_team_card_sync_discarded_cards = collect_highlighted_team_cards()
 		end,
 		after = function(ctx)
-			if is_calculator_dry_run() then return end
+			if is_calculator_dry_run() or not is_team_card_sync_active() then return end
 			sync_card_list(ctx.mp_team_card_sync_discarded_cards or {})
 		end,
 	})
@@ -215,7 +182,8 @@ local function install_team_card_sync_hooks()
 				return
 			end
 
-			if is_team_card_sync_active() and has_played_cards_waiting_to_discard() and BALATRO.queue_event then
+			local shared_sync_enabled = MP.is_shared_card_sync_enabled and MP.is_shared_card_sync_enabled()
+			if shared_sync_enabled and is_team_card_sync_active() and has_played_cards_waiting_to_discard() and BALATRO.queue_event then
 				ctx.skip_original = true
 				BALATRO.queue_event({
 					trigger = "after",

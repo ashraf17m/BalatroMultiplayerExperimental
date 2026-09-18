@@ -12,6 +12,11 @@ local function has_blind_hud_context()
 	return MP and MP.LOBBY and MP.LOBBY.code
 end
 
+local function get_current_blind_key()
+	local blind = (G and G.GAME and G.GAME.blind) or nil
+	return blind and blind.config and blind.config.blind and blind.config.blind.key or blind and blind.name or nil
+end
+
 function MP.UI.update_primary_opponent_blind_name(pop_in)
 	if not (has_blind_hud_context() and BALATRO.get_hud_blind and BALATRO.get_hud_blind() and MP.is_pvp_boss and MP.is_pvp_boss()) then
 		return false
@@ -35,8 +40,8 @@ function MP.UI.update_primary_opponent_blind_name(pop_in)
 end
 
 function MP.UI.reapply_active_multiplayer_blind_ui()
-	if not (has_blind_hud_context() and BALATRO.is_run_stage and BALATRO.is_run_stage()
-		and BALATRO.get_current_blind and BALATRO.get_current_blind() and BALATRO.get_hud_blind and BALATRO.get_hud_blind()) then
+	if not (has_blind_hud_context() and (G and G.STAGES and G.STAGE == G.STAGES.RUN or false)
+		and (G and G.GAME and G.GAME.blind) and BALATRO.get_hud_blind and BALATRO.get_hud_blind()) then
 		return false
 	end
 
@@ -117,7 +122,7 @@ function MP.UI.update_blind_HUD()
 			})
 		end
 
-		if BALATRO.get_current_blind_key and BALATRO.get_current_blind_key() == "bl_mp_nemesis" then
+		if get_current_blind_key() == "bl_mp_nemesis" then
 			BALATRO.apply_multiplayer_blind_sprite(MP.UTILS.get_pvp_blind_key())
 		end
 	end
@@ -129,8 +134,8 @@ function MP.UI.reset_blind_HUD()
 			MP.UI.remove_player_list(true)
 		end
 
-		if BALATRO.get_current_blind_key and BALATRO.get_current_blind_key() ~= "bl_mp_nemesis" then
-			local current_blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+		if get_current_blind_key() ~= "bl_mp_nemesis" then
+			local current_blind = (G and G.GAME and G.GAME.blind) or nil
 			if current_blind and current_blind.chips ~= nil then
 				current_blind.chip_text = number_format(current_blind.chips)
 			end
@@ -139,18 +144,18 @@ function MP.UI.reset_blind_HUD()
 		if BALATRO.get_hud_blind and BALATRO.get_hud_blind() then
 			BALATRO.set_hud_blind_visible(true)
 			local blind_name = BALATRO.get_hud_blind_element_by_id("HUD_blind_name")
-			BALATRO.set_text_object_ref(blind_name, BALATRO.get_current_blind(), "loc_name")
+			BALATRO.set_text_object_ref(blind_name, (G and G.GAME and G.GAME.blind or nil), "loc_name")
 
 			local blind_count = BALATRO.get_hud_blind_element_by_id("HUD_blind_count")
 			if blind_count then
-				BALATRO.set_text_ref_node(blind_count, BALATRO.get_current_blind(), "chip_text", "blind_chip_UI_scale")
+				BALATRO.set_text_ref_node(blind_count, (G and G.GAME and G.GAME.blind or nil), "chip_text", "blind_chip_UI_scale")
 				BALATRO.call_ui_function("blind_chip_UI_scale", blind_count)
 			end
 
 			BALATRO.set_hud_blind_panel_labels(localize("ph_blind_score_at_least"), localize("ph_blind_reward"))
 
 			local dollars = BALATRO.get_hud_blind_element_by_id("dollars_to_be_earned")
-			BALATRO.set_text_object_ref(dollars, BALATRO.get_current_round(), "dollars_to_be_earned")
+			BALATRO.set_text_object_ref(dollars, (G and G.GAME and G.GAME.current_round or nil), "dollars_to_be_earned")
 		end
 	end
 end
@@ -158,7 +163,7 @@ BALATRO.set_ui_function("multiplayer_blind_chip_UI_scale", function(e)
 	local enemy_view = OPPONENTS.get_primary_enemy_state and OPPONENTS.get_primary_enemy_state()
 	if not enemy_view then return end
 	local new_score_text = MP.INSANE_INT.to_string(enemy_view.score)
-	if BALATRO.get_current_blind and BALATRO.get_current_blind() and enemy_view.score and enemy_view.score_text ~= new_score_text then
+	if (G and G.GAME and G.GAME.blind) and enemy_view.score and enemy_view.score_text ~= new_score_text then
 		if not MP.INSANE_INT.reaches_e_switch_point(enemy_view.score) then
 			e.config.scale = scale_number(MP.INSANE_INT.to_safe_number(enemy_view.score) or enemy_view.score.coefficient, 0.7, 100000)
 		end

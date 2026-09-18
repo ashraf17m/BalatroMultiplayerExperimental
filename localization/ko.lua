@@ -144,244 +144,29 @@ return {
 				},
 			},
 
-			j_mp_magnet_sandbox = {
-				name = "마그넷",
-				text = {
-					"{C:attention}#1#{} 라운드 후 이 카드를 판매하면",
-					"{X:purple,C:white}Nemesis{}의 최고 판매가 {C:attention}조커{}를 {C:attention}복사{}",
-					"{C:attention}#3#{} 라운드 후 극성(polarity)이 반전되어",
-					"쓸모없는 고철이 되어버림!!!!",
-					"{C:inactive}(현재 {C:attention}#2#{C:inactive}/#1# 라운드)",
-				},
-			},
 
-			j_mp_cloud_9_sandbox = {
-				name = "클라우드 9",
-				text = {
-					"숫자 단일재배 농부",
-					"당신의 다양한 덱을",
-					"수익성 좋은 9번 농장으로 바꿔버림!!!!",
-					"{C:inactive}({C:green}#1# / #2#{} {C:inactive}확률, 현재 {C:money}$#3#{}{C:inactive})",
-				},
-			},
 
-			j_mp_lucky_cat_sandbox = {
-				name = "럭키 캣",
-				text = {
-					"행운 → 취약성 파이프라인 운영자",
-					"럭키 캣이 글래스 캣이 되어",
-					"지수적으로 강해진다!!!!",
-					"{C:inactive}(현재 {X:mult,C:white}X#2#{C:inactive})",
-				},
-			},
 
-			j_mp_constellation_sandbox = {
-				name = "컨스텔레이션",
-				text = {
-					"행성 관리 불안장애",
-					"다마고치에게 먹이를 줘야 한다",
-					"안 그러면 시들어버림!!!!",
-					"{C:inactive}(현재 {X:mult,C:white}X#1#{C:inactive})",
-				},
-			},
 
-			j_mp_bloodstone_sandbox = {
-				name = "블러드스톤",
-				text = {
-					"{V:1}패치노트 퇴행 증후군",
-					"출시일 트라우마로 되돌아가",
-					"추억의 {X:mult,C:white}X#3#{} 파워 스파이크!!!!",
-					"{C:inactive}({C:green}#1# / #2#{} {C:inactive}확률)",
-				},
-			},
 
-			j_mp_juggler_sandbox = {
-				name = "저글러",
-				text = {
-					"손패 크기 완벽주의자",
-					"모든 카드를",
-					"언제나 공중에 띄워야만 한다!!!!",
-					"{C:inactive}(현재 손패 크기 {C:attention}+#1#{C:inactive})",
-				},
-			},
 
-			j_mp_mail_sandbox = {
-				name = "메일-인 리베이트",
-				text = {
-					"버린 {C:attention}#2#{} 1장당",
-					"{C:money}$#1#{} 획득",
-					"{s:0.8}랭크는 절대 바뀌지 않음",
-				},
-			},
 
-			j_mp_hit_the_road_sandbox = {
-				name = "히트 더 로드",
-				text = {
-					"버린 {C:attention}잭{} 1장당",
-					"이 조커가 {X:mult,C:white}X0.75{} 배수를 획득",
-					"버린 잭은 {C:attention}파괴{}됨",
-					"{C:inactive}(현재 {X:mult,C:white}X#2#{C:inactive})",
-				},
-			},
 
-			j_mp_misprint_sandbox = {
-				name = "미스프린트",
-				text = {
-					"{V:1}#1#{} 배수",
-					"{C:attention}구매 시 값이 공개됨{}",
-					"{C:green}인쇄 오류는 누적된다{}",
-				},
-			},
 
-			j_mp_castle_sandbox = {
-				name = "캐슬",
-				text = {
-					"버린 {V:1}#1#{} 1장당",
-					"이 조커가 {C:chips}#3{} 칩 획득",
-					"문양은 구매 시 고정",
-					"{C:inactive}(현재 {C:chips}+#2#{C:inactive} 칩)",
-				},
-			},
 
-			j_mp_runner_sandbox = {
-				name = "러너",
-				text = {
-					"연속 카드 우월주의자",
-					"다른 모든 포커 핸드는",
-					"열등하다고 믿는다!!!!",
-					"{C:inactive}(현재 {C:chips}+#1#{C:inactive})",
-				},
-			},
 
-			j_mp_order_sandbox = {
-				name = "더 오더",
-				text = {
-					"낸 패에 {C:attention}스트레이트{}가 있으면 {X:mult,C:white}X3{} 배수",
-					"연속으로 {C:attention}스트레이트{}를 낼 때마다 {X:mult,C:white}X#1#{} 배수 획득",
-					"다른 패를 내면 초기화",
-					"{C:inactive}(현재 {X:mult,C:white}X#2#{C:inactive})",
-				},
-			},
 
-			j_mp_photograph_sandbox = {
-				name = "포토그래프",
-				text = {
-					"한 손당 단 한 번의 완벽한 장면만을",
-					"노리는 단발 촬영 사진가!!!!",
-				},
-			},
 
-			j_mp_ride_the_bus_sandbox = {
-				name = "라이드 더 버스",
-				text = {
-					"페이스 카드 금주 프로그램",
-					"페이스 카드 한 장만 나와도",
-					"버스에서 쫓겨난다!!!!",
-					"{C:inactive}(현재 {C:mult}+#1#{C:inactive} 배수)",
-				},
-			},
 
-			j_mp_loyalty_card_sandbox = {
-				name = "로열티 카드",
-				text = {
-					"{C:attention}#1#{}를 {C:attention}#3#{}번 낼 때마다",
-					"{X:mult,C:white}X6{} 배수",
-					"{C:inactive}(#2#/#3#)",
-				},
-			},
 
-			j_mp_faceless_sandbox = {
-				name = "페이스리스 조커",
-				text = {
-					"엘리트 페이스 카드 소믈리에",
-					"장인의",
-					"3종 시음 플라이트를 큐레이팅해",
-					"프리미엄 폐기 경험을 제공한다!!!!",
-				},
-			},
 
-			j_mp_square_sandbox = {
-				name = "스퀘어 조커",
-				text = {
-					"낸 패가 정확히 {C:attention}4{}장일 때",
-					"이 조커가 {C:chips}+#2#{} 칩 획득",
-					"{C:attention}4장 패에서만 적용{}",
-					"{C:inactive}(현재 {C:chips}+#1#{C:inactive} 칩)",
-				},
-			},
 
-			j_mp_throwback_sandbox = {
-				name = "스로우백",
-				text = {
-					"이번 런에서 스킵한 {C:attention}블라인드{} 1개당",
-					"기본 배수 {X:mult,C:white}X#2#{}",
-					"스킵 직후 다음 블라인드에 {X:mult,C:white}X#3#{} 배수",
-					"블라인드를 스킵하지 않으면 {X:mult,C:white}X#4#{} 배수 감소",
-					"{C:inactive}(현재 {X:mult,C:white}X#1#{C:inactive})",
-				},
-			},
 
-			j_mp_vampire_sandbox = {
-				name = "뱀파이어",
-				text = {
-					"점수 계산에 사용된 {C:attention}강화 카드{} 1장당",
-					"이 조커가 {X:mult,C:white}X#1#{} 배수 획득",
-					"플레이된 강화 카드는 {C:attention}스톤{}으로 변함",
-					"스톤 카드는 플레이 시 {C:money}$#3#{} 획득",
-					"{C:inactive}(현재 {X:mult,C:white}X#2#{C:inactive})",
-				},
-			},
 
-			j_mp_baseball_sandbox = {
-				name = "베이스볼 카드",
-				text = {
-					"{C:green}언커먼{} 조커는 각각",
-					"{X:mult,C:white}X#1#{} 배수 제공",
-				},
-			},
 
-			j_mp_steel_joker_sandbox = {
-				name = "스틸 조커",
-				text = {
-					"플레이된 스틸 카드를",
-					"{C:attention}재발동{}",
-				},
-			},
 
-			j_mp_satellite_sandbox = {
-				name = "새틀라이트",
-				text = {
-					"만성 위성 열화 불안",
-					"행성 업그레이드를 꾸준히 하지 않으면",
-					"인프라가 서서히 무너져내린다!!!!",
-					"{C:inactive}(현재 {C:money}$#1#{C:inactive})",
-				},
-			},
 
-			j_mp_idol_sandbox_zealot = {
-				name = "질럿 아이돌",
-				text = {
-					"플레이된 {C:attention}#1#{}마다",
-					"점수 계산 시 {X:mult,C:white}X#2#{} 배수 제공",
-					"{s:0.8}카드는 라운드마다 바뀜",
-				},
-			},
-			j_mp_idol_sandbox_collector = {
-				name = "메타 아이돌",
-				text = {
-					"가장 흔한 카드가 점수 계산 시",
-					"{X:mult,C:white}X#3#{} 배수 제공",
-					"({X:mult,C:white}+X#4#{} : 덱 내 해당 카드 1장당)",
-					"{C:inactive}(현재 {C:attention}#1#{} / {V:1}#2#{})",
-				},
-			},
 
-			j_mp_error_sandbox = {
-				name = "????",
-				text = {
-					"{X:purple,C:white,s:0.85}뭔가{} {X:purple,C:white,s:0.85}잘못됐다",
-				},
-			},
 		},
 
 		Planet = {

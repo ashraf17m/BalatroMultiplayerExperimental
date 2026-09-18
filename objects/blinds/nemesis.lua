@@ -19,10 +19,10 @@ SMODS.Atlas({
 SMODS.Blind({
 	key = "nemesis",
 	dollars = 5,
-	mult = 1, -- Jen's Almanac crashes the game if the mult is 0
+	mult = 2, -- Boss Blind mult (was 1, which caused PvP baseline to fall back to Small Blind)
 	boss_colour = G.C.MULTIPLAYER,
 	boss = { min = 1, max = 10 },
-	atlas = "player_blind_chip",
+	atlas = "player_blind_col",
 	discovered = true,
 	in_pool = function(self)
 		return false

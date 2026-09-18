@@ -92,7 +92,7 @@ local function get_localized_blind_name(blind_key, fallback)
 		return loc_name
 	end
 
-	local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(blind_key) or nil
+	local blind_def = (G and G.P_BLINDS and G.P_BLINDS[blind_key]) or nil
 	return (blind_def and blind_def.name) or fallback or blind_key
 end
 
@@ -162,8 +162,8 @@ local function get_pvp_display_blind_key(options)
 end
 
 local function get_boss_display_blind_key()
-	local boss_key = BALATRO.get_blind_choice and BALATRO.get_blind_choice("Boss") or nil
-	if boss_key and boss_key ~= "bl_mp_nemesis" and BALATRO.get_blind_def and BALATRO.get_blind_def(boss_key) then
+	local boss_key = (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.blind_choices and G.GAME.round_resets.blind_choices["Boss"]) or nil
+	if boss_key and boss_key ~= "bl_mp_nemesis" and (G and G.P_BLINDS and G.P_BLINDS[boss_key]) then
 		return boss_key
 	end
 	return nil
@@ -193,7 +193,7 @@ local function resolve_blind_icon_spec(blind_value, options)
 	end
 
 	if blind_value:match("^bl_") then
-		local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(blind_value) or nil
+		local blind_def = (G and G.P_BLINDS and G.P_BLINDS[blind_value]) or nil
 		if blind_def then
 			return {
 				blind_key = blind_value,
@@ -253,13 +253,13 @@ function MP.UI.UTILS.create_location_blind_icon_object(location_display, size)
 	local pos
 
 	if display.icon_kind == "pvp" then
-		local pvp_blind = display.pvp_blind_key and BALATRO.get_blind_def and BALATRO.get_blind_def(display.pvp_blind_key) or nil
+		local pvp_blind = display.pvp_blind_key and (G and G.P_BLINDS and G.P_BLINDS[display.pvp_blind_key]) or nil
 		atlas_key = "player_blind_col"
 		pos = pvp_blind and pvp_blind.pos or nil
 	end
 
 	if display.blind_key and display.blind_key ~= "bl_mp_nemesis" then
-		local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(display.blind_key) or nil
+		local blind_def = (G and G.P_BLINDS and G.P_BLINDS[display.blind_key]) or nil
 		if blind_def then
 			atlas_key = blind_def.atlas or "blind_chips"
 			pos = blind_def.pos
@@ -413,4 +413,122 @@ function MP.UI.UTILS.overlay_message(message, no_back)
 	end
 
 	open_overlay_message_rows(build_overlay_message_rows(message), no_back)
+end
+
+local function normalize_button_label(label)
+	if type(label) == "table" then
+		return label
+	end
+	if label == nil then
+		return {}
+	end
+	return { tostring(label) }
+end
+
+function MP.UI.Disableable_Button(args)
+	local enabled = MP.UI.UTILS.resolve_enabled_flag(args)
+	args.colour = args.colour or G.C.RED
+	args.text_colour = args.text_colour or G.C.UI.TEXT_LIGHT
+	args.disabled_text = args.disabled_text or args.label
+	args.label = normalize_button_label(not enabled and args.disabled_text or args.label)
+
+	local button_component = UIBox_button(args)
+	local button_node = button_component.nodes[1]
+	local text_node = button_node.nodes[1].nodes[1]
+
+	button_node.config.button = enabled and args.button or nil
+	button_node.config.hover = enabled
+	button_node.config.shadow = enabled
+	button_node.config.colour = enabled and args.colour or G.C.UI.BACKGROUND_INACTIVE
+	text_node.colour = enabled and args.text_colour or G.C.UI.TEXT_INACTIVE
+	text_node.shadow = enabled
+	return button_component
+end
+
+function MP.UI.Disableable_Option_Cycle(args)
+	local enabled = MP.UI.UTILS.resolve_enabled_flag(args)
+	local cycle_args = {}
+	for key, value in pairs(args or {}) do
+		cycle_args[key] = value
+	end
+	if args then
+		args._mp_effective_cycle_args = cycle_args
+	end
+
+	if not enabled then
+		cycle_args.options = { cycle_args.options[cycle_args.current_option] }
+		cycle_args.current_option = 1
+	end
+
+	return create_option_cycle(cycle_args)
+end
+
+function MP.UI.Disableable_Toggle(args)
+	local enabled = MP.UI.UTILS.resolve_enabled_flag(args)
+
+	local toggle_component = create_toggle(args)
+	local toggle_node = toggle_component.nodes[2].nodes[1].nodes[1]
+
+	toggle_node.config.id = args.id
+	toggle_node.config.button = enabled and "toggle_button" or nil
+	toggle_node.config.button_dist = enabled and 0.2 or nil
+	toggle_node.config.hover = enabled and true or false
+	toggle_node.config.toggle_callback = enabled and args.callback or nil
+	return toggle_component
+end
+
+function MP.UI.BackgroundGrouping(text, nodes, config)
+	config = config or {}
+	config.text_scale = config.text_scale or 0.33
+	return {
+		n = config.col and G.UIT.C or G.UIT.R,
+		config = { align = "cm", padding = 0.05, r = 0.1, colour = G.C.UI.TRANSPARENT_DARK },
+		nodes = {
+			{ n = G.UIT.R, config = { align = "cm" }, nodes = nodes },
+			{
+				n = G.UIT.R,
+				config = { align = "cm", padding = 0.05 },
+				nodes = {
+					{
+						n = G.UIT.T,
+						config = { text = text, colour = lighten(G.C.L_BLACK, 0.5), scale = config.text_scale },
+					},
+				},
+			},
+		},
+	}
+end
+
+MP.UI.BlindChip = {}
+
+function MP.UI.BlindChip.custom(atlas, x, y)
+	local blind_chip = BALATRO.create_animated_sprite(
+		0,
+		0,
+		1.4,
+		1.4,
+		BALATRO.get_animation_atlas(atlas),
+		{ x = x, y = y }
+	)
+	blind_chip:define_draw_steps({
+		{ shader = "dissolve", shadow_height = 0.05 },
+		{ shader = "dissolve" },
+	})
+	return blind_chip
+end
+
+function MP.UI.BlindChip.small()
+	return MP.UI.BlindChip.custom("blind_chips", 0, 0)
+end
+
+function MP.UI.BlindChip.big()
+	return MP.UI.BlindChip.custom("blind_chips", 0, 1)
+end
+
+function MP.UI.BlindChip.random()
+	return MP.UI.BlindChip.custom("blind_chips", 0, 30)
+end
+
+function MP.UI.BlindChip.pvp()
+	return MP.UI.BlindChip.custom("mp_player_blind_col", 0, 22)
 end

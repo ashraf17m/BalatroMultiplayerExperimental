@@ -45,9 +45,13 @@ local function get_scaled_coop_blind_amount(self)
 	if base_amount == nil then
 		return nil
 	end
-	self.mp_coop_base_chips = base_amount
+	if not self.mp_coop_base_chips then
+		self.mp_coop_base_chips = base_amount
+	end
+	local current_ante = (G and G.GAME and G.GAME.round_resets and (G.GAME.round_resets.blind_ante or G.GAME.round_resets.ante)) or nil
+	local blind_mult = self.config and self.config.blind and self.config.blind.mult or nil
 	local scaled_amount = server_amount ~= nil and server_amount
-		or MP.scale_coop_blind_amount and MP.scale_coop_blind_amount(base_amount)
+		or MP.scale_coop_blind_amount and MP.scale_coop_blind_amount(base_amount, current_ante, blind_mult)
 		or base_amount
 	scaled_amount = to_score_number(scaled_amount)
 	if scaled_amount == nil then
@@ -85,25 +89,9 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "draw", "mp.blind_hud.hide_floatin
 	end,
 })
 
-MP.HOOKS.register_method_hook(Blind, "Blind", "defeat", "mp.blind_hud.reset_after_defeat", {
-	after = function(ctx)
-		BALATRO.queue_event({
-			trigger = "after",
-			delay = 0.5,
-			func = function()
-				if has_blind_hud_context() and MP.UI.reset_blind_HUD then
-					MP.UI.reset_blind_HUD()
-				end
-				return true
-			end,
-		})
-		ctx.results = { n = 0 }
-	end,
-})
-
 local get_blind_main_colour_ref = get_blind_main_colour
 function get_blind_main_colour(type)
-	local blind_choices = BALATRO.get_blind_choices and BALATRO.get_blind_choices() or nil
+	local blind_choices = (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.blind_choices or nil)
 	local is_pvp_blind = (blind_choices and blind_choices[type] == "bl_mp_nemesis") or type == "bl_mp_nemesis"
 	if is_pvp_blind then
 		type = MP.UTILS.get_pvp_blind_key()
@@ -148,13 +136,6 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "alert_debuff", "mp.spectator.skip
 
 MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis_state", {
 	after = function(ctx, self)
-		if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
-			if MP.SPECTATOR.applying_snapshot then
-				MP.SPECTATOR.hide_blind_loc_debuff = true
-			else
-				MP.SPECTATOR.hide_blind_loc_debuff = false
-			end
-		end
 		local blind = ctx.args and ctx.args[1] or nil
 		local reset = ctx.args and ctx.args[2] or nil
 		local blind_key = (blind and blind.key) or (self and self.name) or nil
@@ -174,6 +155,25 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis
 			end
 			ctx.results = { n = 0 }
 			return
+		end
+
+		if is_pvp_blind then
+			local is_bye = MP.is_duel_bye_blind and MP.is_duel_bye_blind()
+			if is_bye then
+				local ante = (G.GAME and G.GAME.round_resets and (G.GAME.round_resets.blind_ante or G.GAME.round_resets.ante)) or 1
+				local mult = 2
+				local scaling = (G.GAME and G.GAME.starting_params and G.GAME.starting_params.ante_scaling) or 1
+				local get_amt = BALATRO.get_blind_amount or (type(get_blind_amount) == "function" and get_blind_amount)
+				self.chips = (get_amt and get_amt(ante) or 300) * mult * scaling
+				local num_fmt = number_format or (type(number_format) == "function" and number_format)
+				self.chip_text = num_fmt and num_fmt(self.chips) or tostring(self.chips)
+			elseif MP.UI and MP.UI.get_pvp_score_to_beat then
+				local score_int, score_text = MP.UI.get_pvp_score_to_beat()
+				if score_int then
+					self.chips = (MP.INSANE_INT and MP.INSANE_INT.to_safe_number(score_int)) or 0
+					self.chip_text = score_text or tostring(self.chips)
+				end
+			end
 		end
 
 		if
@@ -203,7 +203,7 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis
 
 local ease_background_colour_blind_ref = ease_background_colour_blind
 function ease_background_colour_blind(state, blind_override)
-	local current_blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local current_blind = (G and G.GAME and G.GAME.blind) or nil
 	local blind_name = blind_override or (current_blind and current_blind.name) or "Small Blind"
 	blind_name = (blind_name == "" and "Small Blind" or blind_name)
 	if blind_name == "bl_mp_nemesis" then
@@ -220,26 +220,40 @@ end
 
 local add_round_eval_row_ref = add_round_eval_row
 function add_round_eval_row(config)
-	local current_blind_key = BALATRO.get_current_blind_key and BALATRO.get_current_blind_key() or nil
+	local current_blind = (G and G.GAME and G.GAME.blind) or nil
+	local current_blind_key = current_blind and current_blind.config and current_blind.config.blind and current_blind.config.blind.key or current_blind and current_blind.name or nil
 	if config.name == "blind1" and current_blind_key == "bl_mp_nemesis" and not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
 		local opponents = MP.OPPONENTS or {}
 		local enemy_view = opponents.get_primary_enemy_state and opponents.get_primary_enemy_state()
-		local current_blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
 		if current_blind then
-			current_blind.chip_text = MP.INSANE_INT.to_string(enemy_view and enemy_view.score or MP.INSANE_INT.empty())
-			current_blind.pos = G.P_BLINDS[MP.UTILS.get_pvp_blind_key()].pos
+			local score_text = nil
+			if MP.UI and MP.UI.get_pvp_score_to_beat then
+				local _, pvp_text = MP.UI.get_pvp_score_to_beat()
+				if pvp_text and pvp_text ~= "" and pvp_text ~= "0" then
+					score_text = pvp_text
+				end
+			end
+			if not score_text and enemy_view then
+				local etext = enemy_view.score_text or (MP.INSANE_INT and MP.INSANE_INT.to_string(enemy_view.score))
+				if etext and etext ~= "" and etext ~= "0" then
+					score_text = etext
+				end
+			end
+			if score_text then
+				current_blind.chip_text = score_text
+			end
+
+			local copy_fn = copy_table or function(t) local r = {} for k, v in pairs(t) do r[k] = v end return r end
+			local pvp_blind_key = MP.UTILS and MP.UTILS.get_pvp_blind_key and MP.UTILS.get_pvp_blind_key() or "bl_small"
+			if G.P_BLINDS and G.P_BLINDS[pvp_blind_key] then
+				current_blind.pos = copy_fn(G.P_BLINDS[pvp_blind_key].pos)
+			end
+			if current_blind.config and current_blind.config.blind then
+				current_blind.config.blind.atlas = "mp_player_blind_col"
+			end
 		end
 
-		G.P_BLINDS["bl_mp_nemesis"].atlas = "mp_player_blind_col"
 		add_round_eval_row_ref(config)
-		BALATRO.queue_event({
-			trigger = "before",
-			delay = 0.0,
-			func = function()
-				G.P_BLINDS["bl_mp_nemesis"].atlas = "mp_player_blind_chip"
-				return true
-			end,
-		})
 		return
 	end
 
@@ -248,7 +262,7 @@ end
 
 MP.HOOKS.register_method_hook(Blind, "Blind", "disable", "mp.blind_hud.pvp_disable_guard", {
 	before = function(ctx)
-		local current_blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+		local current_blind = (G and G.GAME and G.GAME.blind) or nil
 		if MP.is_pvp_boss() and not (current_blind and current_blind.name == "Verdant Leaf") then
 			ctx.skip_original = true
 			ctx.results = { n = 0 }
@@ -259,97 +273,16 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "disable", "mp.blind_hud.pvp_disab
 	end,
 })
 
--- Fix SMODS src/overrides.lua:46 crash (assert(G.HUD_blind == e.UIBox)) during profile switches / menu transitions
 G.FUNCS = G.FUNCS or {}
+local hud_blind_debuff_ref = G.FUNCS.HUD_blind_debuff
 G.FUNCS.HUD_blind_debuff = function(e)
-	-- Spectators only see boss loc_debuff if they watched set_blind live.
-	-- Switching onto a player who is already in the blind must not show it,
-	-- and delayed HUD pop-in from snapshot set_blind must not stick it.
-	if MP and MP.SPECTATOR and MP.SPECTATOR.is_spectating and MP.SPECTATOR.hide_blind_loc_debuff then
-		if e and e.children then
-			for i = 1, #e.children do
-				local child = e.children[i]
-				if child and child.states then
-					child.states.visible = false
-				end
-			end
-		end
-		if e and e.config then
-			e.config.minh = 0
-			e.config.padding = 0
-		end
+	if MP.UI and MP.UI.using_standings_blind_hud and MP.UI.using_standings_blind_hud() then
 		return
 	end
-	if not (G and G.GAME and G.GAME.blind and G.GAME.blind.loc_debuff_lines) then
+	if not (e and e.UIBox and G.HUD_blind == e.UIBox) then
 		return
 	end
-	if not e or not e.UIBox or not e.children then
-		return
-	end
-	local scale = 0.4
-	local num_lines = #G.GAME.blind.loc_debuff_lines
-	while num_lines > 0 and G.GAME.blind.loc_debuff_lines[num_lines] == "" do
-		num_lines = num_lines - 1
-	end
-	local padding = 0.05
-	if num_lines > 5 then
-		local excess_height = (0.3 + padding) * (num_lines - 5)
-		padding = padding - excess_height / (num_lines + 1)
-	end
-	e.config = e.config or {}
-	e.config.padding = padding
-	if G.GAME.blind.update_loc_debuff_lines then
-		for i = 1, #e.children do
-			if e.children[i] then
-				e.children[i]:remove()
-				e.children[i] = nil
-			end
-		end
-		G.GAME.blind.update_loc_debuff_lines = nil
-	end
-	if num_lines > #e.children then
-		for i = #e.children + 1, num_lines do
-			local node_def = nil
-			if type(G.GAME.blind.loc_debuff_lines[i]) == "string" then
-				node_def = {
-					n = G.UIT.R,
-					config = { align = "cm", minh = 0.3, maxw = 4.2 },
-					nodes = {
-						{
-							n = G.UIT.T,
-							config = {
-								ref_table = G.GAME.blind.loc_debuff_lines,
-								ref_value = i,
-								scale = scale * 0.9,
-								colour = G.C.UI.TEXT_LIGHT,
-							},
-						},
-					},
-				}
-			elseif SMODS and SMODS.localize_box then
-				node_def = {
-					n = G.UIT.R,
-					config = { align = "cm", minh = 0.3, maxw = 4.2 },
-					nodes = SMODS.localize_box(G.GAME.blind.loc_debuff_lines[i], {
-						default_col = G.GAME.blind.loc_debuff_lines.text_colour or G.C.UI.TEXT_LIGHT,
-						scale = 1.125 * (G.GAME.blind.loc_debuff_lines.scale or 1),
-						vars = G.GAME.blind.loc_debuff_lines.vars or {},
-					}),
-				}
-			end
-			if node_def and e.UIBox and e.UIBox.set_parent_child then
-				e.UIBox:set_parent_child(node_def, e)
-			end
-		end
-	elseif num_lines < #e.children then
-		for i = num_lines + 1, #e.children do
-			if e.children[i] then
-				e.children[i]:remove()
-				e.children[i] = nil
-			end
-		end
-	end
-	if e.UIBox and e.UIBox.recalculate then
-		e.UIBox:recalculate()
+	if hud_blind_debuff_ref then
+		return hud_blind_debuff_ref(e)
 	end
 end

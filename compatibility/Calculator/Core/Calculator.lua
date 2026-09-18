@@ -131,7 +131,7 @@ local function get_calculation_timer_settings(is_current_pvp_blind)
 	end
 
 	local ruleset = MP.current_ruleset and MP.current_ruleset() or {}
-	local fallback_delay = 3 * (G and G.SETTINGS and G.SETTINGS.GAMESPEED or 1)
+	local fallback_delay = 3
 	local delay = MP.LOBBY.config.preview_calculate_delay or ruleset.preview_calculate_delay or fallback_delay
 	local cost = MP.LOBBY.config.preview_calculate_cost or ruleset.preview_calculate_cost or 0
 	return tonumber(delay) or 0, tonumber(cost) or 0
@@ -347,10 +347,6 @@ function CORE.current_display_part(key)
 	local part = parts and parts[key] or nil
 	part = part or blank_part(key == "l" and " " or "")
 	return part.text, part.should_pulse, part.colour
-end
-
-function CORE.current_display()
-	return CORE.current_display_part("l")
 end
 
 function CORE.request()

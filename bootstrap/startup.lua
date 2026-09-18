@@ -9,7 +9,6 @@ local CORE_RUNTIME_FILES = bootstrap_map and bootstrap_map.CORE_RUNTIME_FILES or
 local RULESET_LAYER_DIRECTORIES = bootstrap_map and bootstrap_map.RULESET_LAYER_DIRECTORIES or {}
 local RULESET_DIRECTORIES = bootstrap_map and bootstrap_map.RULESET_DIRECTORIES or { "rulesets" }
 local TEAM_SYNC_FEATURE_FILES = bootstrap_map and bootstrap_map.TEAM_SYNC_FEATURE_FILES or {}
-local TEAM_SYNC_DIAGNOSTIC_FILES = bootstrap_map and bootstrap_map.TEAM_SYNC_DIAGNOSTIC_FILES or {}
 local PROTOCOL_BOUNDARY_FILES = bootstrap_map and bootstrap_map.PROTOCOL_BOUNDARY_FILES or {}
 local UI_BOUNDARY_FILES = bootstrap_map and bootstrap_map.UI_BOUNDARY_FILES or {}
 local CONTENT_ADAPTER_FILES = bootstrap_map and bootstrap_map.CONTENT_ADAPTER_FILES or {}
@@ -196,6 +195,9 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/decks/erratic_15.lua",
 	"testing_tools/notice.lua",
 	"testing_tools/fkey_utilities.lua",
+	"testing_tools/speed_lab.lua",
+	"testing_tools/perf_monitor.lua",
+	"testing_tools/calculator_delay_hotkey.lua",
 	"testing_tools/solo_pvp_launcher.lua",
 	"testing_tools/temp_username_hotkey.lua",
 	"testing_tools/dummy_players_hotkey.lua",
@@ -205,7 +207,9 @@ local TESTING_TOOL_FILES = {
 	"testing_tools/stress_info_hotkey.lua",
 	"testing_tools/ui_mover_hotkey.lua",
 	"testing_tools/spectator_debugger_hotkey.lua",
+	"testing_tools/hud_align_probe.lua",
 	"testing_tools/rng_tracer.lua",
+	"testing_tools/font_inspector.lua",
 }
 
 local DIAGNOSTIC_TOOL_FILES = {
@@ -230,27 +234,8 @@ local load_diagnostic_tools = function()
 	return true
 end
 
-local function is_runtime_trace_logging_enabled()
-	return MP.UTILS
-		and MP.UTILS.is_runtime_trace_enabled
-		and MP.UTILS.is_runtime_trace_enabled()
-end
-
-local function build_team_sync_feature_files()
-	local files = {}
-	for _, file in ipairs(TEAM_SYNC_FEATURE_FILES) do
-		files[#files + 1] = file
-		if file == "multiplayer/features/team_card_sync_identity.lua" and is_runtime_trace_logging_enabled() then
-			for _, diagnostic_file in ipairs(TEAM_SYNC_DIAGNOSTIC_FILES) do
-				files[#files + 1] = diagnostic_file
-			end
-		end
-	end
-	return files
-end
-
-local load_team_sync_feature_files = function()
-	return platform_loader.load_mod_files(build_team_sync_feature_files(), "Team sync feature files", { required = true }) ~= false
+local function load_team_sync_feature_files()
+	return platform_loader.load_mod_files(TEAM_SYNC_FEATURE_FILES, "Team sync feature files", { required = true }) ~= false
 end
 
 local register_multiplayer_mod_icon = function()
@@ -390,7 +375,7 @@ local CONTENT_BOOTSTRAP_STEPS = {
 	{
 		kind = "dirs",
 		paths = RULESET_DIRECTORIES,
-		recursive = false,
+		recursive = true,
 		label = "Ruleset registries",
 		options = { required = true },
 		failure_message = "Failed to load required multiplayer ruleset registries.",
@@ -413,7 +398,7 @@ local CONTENT_BOOTSTRAP_STEPS = {
 	{
 		kind = "dirs",
 		paths = OBJECT_DIRECTORIES,
-		recursive = false,
+		recursive = true,
 		label = "Gameplay objects",
 		options = { required = true },
 		failure_message = "Failed to load required multiplayer gameplay objects.",

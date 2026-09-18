@@ -2,7 +2,6 @@ MP.DOMAIN = MP.DOMAIN or {}
 MP.DOMAIN.TEAMS = MP.DOMAIN.TEAMS or {}
 
 local TEAMS_DOMAIN = MP.DOMAIN.TEAMS
-local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
 local function get_normalized_score_text(score_value)
 	if type(score_value) == "string" then
@@ -29,7 +28,7 @@ local function get_local_score_text_from_context(is_cooperative_blind, chips)
 end
 
 local function refresh_shared_score_ui_if_changed(previous_team_score_text, previous_team_lives)
-	if (BALATRO.is_game_over_or_win and BALATRO.is_game_over_or_win()) or MP.GAME.won then
+	if ((G and (G.STATE == G.STATES.GAME_OVER or G.STATE == G.STATES.GAME_WIN) or false)) or MP.GAME.won then
 		return
 	end
 
@@ -53,11 +52,11 @@ local function get_blind_choice_internal()
 end
 
 function TEAMS_DOMAIN.get_current_blind_row()
-	if not (BALATRO.get_game and BALATRO.get_game()) then
+	if not ((G and G.GAME)) then
 		return nil
 	end
 
-	local blind_on_deck = BALATRO.get_game_value and BALATRO.get_game_value("blind_on_deck") or nil
+	local blind_on_deck = (G and G.GAME and G.GAME["blind_on_deck"] or nil)
 	if blind_on_deck then
 		return blind_on_deck
 	end
@@ -91,7 +90,7 @@ function TEAMS_DOMAIN.resolve_lobby_blinds_for_ante(ante)
 		return nil, nil, nil, {}
 	end
 
-	local round_resets = BALATRO.get_round_resets and BALATRO.get_round_resets() or nil
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
 	local previous_pvp_blind_choices = round_resets and round_resets.pvp_blind_choices or nil
 	local resolved_pvp_blind_choices = {}
 
@@ -119,7 +118,7 @@ function TEAMS_DOMAIN.resolve_lobby_blinds_for_ante(ante)
 end
 
 function TEAMS_DOMAIN.is_cooperative_blind()
-	if not MP.is_teams_mode() or not (BALATRO.get_game and BALATRO.get_game()) then
+	if not MP.is_teams_mode() or not ((G and G.GAME)) then
 		return false
 	end
 	if MP.is_survival_gamemode and MP.is_survival_gamemode() then
@@ -136,7 +135,7 @@ function TEAMS_DOMAIN.is_cooperative_blind()
 		return blind_choice.is_teams_cooperative_row(row)
 	end
 
-	local round_resets = BALATRO.get_round_resets and BALATRO.get_round_resets() or nil
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
 	local blind_choices = round_resets and round_resets.pvp_blind_choices or nil
 	if blind_choices and blind_choices[row] ~= nil then
 		return not blind_choices[row]
@@ -155,7 +154,7 @@ function TEAMS_DOMAIN.is_cooperative_blind()
 end
 
 function TEAMS_DOMAIN.get_local_score_text()
-	local chips = BALATRO.get_game_value and BALATRO.get_game_value("chips") or nil
+	local chips = (G and G.GAME and G.GAME["chips"] or nil)
 	local is_cooperative_blind = uses_cooperative_score_context()
 	return get_local_score_text_from_context(is_cooperative_blind, chips)
 end
@@ -200,14 +199,14 @@ function TEAMS_DOMAIN.get_cooperative_blind_target()
 		return nil
 	end
 
-	if MP.GAME.coop_blind_target_chips ~= nil then
-		return MP.GAME.coop_blind_target_chips
-	end
 	if MP.GAME.coop_blind_server_target_chips ~= nil then
 		return MP.GAME.coop_blind_server_target_chips
 	end
+	if MP.GAME.coop_blind_target_chips ~= nil then
+		return MP.GAME.coop_blind_target_chips
+	end
 
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if blind and blind.mp_coop_scaled_chips ~= nil then
 		return blind.mp_coop_scaled_chips
 	end
@@ -228,7 +227,7 @@ function TEAMS_DOMAIN.reset_round_score_state()
 	MP.GAME.force_zero_round_score = true
 
 	local round_hands = nil
-	local round_resets = BALATRO.get_round_resets and BALATRO.get_round_resets() or nil
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
 	if round_resets and round_resets.hands then
 		round_hands = round_resets.hands
 	end
@@ -253,10 +252,16 @@ function TEAMS_DOMAIN.refresh_live_score()
 	local is_cooperative_blind = uses_cooperative_score_context()
 	if not is_cooperative_blind then
 		MP.GAME.live_team_local_score_cache = nil
+		MP.GAME._last_raw_chips = nil
 		return
 	end
 
-	local chips = BALATRO.get_game_value and BALATRO.get_game_value("chips") or nil
+	local chips = (G and G.GAME and G.GAME["chips"] or nil)
+	if chips == MP.GAME._last_raw_chips and not MP.GAME.force_zero_round_score and MP.GAME.live_team_local_score_cache then
+		return
+	end
+	MP.GAME._last_raw_chips = chips
+
 	if MP.GAME.force_zero_round_score and chips ~= nil then
 		local current_local_score = get_normalized_score_text(chips)
 		if current_local_score == "0" then

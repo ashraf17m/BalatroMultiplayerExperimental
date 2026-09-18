@@ -155,7 +155,7 @@ function content_runtime.get_enemy_sells_for_ante(ante)
 end
 
 function content_runtime.is_pvp_boss()
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if not blind then
 		return false
 	end

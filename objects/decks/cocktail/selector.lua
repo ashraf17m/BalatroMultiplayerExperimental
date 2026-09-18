@@ -28,9 +28,6 @@ local function get_center_key(center)
 	if center and center.key then
 		return center.key
 	end
-	if BALATRO.get_center_key then
-		return BALATRO.get_center_key(center)
-	end
 	for key, candidate in pairs(G.P_CENTERS or {}) do
 		if candidate == center then
 			return key
@@ -40,19 +37,14 @@ local function get_center_key(center)
 end
 
 local function get_current_setup()
-	if BALATRO.get_setting_value then
-		return BALATRO.get_setting_value("current_setup", nil)
-	end
-	return G.SETTINGS and G.SETTINGS.current_setup or nil
+	return (G and G.SETTINGS and G.SETTINGS["current_setup"] or nil)
 end
 
 local function set_current_setup(value)
 	if value == nil then
 		return
 	end
-	if BALATRO.set_current_setup then
-		BALATRO.set_current_setup(value)
-	elseif G.SETTINGS then
+	if G and G.SETTINGS then
 		G.SETTINGS.current_setup = value
 	end
 end

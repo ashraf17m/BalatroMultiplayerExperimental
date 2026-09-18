@@ -3,14 +3,12 @@ local team_hand_level_sync = MP.SYNC and MP.SYNC.TEAM_HAND_LEVEL or {}
 local level_up_hand_ref = level_up_hand
 function level_up_hand(card, hand, instant, amount, statustext)
 	local previous_level = team_hand_level_sync.get_hand_level and team_hand_level_sync.get_hand_level(hand) or nil
-	local previous_level_wire = team_hand_level_sync.serialize_hand_level and team_hand_level_sync.serialize_hand_level(previous_level) or nil
 	local result = level_up_hand_ref(card, hand, instant, amount, statustext)
 
 	if not team_hand_level_sync.is_applying_remote_change() and team_hand_level_sync.is_sync_active() then
 		local next_level = team_hand_level_sync.get_hand_level and team_hand_level_sync.get_hand_level(hand) or nil
-		local next_level_wire = team_hand_level_sync.serialize_hand_level and team_hand_level_sync.serialize_hand_level(next_level) or nil
-		if previous_level_wire and next_level_wire and next_level_wire ~= previous_level_wire then
-			MP.ACTIONS.team_hand_level_sync(hand, next_level_wire)
+		if next_level ~= nil and next_level ~= previous_level then
+			MP.ACTIONS.team_hand_level_sync(hand, next_level)
 		end
 	end
 

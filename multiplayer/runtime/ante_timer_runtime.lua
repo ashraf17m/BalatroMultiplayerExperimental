@@ -182,7 +182,7 @@ end
 
 local function maybe_play_ante_timer_sfx()
 	local option = MP.PLATFORM.SMODS.get_config_value("timersfx", 1)
-	local current_ante = BALATRO.get_ante and BALATRO.get_ante() or nil
+	local current_ante = (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or nil)
 	local timer_ante = BALATRO.get_timer_ante and BALATRO.get_timer_ante() or nil
 	local timersfx = (option == 1) or (option == 2 and current_ante ~= nil and timer_ante ~= current_ante)
 	if current_ante ~= nil and BALATRO.set_timer_ante then
@@ -199,7 +199,7 @@ local function maybe_play_ante_timer_sfx()
 			blocking = false,
 			blockable = false,
 			trigger = "after",
-			delay = (BALATRO.get_game_speed and BALATRO.get_game_speed() or 1) * wait_time,
+			delay = ((tonumber(G and G.SETTINGS and G.SETTINGS["GAMESPEED"] or 1)) or 1) * wait_time,
 			func = function()
 				BALATRO.play_sound("timpani", 0.55 + 0.25 * i, 0.7)
 				BALATRO.play_sound("generic1", 0.75 + 0.25 * i, 0.7)
@@ -336,6 +336,71 @@ function ante_timer_runtime.handle_pause_ante_timer(time, server_now, deadline_a
 
 	ante_timer_runtime.pause(time, server_now, deadline_at, timer_generation)
 end
+
+local function get_effective_pvp_scores()
+	local local_score = nil
+	if MP.is_teams_mode and MP.is_teams_mode() and MP.GAME and MP.GAME.team_score then
+		local_score = MP.GAME.team_score
+	elseif MP.GAME and MP.GAME.score_display then
+		local_score = MP.GAME.score_display
+	elseif MP.INSANE_INT and MP.INSANE_INT.from_string then
+		local_score = MP.INSANE_INT.from_string(tostring(MP.GAME and MP.GAME.score_text or "0"))
+	end
+
+	local target_score = nil
+	if MP.UI and MP.UI.get_pvp_score_to_beat then
+		local score_int, _ = MP.UI.get_pvp_score_to_beat()
+		if score_int then
+			target_score = score_int
+		end
+	end
+	if not target_score and MP.GAME and MP.GAME.enemy then
+		target_score = MP.GAME.enemy.score
+	end
+
+	return local_score, target_score
+end
+
+function ante_timer_runtime.is_local_winning_pvp()
+	if not (MP.is_pvp_boss and MP.is_pvp_boss() and MP.INSANE_INT) then
+		return false
+	end
+
+	local local_score, target_score = get_effective_pvp_scores()
+	if not (local_score and target_score) then
+		return false
+	end
+
+	if MP.INSANE_INT.greater_than and MP.INSANE_INT.greater_than(local_score, target_score) then
+		return true
+	end
+	if MP.INSANE_INT.equal and MP.INSANE_INT.equal(local_score, target_score) then
+		return not not (MP.GAME and MP.GAME.pvp_reached_first)
+	end
+	return false
+end
+
+function ante_timer_runtime.apply_pvp_timer_score_gate()
+	if not (
+		MP.GAME
+		and MP.is_pvp_boss
+		and MP.is_pvp_boss()
+		and MP.is_layer_active
+		and MP.is_layer_active("pvp_timer")
+		and MP.INSANE_INT
+	) then
+		return
+	end
+
+	if ante_timer_runtime.is_local_winning_pvp() then
+		MP.GAME.nemesis_timer_started = false
+	else
+		MP.GAME.timer_started = false
+	end
+end
+
+MP.is_local_winning_pvp = ante_timer_runtime.is_local_winning_pvp
+MP.apply_pvp_timer_score_gate = ante_timer_runtime.apply_pvp_timer_score_gate
 
 MP.NETWORKING_INTERNAL.restore_local_ante_timer_state = ante_timer_runtime.restore_local_ante_timer_state
 MP.NETWORKING_INTERNAL.handle_start_ante_timer = ante_timer_runtime.handle_start_ante_timer

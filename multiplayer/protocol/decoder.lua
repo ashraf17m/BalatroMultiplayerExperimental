@@ -33,12 +33,18 @@ function MP.PROTOCOL.decode_v2_packet(packet)
 		return nil, "Protocol schema id is required."
 	end
 
+	local payload = normalize_protocol_payload(packet.payload)
+	if packet.playerId ~= nil and payload.playerId == nil then
+		payload.playerId = packet.playerId
+	end
+
 	return {
 		version = MP.PROTOCOL.VERSION,
 		family = family,
 		action = action,
 		schema_id = schema_id,
-		payload = normalize_protocol_payload(packet.payload),
+		payload = payload,
+		playerId = payload.playerId or packet.playerId,
 		flags = MP.PROTOCOL.get_schema_flags(schema_id) or {},
 	}
 end

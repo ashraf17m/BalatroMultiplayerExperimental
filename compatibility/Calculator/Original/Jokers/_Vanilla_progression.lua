@@ -163,7 +163,7 @@ FNSJ.simulate_obelisk = function(joker_obj, context)
 	if context.cardarea == G.jokers and context.before and not context.blueprint then
 		local reset = true
 		local scoring_hand = FN.SIM.get_hand_state(context.scoring_name)
-		local play_more_than = scoring_hand and (scoring_hand.played or 0) or 0
+		local play_more_than = scoring_hand and (scoring_hand.played or 0)
 		for hand_name, hand in FN.SIM.iter_hand_state() do
 			if hand_name ~= context.scoring_name and hand.played >= play_more_than and hand.visible then
 				reset = false

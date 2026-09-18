@@ -1,4 +1,3 @@
-local BALATRO = MP.PLATFORM.BALATRO
 MP.OPPONENTS = MP.OPPONENTS or {}
 local OPPONENTS = MP.OPPONENTS
 
@@ -19,7 +18,7 @@ local function is_lobby_opponent_player(player, opts)
 		return false
 	end
 
-	if not player or player.id == nil or player.id == BALATRO.get_player_id() then
+	if not player or player.id == nil or player.id == (G and G.MP_ID or nil) then
 		return false
 	end
 
@@ -67,6 +66,22 @@ function OPPONENTS.get_active_lobby_players()
 end
 
 local function get_nemesis_player_id()
+	local spec = MP.SPECTATOR
+	if spec and spec.is_spectating and spec.target_player_id and MP.LOBBY and MP.LOBBY.players then
+		for _, player in ipairs(MP.LOBBY.players) do
+			if player.id == spec.target_player_id and player.nemesis_player_id then
+				return player.nemesis_player_id
+			end
+		end
+		if MP.GAME and MP.GAME.enemies then
+			for enemy_id, enemy in pairs(MP.GAME.enemies) do
+				if enemy and enemy_id ~= spec.target_player_id then
+					return enemy_id
+				end
+			end
+		end
+	end
+
 	local self_player = MP.get_self_lobby_player and MP.get_self_lobby_player() or nil
 	if not self_player then
 		return nil
@@ -85,9 +100,12 @@ function OPPONENTS.get_nemesis_lobby_player()
 		return nil
 	end
 
+	local spectating = MP.SPECTATOR and MP.SPECTATOR.is_spectating
 	for _, player in ipairs(MP.LOBBY.players) do
-		if player.id == nemesis_player_id and is_lobby_opponent_player(player) then
-			return player
+		if player.id == nemesis_player_id then
+			if spectating or is_lobby_opponent_player(player) then
+				return player
+			end
 		end
 	end
 

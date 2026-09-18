@@ -9,7 +9,7 @@ function BALATRO.with_overlay_menu_guard(callback)
 		return nil
 	end
 
-	local original_overlay = BALATRO.get_overlay_menu()
+	local original_overlay = (G and G.OVERLAY_MENU or nil)
 	BALATRO.set_overlay_menu(original_overlay or true)
 
 	local ok, result_a, result_b, result_c = xpcall(callback, function(err)
@@ -71,15 +71,6 @@ function BALATRO.register_wheelmoved_handler(key, handler)
 
 	ensure_wheelmoved_router()
 	wheelmoved_handlers[key] = handler
-	return true
-end
-
-function BALATRO.clear_wheelmoved_handler(key)
-	if type(key) ~= "string" or key == "" then
-		return false
-	end
-
-	wheelmoved_handlers[key] = nil
 	return true
 end
 

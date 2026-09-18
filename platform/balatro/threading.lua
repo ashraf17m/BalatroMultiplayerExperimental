@@ -3,23 +3,12 @@ MP.PLATFORM.BALATRO = MP.PLATFORM.BALATRO or {}
 
 local BALATRO = MP.PLATFORM.BALATRO
 
-local build_threading_traceback =
-	(MP.BOOTSTRAP_INTERNAL and MP.BOOTSTRAP_INTERNAL.build_traceback)
-	or function(err) return tostring(err) end
-
 function BALATRO.create_thread(thread_path)
 	if not (love and love.thread and type(love.thread.newThread) == "function") then
 		return nil
 	end
 
-	local ok, result = xpcall(function()
-		return love.thread.newThread(thread_path)
-	end, build_threading_traceback)
-	if not ok then
-		return nil, result
-	end
-
-	return result
+	return love.thread.newThread(thread_path)
 end
 
 function BALATRO.start_thread(thread, ...)
@@ -27,13 +16,7 @@ function BALATRO.start_thread(thread, ...)
 		return false
 	end
 
-	local ok, err = xpcall(function(...)
-		thread:start(...)
-	end, build_threading_traceback, ...)
-	if not ok then
-		return false, err
-	end
-
+	thread:start(...)
 	return true
 end
 

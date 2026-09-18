@@ -76,14 +76,6 @@ if MP.PLATFORM.SMODS.is_mod_loadable("JokerDisplay") then
 				})
 			end,
 		}
-		jd_def["j_mp_magnet_sandbox"] = {
-			reminder_text = parenthesized_ref("card.joker_display_values", "active"),
-			calc_function = function(card)
-				card.joker_display_values.active = card.ability.extra.current_rounds >= card.ability.extra.rounds
-						and localize("k_active")
-					or (card.ability.extra.current_rounds .. "/" .. card.ability.extra.rounds)
-			end,
-		}
 		jd_def["j_mp_pacifist"] = {
 			text = {
 				{

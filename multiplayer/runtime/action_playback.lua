@@ -48,7 +48,7 @@ function SPECTATOR.set_lobby_role(role)
 		MP.LOBBY.client.role = role
 		MP.LOBBY.client.is_spectator = is_spec
 	end
-	local self_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	local self_id = (G and G.MP_ID or nil)
 	if self_id and MP.LOBBY and MP.LOBBY.players then
 		for _, p in ipairs(MP.LOBBY.players) do
 			if p.id == self_id then
@@ -68,89 +68,117 @@ end
 function SPECTATOR.get_spectatable_players()
 	local spectatable = {}
 	local players = MP.LOBBY and MP.LOBBY.players or {}
-	local self_id = BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	local self_id = ((G and G.MP_ID or nil))
+		or (MP.LOBBY and MP.LOBBY.client and (MP.LOBBY.client.id or MP.LOBBY.client.player_id))
+		or (G and G.MP_ID)
 
 	for _, player in ipairs(players) do
 		local is_spec = (player.is_spectator or player.role == "spectator")
-		if player.id ~= self_id and not is_spec and (player.lives == nil or tonumber(player.lives) > 0) then
+		local enemy = MP.GAME and MP.GAME.enemies and MP.GAME.enemies[player.id]
+		local lives = (enemy and enemy.lives ~= nil and enemy.lives) or player.lives
+		if player.id ~= self_id and not is_spec and (lives == nil or tonumber(lives) > 0) then
 			spectatable[#spectatable + 1] = player
+		end
+	end
+
+	if #spectatable == 0 and MP.GAME and MP.GAME.enemies then
+		for enemy_id, enemy in pairs(MP.GAME.enemies) do
+			if enemy_id ~= self_id and (enemy.lives == nil or tonumber(enemy.lives) > 0) then
+				spectatable[#spectatable + 1] = {
+					id = enemy_id,
+					username = enemy.username or "Player",
+					lives = enemy.lives,
+				}
+			end
 		end
 	end
 
 	return spectatable
 end
 
+local SAFE_REMOVED_BOOSTER = {
+	REMOVED = true,
+	remove = function() end,
+	alignment = { offset = {} },
+}
+
 local function remove_ui_box_safely(box_field)
 	if G and G[box_field] then
 		pcall(function()
 			G[box_field]:remove()
 		end)
-		G[box_field] = nil
+		if box_field == "booster_pack" then
+			G.booster_pack = SAFE_REMOVED_BOOSTER
+			if G.E_MANAGER and G.E_MANAGER.add_event and Event then
+				G.E_MANAGER:add_event(Event({
+					trigger = "after",
+					delay = 0.3,
+					blocking = false,
+					blockable = false,
+					func = function()
+						if G and G.booster_pack == SAFE_REMOVED_BOOSTER then
+							G.booster_pack = nil
+						end
+						return true
+					end,
+				}))
+			end
+		else
+			G[box_field] = nil
+		end
 	end
+end
+
+local function remove_named(name)
+	if G and G[name] then
+		pcall(function()
+			G[name]:remove()
+		end)
+		G[name] = nil
+	end
+end
+
+local function is_booster_pack_state(state)
+	local states = G and G.STATES
+	if not states then
+		return false
+	end
+	state = tonumber(state) or state
+	return state == states.TAROT_PACK
+		or state == states.SPECTRAL_PACK
+		or state == states.STANDARD_PACK
+		or state == states.BUFFOON_PACK
+		or state == states.PLANET_PACK
+		or state == states.SMODS_BOOSTER_OPENED
+end
+
+-- Pack sparkles/stars keep easing after the UIBox is gone; skip_booster
+-- is what vanilla uses to fade them. A switch never runs that.
+local function teardown_pack_fx()
+	remove_ui_box_safely("booster_pack")
+	remove_named("booster_pack_sparkles")
+	remove_named("booster_pack_stars")
+	remove_named("booster_pack_meteors")
+	if G then
+		G.TAROT_INTERRUPT = nil
+	end
+	booster_obj = nil
 end
 
 -- EventManager stores work in queues.base / unlock / etc. There is no
--- G.E_MANAGER.queue. Checking that made sim_busy always false and made us
--- think a blind-select build had finished when it was still in queues.base.
+-- G.E_MANAGER.queue. Checking that made sim_busy always false.
 local function count_e_manager_events()
 	local queues = G and G.E_MANAGER and G.E_MANAGER.queues
 	if type(queues) ~= "table" then
-		return 0, "no-queues"
+		return 0
 	end
 	local total = 0
-	local parts = {}
-	for name, q in pairs(queues) do
-		local n = type(q) == "table" and #q or 0
-		total = total + n
-		if n > 0 then
-			parts[#parts + 1] = tostring(name) .. "=" .. tostring(n)
+	for _, q in pairs(queues) do
+		if type(q) == "table" then
+			total = total + #q
 		end
 	end
-	return total, (#parts > 0 and table.concat(parts, ",") or "empty")
-end
-
-local function spec_blind_log(event, detail, is_flaw)
-	local msg = tostring(detail or "")
-	if is_flaw and MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.flaw then
-		MP.SPECTATOR_DIAG.flaw(event, msg)
-	elseif MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.log then
-		MP.SPECTATOR_DIAG.log(event, msg)
-	end
-	if MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.flush_buffer then
-		pcall(MP.SPECTATOR_DIAG.flush_buffer)
-	end
-	if MP.TESTING and MP.TESTING.log_spectator then
-		MP.TESTING.log_spectator("BLIND", event, msg)
-	else
-		print("[SPEC BLIND] " .. tostring(event) .. " " .. msg)
-	end
-end
-
-local function blind_select_debug_snapshot(reason)
-	local state_name = "?"
-	if G and G.STATE and G.STATES then
-		for k, v in pairs(G.STATES) do
-			if v == G.STATE then
-				state_name = tostring(k)
-				break
-			end
-		end
-	end
-	local n, parts = count_e_manager_events()
-	local uiboxes = G and G.I and G.I.UIBOX and #G.I.UIBOX or 0
-	return string.format(
-		"%s state=%s complete=%s catchup=%s has_select=%s has_prompt=%s events=%d [%s] uiboxes=%d hud_row=%s",
-		tostring(reason or ""),
-		state_name,
-		tostring(G and G.STATE_COMPLETE),
-		tostring(SPECTATOR.is_catching_up),
-		tostring(not not (G and G.blind_select)),
-		tostring(not not (G and G.blind_prompt_box)),
-		n,
-		parts,
-		uiboxes,
-		tostring(G and G.HUD and G.HUD.get_UIE_by_ID and G.HUD:get_UIE_by_ID("row_blind") ~= nil)
-	)
+	return total
 end
 
 local function remove_attention_texts()
@@ -167,31 +195,81 @@ local function remove_attention_texts()
 	end
 end
 
--- Must run after the last clear_queue on a switch. Vanilla eases from
--- G.GAME.blind.name; parking with set_blind(nil) is what drops the old boss.
-local function refresh_spectated_blind_backdrop(state)
-	remove_attention_texts()
+local function opened_booster_center()
+	return SMODS and SMODS.OPENED_BOOSTER and SMODS.OPENED_BOOSTER.config and SMODS.OPENED_BOOSTER.config.center
+end
+
+-- Vanilla pack colour is not ease_background_colour_blind(G.STATE). SMODS
+-- packs live in SMODS_BOOSTER_OPENED, which that helper treats as a blind
+-- (shop-like). Arcana/Celestial/etc. call the center's ease, which maps to
+-- TAROT_PACK / PLANET_PACK / ...
+
+local function ease_spectated_pack_background(state)
+	local center = opened_booster_center()
+	if center and type(center.ease_background_colour) == "function" then
+		pcall(function()
+			center:ease_background_colour()
+		end)
+		return
+	end
 	if ease_background_colour_blind then
 		pcall(ease_background_colour_blind, state or (G and G.STATE))
 	end
 end
 
--- Removes every overlay surface that belongs to the spectated run so a
--- target switch (or stop) never leaves half-torn UI behind. G.blind_select
--- and G.blind_prompt_box are always removed as a pair: vanilla indexes both
--- whenever either exists.
-local function teardown_spectated_overlays()
+-- Must run after the last clear_queue on a switch. Vanilla eases from
+-- G.GAME.blind.name; parking with set_blind(nil) is what drops the old boss.
+local function refresh_spectated_blind_backdrop(state)
+	remove_attention_texts()
+	state = tonumber(state) or state or (G and G.STATE)
+	if is_booster_pack_state(state) then
+		ease_spectated_pack_background(state)
+		return
+	end
+	if ease_background_colour_blind then
+		pcall(ease_background_colour_blind, state)
+	end
+end
+
+-- Pack-return is per snapshot/target. G.GAME.PACK_INTERRUPT survives a
+-- switch even after SPECTATOR.pack_interrupt is cleared, and the viewport
+-- tick then rebuilds a shop onto whoever we switched to.
+local function clear_pack_return_latch()
+	SPECTATOR.pack_interrupt = nil
+	SPECTATOR.cached_pack_return_shop_cards = nil
+	SPECTATOR.cached_pack_return_round = nil
+	SPECTATOR._handling_pack_exit = nil
+	if G and G.GAME then
+		G.GAME.PACK_INTERRUPT = nil
+	end
+end
+
+-- Removes overlay surfaces on a target switch. A pack snapshot keeps an
+-- already-open shop so vanilla can park/unpark it instead of rolling a new one.
+local function teardown_spectated_overlays(opts)
 	if not G then
 		return
 	end
+	opts = opts or {}
 	remove_attention_texts()
-	remove_ui_box_safely("booster_pack")
+	teardown_pack_fx()
+	if SMODS then
+		SMODS.OPENED_BOOSTER = nil
+	end
 	remove_ui_box_safely("deck_preview")
 	remove_ui_box_safely("round_eval")
-	remove_ui_box_safely("shop")
-	remove_ui_box_safely("SHOP_SIGN")
+	if not opts.keep_shop then
+		remove_ui_box_safely("shop")
+		remove_ui_box_safely("SHOP_SIGN")
+	end
 	remove_ui_box_safely("blind_select")
 	remove_ui_box_safely("blind_prompt_box")
+	if G.OVERLAY_MENU and G.OVERLAY_MENU.is_mp_end_game_overlay then
+		pcall(function()
+			G.OVERLAY_MENU:remove()
+		end)
+		G.OVERLAY_MENU = nil
+	end
 end
 
 -- Vanilla parks the plaque with set_blind(nil), which also clears the
@@ -204,6 +282,256 @@ local function park_blind_hud()
 	end
 end
 
+local function wipe_card_area(area)
+	if not (area and area.cards) then
+		return
+	end
+	for i = #area.cards, 1, -1 do
+		local card = area.cards[i]
+		pcall(function()
+			if card and card.remove then
+				card:remove()
+			end
+		end)
+	end
+	area.cards = {}
+	if area.highlighted then
+		area.highlighted = {}
+	end
+end
+
+local DEFAULT_HANDS = {
+	["Flush Five"] = { level = 1, order = 1, mult = 14, chips = 160, s_mult = 3, s_chips = 50, l_mult = 3, l_chips = 50, played = 0, played_this_round = 0, visible = false },
+	["Flush House"] = { level = 1, order = 2, mult = 14, chips = 140, s_mult = 4, s_chips = 40, l_mult = 4, l_chips = 40, played = 0, played_this_round = 0, visible = false },
+	["Five of a Kind"] = { level = 1, order = 3, mult = 12, chips = 120, s_mult = 3, s_chips = 35, l_mult = 3, l_chips = 35, played = 0, played_this_round = 0, visible = false },
+	["Straight Flush"] = { level = 1, order = 4, mult = 8, chips = 100, s_mult = 4, s_chips = 40, l_mult = 4, l_chips = 40, played = 0, played_this_round = 0, visible = false },
+	["Four of a Kind"] = { level = 1, order = 5, mult = 7, chips = 60, s_mult = 3, s_chips = 30, l_mult = 3, l_chips = 30, played = 0, played_this_round = 0, visible = true },
+	["Full House"] = { level = 1, order = 6, mult = 4, chips = 40, s_mult = 2, s_chips = 25, l_mult = 2, l_chips = 25, played = 0, played_this_round = 0, visible = true },
+	["Flush"] = { level = 1, order = 7, mult = 4, chips = 35, s_mult = 2, s_chips = 15, l_mult = 2, l_chips = 15, played = 0, played_this_round = 0, visible = true },
+	["Straight"] = { level = 1, order = 8, mult = 4, chips = 30, s_mult = 3, s_chips = 30, l_mult = 3, l_chips = 30, played = 0, played_this_round = 0, visible = true },
+	["Three of a Kind"] = { level = 1, order = 9, mult = 3, chips = 30, s_mult = 2, s_chips = 20, l_mult = 2, l_chips = 20, played = 0, played_this_round = 0, visible = true },
+	["Two Pair"] = { level = 1, order = 10, mult = 2, chips = 20, s_mult = 1, s_chips = 20, l_mult = 1, l_chips = 20, played = 0, played_this_round = 0, visible = true },
+	["Pair"] = { level = 1, order = 11, mult = 2, chips = 10, s_mult = 1, s_chips = 15, l_mult = 1, l_chips = 15, played = 0, played_this_round = 0, visible = true },
+	["High Card"] = { level = 1, order = 12, mult = 1, chips = 5, s_mult = 1, s_chips = 10, l_mult = 1, l_chips = 10, played = 0, played_this_round = 0, visible = true },
+}
+
+local function get_default_hands()
+	if G and G.init_game_object then
+		local ok, obj = pcall(function() return G:init_game_object() end)
+		if ok and type(obj) == "table" and type(obj.hands) == "table" then
+			return obj.hands
+		end
+	end
+	return DEFAULT_HANDS
+end
+
+local function reset_hands_to_base()
+	if not (G and G.GAME) then
+		return
+	end
+	local base_hands = get_default_hands()
+	G.GAME.hands = G.GAME.hands or {}
+	for k in pairs(G.GAME.hands) do
+		if not base_hands[k] then
+			G.GAME.hands[k] = nil
+		end
+	end
+	for name, data in pairs(base_hands) do
+		G.GAME.hands[name] = G.GAME.hands[name] or {}
+		for k, v in pairs(data) do
+			G.GAME.hands[name][k] = v
+		end
+	end
+end
+
+local function reset_spectator_game_state()
+	if not (G and G.STAGE == G.STAGES.RUN) then
+		return
+	end
+
+	-- 1. Wipe all active card areas
+	if G.play then wipe_card_area(G.play) end
+	if G.hand then wipe_card_area(G.hand) end
+	if G.jokers then wipe_card_area(G.jokers) end
+	if G.consumeables then wipe_card_area(G.consumeables) end
+	if G.discard then wipe_card_area(G.discard) end
+	if G.deck then wipe_card_area(G.deck) end
+
+	-- 2. Reset poker hands to clean baseline
+	reset_hands_to_base()
+
+	-- 3. Reset card slot limits
+	if G.consumeables and G.consumeables.config then
+		G.consumeables.config.card_limit = 2
+		if G.consumeables.config.card_limits then
+			G.consumeables.config.card_limits.total_slots = 2
+			G.consumeables.config.card_limits.old_slots = 2
+		end
+	end
+	if G.jokers and G.jokers.config then
+		G.jokers.config.card_limit = 5
+		if G.jokers.config.card_limits then
+			G.jokers.config.card_limits.total_slots = 5
+			G.jokers.config.card_limits.old_slots = 5
+		end
+	end
+	if G.hand and G.hand.config then
+		G.hand.config.card_limit = 8
+		if G.hand.config.card_limits then
+			G.hand.config.card_limits.total_slots = 8
+			G.hand.config.card_limits.old_slots = 8
+			G.hand.config.card_limits.base = 8
+			G.hand.config.card_limits.mod = 0
+		end
+	end
+
+	-- 4. Reset round resets, probabilities, discounts, interest cap, vouchers, tags
+	if G.GAME then
+		if G.GAME.round_resets then
+			G.GAME.round_resets.hands = 4
+			G.GAME.round_resets.discards = 3
+			G.GAME.round_resets.temp_handsize = nil
+		end
+		if G.GAME.probabilities then
+			G.GAME.probabilities.normal = 1
+		end
+		G.GAME.discount_percent = 0
+		G.GAME.interest_cap = 25
+		G.GAME.used_vouchers = {}
+		if G.GAME.tags then
+			for i = #G.GAME.tags, 1, -1 do
+				local t = G.GAME.tags[i]
+				pcall(function()
+					if t and t.remove then
+						t:remove()
+					end
+				end)
+			end
+		end
+		G.GAME.tags = {}
+		G.GAME.last_tarot_planet = nil
+		if G.GAME.current_round then
+			G.GAME.current_round.discards_used = 0
+			G.GAME.current_round.hands_played = 0
+			G.GAME.current_round.discards_left = G.GAME.round_resets and G.GAME.round_resets.discards or 3
+			G.GAME.current_round.hands_left = G.GAME.round_resets and G.GAME.round_resets.hands or 4
+			G.GAME.current_round.ancient_card = nil
+			G.GAME.current_round.idol_card = nil
+			G.GAME.current_round.mail_card = nil
+			G.GAME.current_round.castle_card = nil
+			G.GAME.current_round.used_packs = {}
+		end
+	end
+
+	-- 5. Clear pending team hand level syncs
+	local team_hand_sync = MP.SYNC and MP.SYNC.TEAM_HAND_LEVEL
+	if team_hand_sync and team_hand_sync.clear_pending_syncs then
+		pcall(team_hand_sync.clear_pending_syncs)
+	end
+
+	-- 6. Clean SMODS draw globals & engine interrupts
+	if SMODS then
+		SMODS.cards_to_draw = nil
+		SMODS.draw_queued = nil
+		SMODS.drawn_cards = nil
+	end
+	if G then
+		G.TAROT_INTERRUPT = nil
+		G.STATE_COMPLETE = false
+		if G.CONTROLLER and G.CONTROLLER.interrupt then
+			G.CONTROLLER.interrupt.focus = false
+		end
+	end
+	clear_pack_return_latch()
+
+	-- 7. Unstick animation / state and reset hand text HUD
+	if G.STATES and (G.STATE == G.STATES.HAND_PLAYED or G.STATE == G.STATES.DRAW_TO_HAND) then
+		G.STATE = G.STATES.SELECTING_HAND
+		G.STATE_COMPLETE = false
+	end
+	if update_hand_text then
+		pcall(update_hand_text, { delay = 0 }, { mult = 0, StatusText = true, chips = 0, handname = "", level = "" })
+	end
+end
+
+-- set_blind(silent=true) can leave delayed pop-in events queued that may be
+-- wiped by clear_pending_game_events(). show_blind_hud_plaque guarantees
+-- the HUD blind plaque, name, chip counter, and dollars are immediately visible at offset.y = 0.
+local function show_blind_hud_plaque()
+	if not (G and G.HUD_blind) then
+		return
+	end
+	if G.HUD_blind.alignment then
+		G.HUD_blind.alignment.offset = G.HUD_blind.alignment.offset or {}
+		G.HUD_blind.alignment.offset.y = 0
+	end
+	if G.HUD_blind.states then
+		G.HUD_blind.states.visible = true
+	end
+	local name_elem = G.HUD_blind.get_UIE_by_ID and G.HUD_blind:get_UIE_by_ID("HUD_blind_name")
+	if name_elem and name_elem.states then
+		name_elem.states.visible = true
+	end
+	local count_elem = G.HUD_blind.get_UIE_by_ID and G.HUD_blind:get_UIE_by_ID("HUD_blind_count")
+	if count_elem and count_elem.states then
+		count_elem.states.visible = true
+	end
+	local dollars_elem = G.HUD_blind.get_UIE_by_ID and G.HUD_blind:get_UIE_by_ID("dollars_to_be_earned")
+	if dollars_elem then
+		if dollars_elem.states then
+			dollars_elem.states.visible = true
+		end
+		if dollars_elem.parent and dollars_elem.parent.parent and dollars_elem.parent.parent.states then
+			dollars_elem.parent.parent.states.visible = true
+		end
+	end
+	if G.GAME and G.GAME.blind then
+		G.GAME.blind.dissolve = 0
+		G.GAME.blind.blind_set = true
+		if G.GAME.blind.children and G.GAME.blind.children.animatedSprite and G.GAME.blind.config and G.GAME.blind.config.blind then
+			pcall(function()
+				G.GAME.blind.children.animatedSprite:set_sprite_pos(G.GAME.blind.config.blind.pos or (G.P_BLINDS and G.P_BLINDS.bl_small and G.P_BLINDS.bl_small.pos))
+			end)
+		end
+	end
+	if G.HUD_blind.recalculate then
+		pcall(function()
+			G.HUD_blind:recalculate(false)
+		end)
+	end
+end
+
+local function should_show_blind_hud(state)
+	if not (G and G.STATES and state) then
+		return false
+	end
+	state = tonumber(state) or state
+	return state == G.STATES.SELECTING_HAND
+		or state == G.STATES.HAND_PLAYED
+		or state == G.STATES.DRAW_TO_HAND
+		or state == G.STATES.PLAY_TAROT
+end
+
+-- Skip-tag / shop packs can still be on screen when the stream already
+-- selected a blind. Leaving the overlay up hides the PvP score table.
+local function dismiss_leftover_pack()
+	if not (G and G.booster_pack and not G.booster_pack.REMOVED) then
+		return false
+	end
+	teardown_pack_fx()
+	if SMODS then
+		SMODS.OPENED_BOOSTER = nil
+	end
+	local interrupt = G.GAME and G.GAME.PACK_INTERRUPT
+	if G.STATES and interrupt then
+		G.STATE = interrupt
+	elseif G.STATES then
+		G.STATE = G.STATES.BLIND_SELECT
+	end
+	G.STATE_COMPLETE = false
+	return true
+end
+
 -- Mid-round draws/scores live in G.E_MANAGER. Switching targets without
 -- clearing it lets the previous player's draw events keep firing into the
 -- new board (wrong cards, RNG looking "broken").
@@ -211,8 +539,23 @@ local function clear_pending_game_events()
 	if G and G.E_MANAGER and G.E_MANAGER.clear_queue then
 		G.E_MANAGER:clear_queue()
 	end
+	if G and G.booster_pack == SAFE_REMOVED_BOOSTER then
+		G.booster_pack = nil
+	end
 	if G and G.GAME then
 		G.GAME.STOP_USE = 0
+	end
+	if SMODS then
+		SMODS.cards_to_draw = nil
+		SMODS.draw_queued = nil
+		SMODS.drawn_cards = nil
+	end
+	if G then
+		G.TAROT_INTERRUPT = nil
+		G.STATE_COMPLETE = false
+		if G.CONTROLLER and G.CONTROLLER.interrupt then
+			G.CONTROLLER.interrupt.focus = false
+		end
 	end
 end
 
@@ -220,11 +563,47 @@ local function is_playing_round_state(state)
 	if not (G and G.STATES and state) then
 		return false
 	end
+	state = tonumber(state) or state
 	return state == G.STATES.SELECTING_HAND
 		or state == G.STATES.HAND_PLAYED
 		or state == G.STATES.DRAW_TO_HAND
 		or state == G.STATES.PLAY_TAROT
 		or state == G.STATES.ROUND_EVAL
+end
+
+local function apply_snapshot_hand_size(board_state)
+	if not (G and G.hand and G.hand.config) then
+		return
+	end
+	local limits = G.hand.config.card_limits
+	local base = tonumber(board_state.hand_size_base)
+		or (G.GAME.starting_params and tonumber(G.GAME.starting_params.hand_size))
+		or 8
+	local mod = tonumber(board_state.hand_size_mod)
+	local stamped = tonumber(board_state.hand_size)
+	if mod == nil then
+		if stamped then
+			mod = stamped - base
+		else
+			mod = 0
+		end
+	end
+	if limits then
+		limits.base = base
+		limits.mod = mod
+		limits.total_slots = (limits.extra_slots or 0) + base + mod
+		limits.display_slots = math.max(0, limits.total_slots)
+		limits.old_slots = limits.total_slots
+	end
+	G.hand.config.card_limit = stamped or (base + mod)
+	if G.GAME and G.GAME.round_resets then
+		local temp = tonumber(board_state.temp_handsize)
+		if temp and temp ~= 0 then
+			G.GAME.round_resets.temp_handsize = temp
+		else
+			G.GAME.round_resets.temp_handsize = nil
+		end
+	end
 end
 
 local function reset_inherited_round_latch()
@@ -272,16 +651,11 @@ local function schedule_catch_up_timeout_check()
 						MP.ACTIONS.spectator_request_snapshot(SPECTATOR.target_player_id)
 						schedule_catch_up_timeout_check()
 					else
-						spec_blind_log(
-							"catchup_timeout",
-							string.format("giving up after %ss, finishing with buffered actions", tostring(CATCH_UP_TIMEOUT)),
-							true
-						)
-						if SPECTATOR.finish_catch_up then
-							SPECTATOR.finish_catch_up()
-						else
-							SPECTATOR.is_catching_up = false
-						end
+					if SPECTATOR.finish_catch_up then
+						SPECTATOR.finish_catch_up()
+					else
+						SPECTATOR.is_catching_up = false
+					end
 					end
 				else
 					schedule_catch_up_timeout_check()
@@ -310,10 +684,6 @@ end
 
 local function finish_catch_up()
 	local pending = SPECTATOR.pending_actions
-	spec_blind_log(
-		"catchup_done",
-		string.format("pending_actions=%d current_step=%s", #pending, tostring(SPECTATOR.current_step))
-	)
 	SPECTATOR.is_catching_up = false
 	SPECTATOR.pending_actions = {}
 	table.sort(pending, function(a, b)
@@ -394,7 +764,10 @@ local function exit_round_eval_to_blind_select()
 	remove_ui_box_safely("blind_prompt_box")
 	remove_ui_box_safely("shop")
 	remove_ui_box_safely("SHOP_SIGN")
-	remove_ui_box_safely("booster_pack")
+	teardown_pack_fx()
+	if SMODS then
+		SMODS.OPENED_BOOSTER = nil
+	end
 	remove_ui_box_safely("deck_preview")
 	remove_ui_box_safely("round_eval")
 	G.STATE = G.STATES.BLIND_SELECT
@@ -420,7 +793,7 @@ local function release_eval_hold_to_blind_select()
 	return G.STATE == G.STATES.BLIND_SELECT and G.blind_select ~= nil
 end
 
-local WATCH_SWITCH_GAP = 0.55
+local WATCH_SWITCH_GAP = 0.35
 
 function SPECTATOR.flush_queued_watch()
 	local queued = SPECTATOR.queued_watch
@@ -448,14 +821,17 @@ function SPECTATOR.start_spectating(target_player_id, username)
 		return
 	end
 
-	-- Rapid A↔B↔A switches each pulled a full snapshot. Keep the latest
-	-- request and send one watch after the gap.
+	-- Rapid A↔B↔A switches: update UI immediately so cycling feels instant,
+	-- debounce the network watch request by WATCH_SWITCH_GAP.
 	local last = tonumber(SPECTATOR.last_watch_sent_at)
 	if last and (os.clock() - last) < WATCH_SWITCH_GAP then
 		SPECTATOR.queued_watch = {
 			id = target_player_id,
 			username = username or "Player",
 		}
+		if MP.UI and MP.UI.show_spectator_viewport then
+			MP.UI.show_spectator_viewport(target_player_id, username)
+		end
 		return
 	end
 
@@ -469,27 +845,31 @@ function SPECTATOR.start_spectating(target_player_id, username)
 		park_blind_hud()
 		teardown_spectated_overlays()
 		refresh_spectated_blind_backdrop(G.STATES and G.STATES.BLIND_SELECT)
-		-- If the previous target left us parked in a round-eval state, leave
-		-- it quietly: vanilla must never rebuild the old cash-in screen over
-		-- the new target's game, and no blind select is fabricated here —
-		-- the incoming snapshot decides what is actually on screen.
+		-- Quietly park engine in BLIND_SELECT with STATE_COMPLETE = true so vanilla
+		-- never fabricates shop/pack/blind UI while waiting for the target snapshot.
 		exit_round_eval_to_blind_select()
+		reset_spectator_game_state()
+		if G.STATES then
+			G.STATE = G.STATES.BLIND_SELECT
+			G.STATE_COMPLETE = true
+		end
 	end
 
 	SPECTATOR.is_spectating = true
-	SPECTATOR.hide_blind_loc_debuff = true
-	SPECTATOR._blind_select_spawns = 0
-	SPECTATOR._select_wait_logs = 0
 	SPECTATOR.target_player_id = target_player_id
 	SPECTATOR.target_username = username or "Player"
 	SPECTATOR.current_step = 0
 	SPECTATOR.last_watch_sent_at = os.clock()
 	SPECTATOR.queued_watch = nil
 	SPECTATOR.target_invalid_since = nil
-	if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-		MP.SPECTATOR_LOG.emit("watch_start", {
-			username = SPECTATOR.target_username,
-		})
+
+	if MP.TESTING and MP.TESTING.log_spectator then
+		MP.TESTING.log_spectator("SPEC", "switch", string.format("target=%s (%s)",
+			tostring(target_player_id):sub(1, 8), tostring(username or "Player")))
+	end
+
+	if MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL.rebuild_spectator_phantoms then
+		pcall(MP.NETWORKING_INTERNAL.rebuild_spectator_phantoms)
 	end
 
 	if MP.RECORDER and MP.RECORDER.stop then
@@ -504,19 +884,52 @@ function SPECTATOR.start_spectating(target_player_id, username)
 		MP.UI.show_spectator_viewport(target_player_id, username)
 	end
 
+	if G and G.SETTINGS and G.SETTINGS.paused then
+		G.SETTINGS.paused = false
+	end
+
+	if MP.PLATFORM and MP.PLATFORM.BALATRO and MP.PLATFORM.BALATRO.set_paused then
+		MP.PLATFORM.BALATRO.set_paused(false)
+	end
+
+	if MP.GAME then
+		MP.GAME.won = false
+		MP.GAME.end_game_result = nil
+		MP.GAME.round_failed = false
+		MP.GAME.round_loss_processed = false
+	end
+
+	if not SPECTATOR.is_spectator_role then
+		SPECTATOR.is_spectator_role = true
+		if MP.ACTIONS and MP.ACTIONS.spectator_set_role then
+			MP.ACTIONS.spectator_set_role("spectator")
+		end
+		if MP.LOBBY and MP.LOBBY.client then
+			MP.LOBBY.client.role = "spectator"
+			MP.LOBBY.client.is_spectator = true
+		end
+		local self_player = MP.get_self_lobby_player and MP.get_self_lobby_player()
+		if self_player then
+			self_player.role = "spectator"
+			self_player.is_spectator = true
+		end
+	end
+
+	if MP.UI and MP.UI.refresh_lives_hud_binding then
+		MP.UI.refresh_lives_hud_binding({ force = true })
+	end
+
 	-- Mid-run spectating: resync through a live snapshot from the target.
-	-- The server pushes a snapshot request to the target on watchTarget, so
-	-- no client-side request is needed here.
 	if G and G.STAGE == G.STAGES.RUN then
-		request_catch_up_snapshot(false)
+		request_catch_up_snapshot(true)
 	end
 
 end
 
 function SPECTATOR.stop_spectating()
 	SPECTATOR.is_spectating = false
-	SPECTATOR.hide_blind_loc_debuff = false
 	SPECTATOR.applying_snapshot = false
+	clear_pack_return_latch()
 	SPECTATOR.shop_joker_queue = nil
 	SPECTATOR.locked_jokers = nil
 	SPECTATOR.queued_watch = nil
@@ -535,6 +948,7 @@ function SPECTATOR.stop_spectating()
 		-- an eval state (vanilla would keep rebuilding the cash-in overlay),
 		-- and never fabricate UI that does not belong to anyone.
 		exit_round_eval_to_blind_select()
+		reset_spectator_game_state()
 	end
 
 	if MP.UI and MP.UI.hide_spectator_viewport then
@@ -598,7 +1012,18 @@ local function build_card_from_info(info, area)
 	if area == G.shop_jokers or area == G.shop_vouchers or area == G.shop_booster then
 		extra = { bypass_discovery_center = true, bypass_discovery_ui = true }
 	end
-	local card = Card(0, 0, card_w, card_h, p_card, use_center, extra)
+	-- create_card spawns at the destination area, not (0,0). Cards created
+	-- at the origin lerp their VT down into the pack/hand and look dragged
+	-- from the top-left corner.
+	local spawn_x, spawn_y = 0, 0
+	if area and area.T then
+		spawn_x = area.T.x + (area.T.w or 0) / 2
+		spawn_y = area.T.y
+	end
+	local card = Card(spawn_x, spawn_y, card_w, card_h, p_card, use_center, extra)
+	if info.sort_id then
+		card.sort_id = tonumber(info.sort_id) or info.sort_id
+	end
 	if info.edition and card.set_edition then
 		local ed = info.edition
 		local ok = pcall(card.set_edition, card, ed, true)
@@ -622,12 +1047,7 @@ local function rebuild_area_cards(area, card_infos)
 	if not (G and area and area.cards and card_infos) then
 		return false
 	end
-	for i = #area.cards, 1, -1 do
-		pcall(function()
-			area.cards[i]:remove()
-		end)
-	end
-	area.cards = {}
+	wipe_card_area(area)
 	-- Deck emplace inserts at index 1; walk captured order backwards so
 	-- cards[#] stays the draw pile (vanilla pops G.deck.cards[#]).
 	local start_i, end_i, step_i = 1, #card_infos, 1
@@ -764,6 +1184,9 @@ local function apply_shop_card_extras(card, info)
 	if not (card and info) then
 		return
 	end
+	if info.sort_id then
+		card.sort_id = tonumber(info.sort_id) or info.sort_id
+	end
 	if info.edition and card.set_edition then
 		local ed = info.edition
 		local ok = pcall(card.set_edition, card, ed, true)
@@ -839,9 +1262,6 @@ local function apply_stream_shop(shop_cards, round)
 		-- A queued reroll will replace this offer; do not stamp it, and do
 		-- not leave the queue half-filled for later unhooked callers.
 		SPECTATOR.shop_joker_queue = {}
-		if MP.TESTING and MP.TESTING.log_spectator then
-			MP.TESTING.log_spectator("SHOP", "defer", "reroll queued after capture")
-		end
 		return true
 	end
 	if not (G.shop and G.shop_jokers) then
@@ -856,20 +1276,18 @@ local function apply_stream_shop(shop_cards, round)
 	emplace_queued_shop_jokers(false)
 	spawn_shop_vouchers(packed.shop_vouchers)
 	spawn_shop_boosters(packed.shop_booster)
-	if MP.TESTING and MP.TESTING.log_spectator then
-		local stamped_keys = {}
-		for _, item in ipairs(packed.shop_jokers) do
-			stamped_keys[#stamped_keys + 1] = tostring(item.key)
-				.. (item.edition and ("+" .. tostring(item.edition)) or "")
-		end
-		MP.TESTING.log_spectator("SHOP", "stamp", string.format(
-			"jokers=%d vouchers=%d boosters=%d [%s]",
-			#packed.shop_jokers,
-			#packed.shop_vouchers,
-			#packed.shop_booster,
-			table.concat(stamped_keys, ", ")
-		))
+	return true
+end
+
+-- Same as use_card: only park an already-open shop. Never build one under a pack.
+local function park_shop_for_pack()
+	if not (G and G.shop and not G.shop.REMOVED and G.shop.alignment and G.shop.alignment.offset) then
+		return false
 	end
+	if G.shop.alignment.offset.py == nil then
+		G.shop.alignment.offset.py = G.shop.alignment.offset.y
+	end
+	G.shop.alignment.offset.y = G.ROOM.T.y + 29
 	return true
 end
 
@@ -881,8 +1299,12 @@ local function restore_opened_booster(board_state)
 	if not (SMODS and center) then
 		return center
 	end
-	local extra = tonumber(board_state.pack_size)
-	if not extra or extra < 1 then
+	local extra = tonumber(board_state.pack_size) or 0
+	local n_cards = board_state.pack_cards and #board_state.pack_cards or 0
+	if extra < n_cards then
+		extra = n_cards
+	end
+	if extra < 1 then
 		extra = (center.config and center.config.extra) or 3
 	end
 	SMODS.OPENED_BOOSTER = {
@@ -914,11 +1336,32 @@ local function get_pack_ui_builder(state)
 	elseif state == states.BUFFOON_PACK then
 		return create_UIBox_buffoon_pack
 	elseif state == states.SMODS_BOOSTER_OPENED then
-		local center = SMODS and SMODS.OPENED_BOOSTER and SMODS.OPENED_BOOSTER.config and SMODS.OPENED_BOOSTER.config.center
+		local opened = SMODS and SMODS.OPENED_BOOSTER
+		local center = opened and opened.config and opened.config.center
 		if center and center.create_UIBox then
 			return function()
 				return center:create_UIBox()
 			end
+		end
+		-- Skip tags open owned vanilla packs through SMODS_BOOSTER_OPENED.
+		-- If the fake OPENED_BOOSTER lost create_UIBox, use the same
+		-- builders Game:update_*_pack uses. Match name or p_* key
+		-- (Charm is p_arcana_*, Buffoon is p_buffoon_*).
+		local name = string.lower(tostring(
+			(center and (center.name or center.key))
+				or (opened and opened.config and opened.config.center_key)
+				or ""
+		))
+		if string.find(name, "arcana") then
+			return create_UIBox_arcana_pack
+		elseif string.find(name, "celestial") or string.find(name, "planet") then
+			return create_UIBox_celestial_pack
+		elseif string.find(name, "spectral") then
+			return create_UIBox_spectral_pack
+		elseif string.find(name, "standard") then
+			return create_UIBox_standard_pack
+		elseif string.find(name, "buffoon") then
+			return create_UIBox_buffoon_pack
 		end
 	end
 	return nil
@@ -928,40 +1371,96 @@ end
 -- recreates the G.pack_cards area) plus the target's real pack contents, so
 -- switching to someone mid-pack shows their pack instead of a blank screen.
 local function rebuild_pack_ui(state, board_state)
-	if not (G and G.GAME) then
-		return false
-	end
+	-- OPENED_BOOSTER must exist before the builder lookup: SMODS packs
+	-- resolve create_UIBox from the opened center, not from G.STATE alone.
+	restore_opened_booster(board_state)
 	local builder = get_pack_ui_builder(state)
-	if not builder then
+	if not (G and G.GAME and builder) then
 		return false
 	end
-
-	remove_ui_box_safely("booster_pack")
-	G.GAME.pack_size = tonumber(board_state.pack_size)
-		or (board_state.pack_cards and #board_state.pack_cards)
-		or 2
+	teardown_pack_fx()
+	restore_opened_booster(board_state)
+	if G.buttons then
+		pcall(function()
+			G.buttons:remove()
+		end)
+		G.buttons = nil
+	end
+	local n = math.max(
+		tonumber(board_state.pack_size) or 0,
+		board_state.pack_cards and #board_state.pack_cards or 0,
+		1
+	)
+	G.GAME.pack_size = n
 	G.GAME.pack_choices = tonumber(board_state.pack_choices) or 1
-
+	if SMODS and SMODS.OPENED_BOOSTER and SMODS.OPENED_BOOSTER.ability then
+		SMODS.OPENED_BOOSTER.ability.extra = n
+	end
+	-- Same order as SMODS.Booster.update_pack: particles, then the overlay.
+	local center = opened_booster_center()
+	if center and type(center.particles) == "function" then
+		pcall(function()
+			center:particles()
+		end)
+	end
 	local ok_def, definition = pcall(builder)
 	if not (ok_def and definition) then
 		return false
 	end
-
 	G.booster_pack = UIBox({
 		definition = definition,
 		config = {
 			align = "tmi",
-			offset = { x = 0, y = G.ROOM.T.y + 9 },
-			major = G.hand,
+			offset = { x = 0, y = -2.2 },
+			major = G.hand or G.ROOM,
 			bond = "Weak",
 		},
 	})
-
-	if board_state.pack_cards and G.pack_cards then
-		rebuild_area_cards(G.pack_cards, board_state.pack_cards)
+	pcall(function()
+		if G.booster_pack.align_to_major then
+			G.booster_pack:align_to_major()
+		end
+		if G.booster_pack.T and G.booster_pack.VT then
+			G.booster_pack.VT.x = G.booster_pack.T.x
+			G.booster_pack.VT.y = G.booster_pack.T.y
+			G.booster_pack.VT.w = G.booster_pack.T.w
+			G.booster_pack.VT.h = G.booster_pack.T.h
+		end
+		if G.booster_pack.UIRoot and G.booster_pack.UIRoot.initialize_VT then
+			G.booster_pack.UIRoot:initialize_VT(true)
+		end
+	end)
+	if G.pack_cards then
+		G.pack_cards.config.card_limit = n
+		-- UIBox already sized G.pack_cards from the booster extra. Pin VT to
+		-- that slot before emplace so cards are created where vanilla
+		-- create_card would (area.T), not at the CardArea constructor pose
+		-- (ROOM.T.x + 9), which is what made skip-tag Buffoon packs look empty.
+		if G.pack_cards.hard_set_T then
+			pcall(function()
+				G.pack_cards:hard_set_T()
+			end)
+		end
+		if G.pack_cards.T and G.pack_cards.VT then
+			G.pack_cards.VT.x = G.pack_cards.T.x
+			G.pack_cards.VT.y = G.pack_cards.T.y
+			G.pack_cards.VT.w = G.pack_cards.T.w
+			G.pack_cards.VT.h = G.pack_cards.T.h
+		end
+		if board_state.pack_cards then
+			rebuild_area_cards(G.pack_cards, board_state.pack_cards)
+		end
 	end
-	if ease_background_colour_blind then
-		pcall(ease_background_colour_blind, state)
+	if state then
+		G.STATE = state
+	end
+	if G.hand and G.hand.cards and #G.hand.cards > 0 then
+		if G.hand.align_cards then
+			pcall(G.hand.align_cards, G.hand)
+		end
+		if G.hand.hard_set_cards then
+			pcall(G.hand.hard_set_cards, G.hand)
+		end
 	end
 	return true
 end
@@ -1018,13 +1517,7 @@ local function ensure_blind_select_ui_ready()
 		release_eval_hold_to_blind_select()
 	end
 	if G.blind_select and G.blind_prompt_box then
-		SPECTATOR._select_wait_logs = 0
 		return true
-	end
-	SPECTATOR._select_wait_logs = (SPECTATOR._select_wait_logs or 0) + 1
-	local n = SPECTATOR._select_wait_logs
-	if n <= 3 or n % 60 == 0 then
-		spec_blind_log("select_wait", blind_select_debug_snapshot("waiting for vanilla UI #" .. tostring(n)))
 	end
 	return false
 end
@@ -1068,6 +1561,9 @@ end
 
 function SPECTATOR.perform_select_blind(data)
 	if not (G and G.GAME) then return false end
+	if dismiss_leftover_pack() then
+		return false
+	end
 	if not ensure_blind_select_ui_ready() then
 		return false
 	end
@@ -1075,7 +1571,7 @@ function SPECTATOR.perform_select_blind(data)
 	local norm_key, norm_title = normalize_blind_row(data)
 	local blind_def = resolve_blind_def(data, norm_key, norm_title)
 
-	local box = (BALATRO.get_blind_select_option_box and (BALATRO.get_blind_select_option_box(norm_title) or BALATRO.get_blind_select_option_box(norm_key)))
+	local box = ((G and G.blind_select_opts and G.blind_select_opts[string.lower(norm_title)] or nil) or (G and G.blind_select_opts and G.blind_select_opts[string.lower(norm_key)] or nil))
 		or (G.blind_select_opts and (G.blind_select_opts[norm_key] or G.blind_select_opts[norm_title]))
 
 	local button = box and box.get_UIE_by_ID and box:get_UIE_by_ID("select_blind_button")
@@ -1089,12 +1585,10 @@ function SPECTATOR.perform_select_blind(data)
 		end
 		if invoke_g_func("select_blind", button) then
 			SPECTATOR.pending_select_blind = nil
-			spec_blind_log("select_ok", blind_select_debug_snapshot("G.FUNCS.select_blind"))
 			return true
 		end
 	end
 
-	spec_blind_log("select_no_button", blind_select_debug_snapshot("UI up but no select_blind_button"))
 	return false
 end
 
@@ -1106,7 +1600,7 @@ function SPECTATOR.perform_skip_blind(data)
 
 	local norm_key, norm_title = normalize_blind_row(data)
 
-	local box = (BALATRO.get_blind_select_option_box and (BALATRO.get_blind_select_option_box(norm_title) or BALATRO.get_blind_select_option_box(norm_key)))
+	local box = ((G and G.blind_select_opts and G.blind_select_opts[string.lower(norm_title)] or nil) or (G and G.blind_select_opts and G.blind_select_opts[string.lower(norm_key)] or nil))
 		or (G.blind_select_opts and (G.blind_select_opts[norm_key] or G.blind_select_opts[norm_title]))
 
 	local button = box and box.get_UIE_by_ID and (box:get_UIE_by_ID("skip_blind_button") or box:get_UIE_by_ID("tag_" .. norm_key) or box:get_UIE_by_ID("tag_" .. norm_title))
@@ -1124,15 +1618,28 @@ function SPECTATOR.perform_skip_blind(data)
 end
 
 function SPECTATOR.perform_play_hand(data)
+	local cards_idx = {}
+	if type(data) == "table" and type(data.cards) == "table" then
+		for _, ci in ipairs(data.cards) do cards_idx[#cards_idx + 1] = tostring(ci) end
+	end
+	local idx_str = table.concat(cards_idx, ",")
+	local cur_hand_count = (G and G.hand and G.hand.cards and #G.hand.cards) or 0
+
+	if dismiss_leftover_pack() then
+		return false
+	end
 	if not (G and G.hand and G.hand.cards and #G.hand.cards > 0) then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("play_hand_fail", { reason = "empty_hand", cards = data and data.cards and #data.cards })
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("ACT", "play_wait", string.format("[%s] no hand cards", idx_str))
 		end
 		return false
 	end
+	if G.play and G.play.cards and #G.play.cards > 0 then
+		wipe_card_area(G.play)
+	end
 	if G.STATE ~= G.STATES.SELECTING_HAND then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("play_hand_fail", { reason = "wrong_state" })
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("ACT", "play_wait", string.format("[%s] st=%s", idx_str, tostring(G.STATE)))
 		end
 		return false
 	end
@@ -1148,35 +1655,44 @@ function SPECTATOR.perform_play_hand(data)
 	end
 
 	if not highlighted_any or not (G.hand.highlighted and #G.hand.highlighted > 0) then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("play_hand_fail", {
-				reason = "bad_indices",
-				want = data and data.cards and table.concat(data.cards, ","),
-			})
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("FAIL", "play_miss", string.format("[%s] hand=%d (indices out of bounds)", idx_str, cur_hand_count))
 		end
 		return false
 	end
 
 	if G.FUNCS and G.FUNCS.play_cards_from_highlighted then
-		if invoke_g_func("play_cards_from_highlighted") then
+		local ok = invoke_g_func("play_cards_from_highlighted")
+		if ok then
 			SPECTATOR.pending_play_hand = nil
-			if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-				MP.SPECTATOR_LOG.emit("play_hand_ok")
-			end
-			return true
 		end
-	end
-	if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-		MP.SPECTATOR_LOG.emit("play_hand_fail", { reason = "invoke_failed" })
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator(ok and "EXEC" or "FAIL", ok and "play_ok" or "play_err",
+				string.format("[%s] hl=%d hand=%d", idx_str, #G.hand.highlighted, cur_hand_count))
+		end
+		return ok
 	end
 	return false
 end
 
 function SPECTATOR.perform_discard(data)
+	local cards_idx = {}
+	if type(data) == "table" and type(data.cards) == "table" then
+		for _, ci in ipairs(data.cards) do cards_idx[#cards_idx + 1] = tostring(ci) end
+	end
+	local idx_str = table.concat(cards_idx, ",")
+	local cur_hand_count = (G and G.hand and G.hand.cards and #G.hand.cards) or 0
+
 	if not (G and G.hand and G.hand.cards and #G.hand.cards > 0) then
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("ACT", "discard_wait", string.format("[%s] no hand cards", idx_str))
+		end
 		return false
 	end
 	if G.STATE ~= G.STATES.SELECTING_HAND then
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("ACT", "discard_wait", string.format("[%s] st=%s", idx_str, tostring(G.STATE)))
+		end
 		return false
 	end
 
@@ -1191,27 +1707,147 @@ function SPECTATOR.perform_discard(data)
 	end
 
 	if not highlighted_any or not (G.hand.highlighted and #G.hand.highlighted > 0) then
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("FAIL", "discard_miss", string.format("[%s] hand=%d (indices out of bounds)", idx_str, cur_hand_count))
+		end
 		return false
 	end
 
 	if G.FUNCS and G.FUNCS.discard_cards_from_highlighted then
-		return invoke_g_func("discard_cards_from_highlighted")
+		local ok = invoke_g_func("discard_cards_from_highlighted")
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator(ok and "EXEC" or "FAIL", ok and "discard_ok" or "discard_err",
+				string.format("[%s] hl=%d hand=%d", idx_str, #G.hand.highlighted, cur_hand_count))
+		end
+		return ok
 	end
 	return false
 end
 
-function SPECTATOR.perform_cash_out()
-	if not (G and G.GAME) then return false end
-	-- Vanilla cash_out does everything inside `if G.round_eval then`; before
-	-- the evaluation screen has materialized (it slides in via queued events)
-	-- a replay would silently do nothing and burn the step, so wait for it.
-	if not G.round_eval then
+local function cash_out_already_passed()
+	if not (G and G.STATES) then
 		return false
 	end
-	-- The Cash Out control is a delayed standalone UIBox major'd onto
-	-- round_eval, not a child of G.round_eval. Look it up by id.
+	return G.STATE == G.STATES.SHOP or G.STATE == G.STATES.BLIND_SELECT
+end
+
+local function in_pvp_hand()
+	if not (G and G.STATES) then
+		return false
+	end
+	local in_hand = G.STATE == G.STATES.SELECTING_HAND
+		or G.STATE == G.STATES.HAND_PLAYED
+		or G.STATE == G.STATES.DRAW_TO_HAND
+	if not in_hand then
+		return false
+	end
+	return (MP.is_pvp_boss and MP.is_pvp_boss())
+		or (G.GAME.blind and G.GAME.blind.pvp)
+		or (MP.is_server_resolved_blind and MP.is_server_resolved_blind())
+end
+
+function SPECTATOR.perform_end_pvp(data)
+	if not (G and G.GAME) then
+		return false
+	end
+	local lost = not not (data and data.lost)
+	local pvp_timer_lost = not not (data and data.pvp_timer_lost)
+	if MP.GAME then
+		MP.GAME.end_pvp = true
+		MP.GAME.round_failed = lost
+
+		-- Decrement and animate lives on defeat
+		local prev = tonumber(MP.GAME.lives)
+		local new_lives = nil
+		if data and data.lives ~= nil and tonumber(data.lives) ~= nil then
+			local d_lives = tonumber(data.lives)
+			if prev and d_lives < prev then
+				new_lives = d_lives
+			elseif lost and prev then
+				new_lives = math.max(0, prev - 1)
+			else
+				new_lives = d_lives
+			end
+		elseif lost and prev then
+			new_lives = math.max(0, prev - 1)
+		end
+
+		local life_lost = false
+		if new_lives ~= nil then
+			if prev and new_lives < prev then
+				life_lost = true
+			elseif lost and prev and prev > 0 then
+				life_lost = true
+			end
+			MP.GAME.lives = new_lives
+			MP.GAME.team_lives = new_lives
+			if life_lost and MP.UI and MP.UI.ease_lives then
+				MP.UI.ease_lives(new_lives - (prev or (new_lives + 1)))
+			end
+		end
+
+		local gold_on_loss = MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gold_on_life_loss
+		if gold_on_loss == nil then gold_on_loss = true end
+		if (life_lost or lost) and gold_on_loss and (not prev or prev > 0) then
+			MP.GAME.comeback_bonus_given = false
+			MP.GAME.comeback_eval_pending = true
+			MP.GAME.comeback_bonus = (tonumber(MP.GAME.comeback_bonus) or 0) + 1
+		end
+		if lost and MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.no_gold_on_round_loss and BALATRO.set_current_blind_dollars then
+			BALATRO.set_current_blind_dollars(0)
+		end
+	end
+	local trigger_loss = trigger_pvp_timer_loss_context or (MP and MP.trigger_pvp_timer_loss_context)
+	if lost and pvp_timer_lost and trigger_loss then
+		trigger_loss()
+	end
+	if G.GAME and G.GAME.blind and MP.UI and MP.UI.get_pvp_score_to_beat then
+		local pvp_int, pvp_text = MP.UI.get_pvp_score_to_beat()
+		if pvp_text and pvp_text ~= "" and pvp_text ~= "0" then
+			G.GAME.blind.chip_text = pvp_text
+			if pvp_int and MP.INSANE_INT then
+				G.GAME.blind.chips = MP.INSANE_INT.to_safe_number(pvp_int) or G.GAME.blind.chips
+			else
+				local num = tonumber((string.gsub(tostring(pvp_text), ",", "")))
+				if num then G.GAME.blind.chips = num end
+			end
+		end
+	end
+	if MP.enter_pvp_new_round and (G.STATE == G.STATES.SELECTING_HAND or G.STATE == G.STATES.HAND_PLAYED or G.STATE == G.STATES.DRAW_TO_HAND) then
+		MP.enter_pvp_new_round({ unhighlight_hand = true, draw_to_deck = true, state_complete = false })
+	elseif MP.DOMAIN and MP.DOMAIN.MATCH and MP.DOMAIN.MATCH.mark_end_pvp then
+		MP.DOMAIN.MATCH.mark_end_pvp()
+	end
+	return true
+end
+
+function SPECTATOR.perform_cash_out()
+	if not (G and G.GAME) then return false end
+	if cash_out_already_passed() then
+		return true
+	end
+	if in_pvp_hand() and not (MP.GAME and MP.GAME.end_pvp) then
+		if MP.enter_pvp_new_round then
+			MP.enter_pvp_new_round({ unhighlight_hand = true, draw_to_deck = true, state_complete = false })
+		elseif MP.DOMAIN and MP.DOMAIN.MATCH and MP.DOMAIN.MATCH.mark_end_pvp then
+			MP.DOMAIN.MATCH.mark_end_pvp()
+		end
+		return false
+	end
+	-- Wait for round evaluation to land and present its Cash Out button naturally
 	local button = find_uie_by_id("cash_out_button", G.round_eval)
-	if not button then
+	if not G.round_eval or not button then
+		-- Fallback: if round_eval is already present and active, but the anonymous
+		-- bottom row UIBox is delayed, dispatch cash_out directly rather than stalling
+		-- the replay queue.
+		if G.round_eval and (G.STATE == G.STATES.ROUND_EVAL or G.STATE == G.STATES.NEW_ROUND) then
+			local queue = SPECTATOR.pending_replay_queue
+			local head = queue and queue[1]
+			if head and head.type == "CASH_OUT" and (head.attempts or 0) > 30 then
+				SPECTATOR.eval_hold = false
+				return invoke_g_func("cash_out", { config = {} })
+			end
+		end
 		return false
 	end
 	-- Handy can mark insta-cash-out as already skipped on this client;
@@ -1246,17 +1882,106 @@ local function find_card_in_area(area, index, card_key)
 	if not (area and area.cards and #area.cards > 0) then
 		return nil
 	end
-	if not index or index < 1 or index > #area.cards then
+	index = tonumber(index)
+	local card = index and area.cards[index]
+
+	-- 1. Exact slot match
+	if card and (not card_key or card_center_key(card) == card_key) then
+		return card
+	end
+
+	-- 2. If slot shifted, search area for matching card_key
+	if card_key then
+		for _, candidate in ipairs(area.cards) do
+			if card_center_key(candidate) == card_key then
+				return candidate
+			end
+		end
+	end
+
+	-- 3. Pure deterministic fallback: buy/use what simulation put in that slot
+	if card then
+		return card
+	end
+
+	return nil
+end
+
+local function find_card_by_sort_id(area, sort_id)
+	if not (area and area.cards and sort_id ~= nil) then
 		return nil
 	end
-	local card = area.cards[index]
-	if not card then
-		return nil
+	for _, card in ipairs(area.cards) do
+		if card and tostring(card.sort_id or card.ID) == tostring(sort_id) then
+			return card
+		end
 	end
-	if card_key and card_center_key(card) ~= card_key then
-		return nil
+	return nil
+end
+
+local function consumeable_needs_targets(card)
+	local ability = card and card.ability and card.ability.consumeable
+	if type(ability) == "table" and (ability.max_highlighted or ability.min_highlighted) then
+		return true
 	end
-	return card
+	local cfg = card and card.config and card.config.center and card.config.center.config
+	if type(cfg) == "table" and (cfg.max_highlighted or cfg.min_highlighted) then
+		return true
+	end
+	return false
+end
+
+-- Vanilla Card:use_consumeable closes over G.hand.highlighted[1] (Talisman
+-- family) or reads it later from a delayed event (Aura/Cryptid). If the
+-- spectator invokes use without those highlights, those events crash.
+local function apply_consumeable_targets(data)
+	local indices = (data and data.target_indices) or {}
+	local ids = (data and data.target_ids) or {}
+	if #indices == 0 and #ids == 0 then
+		return true
+	end
+	local area = get_card_area_by_name((data and data.target_area) or "hand") or G.hand
+	if not (area and area.cards) then
+		return false
+	end
+	pcall(function()
+		area:unhighlight_all()
+	end)
+	local n = math.max(#indices, #ids)
+	for i = 1, n do
+		local card = nil
+		if ids[i] ~= nil then
+			card = find_card_by_sort_id(area, ids[i])
+		end
+		if not card and indices[i] then
+			card = area.cards[indices[i]]
+		end
+		if not card then
+			return false
+		end
+		area:add_to_highlighted(card)
+	end
+	return area.highlighted and #area.highlighted == n
+end
+
+local function prepare_consumeable_use(card, data)
+	local applied = apply_consumeable_targets(data)
+	if not consumeable_needs_targets(card) then
+		return applied
+	end
+	if not applied then
+		local has_payload = (data and ((data.target_indices and #data.target_indices > 0) or (data.target_ids and #data.target_ids > 0)))
+		if not has_payload then
+			-- Old stream with no targets: skip rather than queue a crash.
+			return "skip"
+		end
+		return false
+	end
+	local area = get_card_area_by_name((data and data.target_area) or "hand") or G.hand
+	if not (area and area.highlighted and #area.highlighted > 0) then
+		return false
+	end
+	return true
 end
 
 function SPECTATOR.perform_buy_card(data)
@@ -1296,6 +2021,14 @@ function SPECTATOR.perform_buy_and_use(data)
 		return false
 	end
 
+	local prepared = prepare_consumeable_use(card, data)
+	if prepared == "skip" then
+		return true
+	end
+	if prepared == false then
+		return false
+	end
+
 	-- Vanilla's buy_and_use is a full purchase that never emplaces the card:
 	-- it pays, removes the shop slot, and re-enters use_card internally.
 	-- Calling use_card directly here skipped payment, left the shop card in
@@ -1323,6 +2056,19 @@ function SPECTATOR.perform_reroll_shop()
 	return ok
 end
 
+local function has_editionless_joker()
+	if not (G and G.jokers and G.jokers.cards) then
+		return false
+	end
+	for i = 1, #G.jokers.cards do
+		local joker = G.jokers.cards[i]
+		if joker and not joker.edition then
+			return true
+		end
+	end
+	return false
+end
+
 function SPECTATOR.perform_use_card(data)
 	if not (G and G.GAME) then
 		return false
@@ -1333,22 +2079,19 @@ function SPECTATOR.perform_use_card(data)
 		return false
 	end
 
-	local target_area_name = (data and data.target_area) or "hand"
-	local target_area = get_card_area_by_name(target_area_name) or G.hand
-	if target_area and data and data.target_indices and #data.target_indices > 0 then
-		pcall(function()
-			target_area:unhighlight_all()
-		end)
-		for _, idx in ipairs(data.target_indices) do
-			local target_card = target_area.cards and target_area.cards[idx]
-			if not target_card then
-				return false
-			end
-			target_area:add_to_highlighted(target_card)
-		end
-		if not (target_area.highlighted and #target_area.highlighted == #data.target_indices) then
-			return false
-		end
+	-- Wheel / Ectoplasm pick a random editionless joker in a delayed event.
+	-- Vanilla crashes if that list is empty (card.lua eligible_card = nil).
+	local key = card_center_key(card)
+	if (key == "c_wheel_of_fortune" or key == "c_ectoplasm") and not has_editionless_joker() then
+		return true
+	end
+
+	local prepared = prepare_consumeable_use(card, data)
+	if prepared == "skip" then
+		return true
+	end
+	if prepared == false then
+		return false
 	end
 
 	if card.check_use and card:check_use() then
@@ -1375,6 +2118,26 @@ function SPECTATOR.perform_sell_card(data)
 	return false
 end
 
+local function remember_pack_interrupt()
+	if not (G and G.GAME and G.STATES) then
+		return
+	end
+	if G.GAME.PACK_INTERRUPT ~= nil then
+		SPECTATOR.pack_interrupt = G.GAME.PACK_INTERRUPT
+		return
+	end
+	if SPECTATOR.pack_interrupt then
+		G.GAME.PACK_INTERRUPT = SPECTATOR.pack_interrupt
+		return
+	end
+	if G.shop and not G.shop.REMOVED then
+		G.GAME.PACK_INTERRUPT = G.STATES.SHOP
+	elseif G.blind_select and not G.blind_select.REMOVED then
+		G.GAME.PACK_INTERRUPT = G.STATES.BLIND_SELECT
+	end
+	SPECTATOR.pack_interrupt = G.GAME.PACK_INTERRUPT
+end
+
 function SPECTATOR.perform_buy_booster(data)
 	if not (G and G.FUNCS and G.FUNCS.use_card) then
 		return false
@@ -1384,22 +2147,33 @@ function SPECTATOR.perform_buy_booster(data)
 	if not card then
 		return false
 	end
-	return invoke_g_func("use_card", { config = { ref_table = card } })
+	local ok = invoke_g_func("use_card", { config = { ref_table = card } })
+	remember_pack_interrupt()
+	return ok
 end
 
 function SPECTATOR.perform_select_pack_card(data)
 	if not (G and G.FUNCS and G.FUNCS.use_card) then
 		return false
 	end
+	remember_pack_interrupt()
 	local area = get_card_area_by_name("pack_cards")
 	local card = find_card_in_area(area, (data and data.index) or 1, data and data.card_key)
 	if not card then
+		return false
+	end
+	local prepared = prepare_consumeable_use(card, data)
+	if prepared == "skip" then
+		return true
+	end
+	if prepared == false then
 		return false
 	end
 	return invoke_g_func("use_card", { config = { ref_table = card } })
 end
 
 function SPECTATOR.perform_skip_pack()
+	remember_pack_interrupt()
 	if not (G and G.FUNCS and G.FUNCS.skip_booster) then
 		return false
 	end
@@ -1407,6 +2181,61 @@ function SPECTATOR.perform_skip_pack()
 		return false
 	end
 	return invoke_g_func("skip_booster")
+end
+
+function SPECTATOR.handle_pack_closed(return_state)
+	if not (SPECTATOR.is_spectating and G and G.STATES) then
+		return
+	end
+	if SPECTATOR._handling_pack_exit then
+		return
+	end
+	SPECTATOR._handling_pack_exit = true
+
+	return_state = tonumber(return_state) or return_state or SPECTATOR.pack_interrupt or (G.GAME and G.GAME.PACK_INTERRUPT)
+
+	-- Live follow: vanilla end_consumeable already closed the pack and slid
+	-- shop back. Doing that again is the shake. Only fill a missing screen
+	-- after a switch-onto-pack snapshot, which never had a parked shop.
+	if return_state == G.STATES.SHOP and (not G.shop or G.shop.REMOVED) then
+		G.STATE = G.STATES.SHOP
+		G.STATE_COMPLETE = false
+		local prev = SPECTATOR.applying_snapshot
+		SPECTATOR.applying_snapshot = true
+		if G.update_shop then
+			pcall(function()
+				G:update_shop(0.016)
+			end)
+		end
+		local cards = SPECTATOR.cached_pack_return_shop_cards
+		if cards and #cards > 0 then
+			apply_stream_shop(cards, SPECTATOR.cached_pack_return_round or (G.GAME and G.GAME.round))
+		end
+		SPECTATOR.applying_snapshot = prev
+	elseif return_state == G.STATES.BLIND_SELECT and (not G.blind_select or G.blind_select.REMOVED) then
+		G.STATE = G.STATES.BLIND_SELECT
+		G.STATE_COMPLETE = false
+	end
+
+	clear_pack_return_latch()
+end
+
+-- One-shot after a pack actually ends. Must not run while waiting in
+-- BLIND_SELECT for a switch snapshot (STATE_COMPLETE is true on purpose).
+function SPECTATOR.ensure_post_pack_ui()
+	if not (SPECTATOR.is_spectating and G and G.STATES) then
+		return
+	end
+	if SPECTATOR.applying_snapshot or SPECTATOR._handling_pack_exit then
+		return
+	end
+	if not SPECTATOR.pack_interrupt then
+		return
+	end
+	if is_booster_pack_state(G.STATE) or (G.booster_pack and not G.booster_pack.REMOVED) then
+		return
+	end
+	SPECTATOR.handle_pack_closed(SPECTATOR.pack_interrupt)
 end
 
 function SPECTATOR.perform_sort_hand(data)
@@ -1450,22 +2279,25 @@ function SPECTATOR.perform_reorder_cards(data)
 			new_cards[#new_cards + 1] = area.cards[old_idx]
 		end
 	end
+	if #new_cards ~= #area.cards then
+		return false
+	end
 	area.cards = new_cards
-	if area.realign_indices then
-		pcall(area.realign_indices, area)
+	-- align_cards writes each card's target T from the new list order.
+	-- Leave VT alone: Moveable eases VT toward T the same way a live drag
+	-- settle does. hard_set_cards would copy T onto VT and teleport.
+	for i, card in ipairs(area.cards) do
+		if card then
+			card.rank = i
+		end
+	end
+	if area.align_cards then
+		pcall(area.align_cards, area)
 	end
 	return true
 end
 
 function SPECTATOR.perform_team_card_sync(data)
-	if MP.TESTING and MP.TESTING.log_team_card then
-		MP.TESTING.log_team_card("STREAM", string.format(
-			"%s %s from=%s",
-			tostring(data and data.actionType or "?"),
-			tostring(data and data.cardKey or "?"),
-			tostring(data and data.sourcePlayerId or "?")
-		))
-	end
 	local sync = MP.SYNC and MP.SYNC.TEAM_CARD
 	if not (sync and sync.handle_sync and data and data.cardKey) then
 		return true
@@ -1494,6 +2326,8 @@ function SPECTATOR.perform_action(action_type, data)
 		return SPECTATOR.perform_select_blind(data)
 	elseif action_type == "SKIP_BLIND" then
 		return SPECTATOR.perform_skip_blind(data)
+	elseif action_type == "END_PVP" then
+		return SPECTATOR.perform_end_pvp(data)
 	elseif action_type == "CASH_OUT" then
 		return SPECTATOR.perform_cash_out()
 	elseif action_type == "TOGGLE_SHOP" then
@@ -1541,8 +2375,20 @@ local ACTION_WINDOW_CLOSED = {
 		if not G then
 			return true
 		end
-		local in_eval = G.STATE == G.STATES.ROUND_EVAL or G.STATE == G.STATES.NEW_ROUND or G.round_eval ~= nil
-		return not in_eval
+		-- SELECTING_HAND is "eval has not opened yet", not "eval is gone".
+		-- Dropping here threw away CASH_OUT while two hands were still left
+		-- and then timed out every shop/pack action behind it.
+		if cash_out_already_passed() then
+			return false
+		end
+		if G.STATES and (
+			G.STATE == G.STATES.GAME_OVER
+			or G.STATE == G.STATES.MENU
+			or G.STATE == G.STATES.SPLASH
+		) then
+			return true
+		end
+		return false
 	end,
 }
 
@@ -1555,6 +2401,11 @@ function SPECTATOR.enqueue_replay_action(action_type, data, step, board_state)
 		target = SPECTATOR.target_player_id,
 		attempts = 0,
 	}
+	table.sort(SPECTATOR.pending_replay_queue, function(a, b)
+		local sa = tonumber(a.step) or 0
+		local sb = tonumber(b.step) or 0
+		return sa < sb
+	end)
 end
 
 -- Replay commands must observe a settled simulation: vanilla lands gameplay
@@ -1567,7 +2418,31 @@ local SETTLE_STUCK_TICKS = 45
 SPECTATOR._settle_ticks = 0
 SPECTATOR._settle_stuck = 0
 SPECTATOR._settle_last_n = 0
-local function sim_busy()
+local function sim_busy(action_type)
+	if G and G.STATES then
+		if G.STATE == G.STATES.DRAW_TO_HAND then
+			return true
+		end
+		if G.STATE == G.STATES.HAND_PLAYED then
+			-- In server-resolved blinds (PvP boss), when the player finishes their hands
+			-- (or is waiting for enemy), the game idles in HAND_PLAYED with an empty event queue.
+			-- Treating HAND_PLAYED as busy when card scoring animations have finished
+			-- permanently deadlocks the replay queue, preventing END_PVP or CASH_OUT from ever executing.
+			local is_phase_action = action_type == "END_PVP" or action_type == "CASH_OUT"
+			if not is_phase_action and SPECTATOR.pending_replay_queue and SPECTATOR.pending_replay_queue[1] then
+				local head = SPECTATOR.pending_replay_queue[1]
+				if head.type == "END_PVP" or head.type == "CASH_OUT" then
+					is_phase_action = true
+				end
+			end
+			if not is_phase_action then
+				return true
+			end
+		end
+	end
+	if SMODS and SMODS.cards_to_draw and SMODS.cards_to_draw > 0 then
+		return true
+	end
 	local n = count_e_manager_events()
 	if n <= 0 then
 		SPECTATOR._settle_ticks = 0
@@ -1589,11 +2464,6 @@ local function sim_busy()
 		return false
 	end
 	if SPECTATOR._settle_ticks > SETTLE_MAX_TICKS then
-		spec_blind_log(
-			"settle_timeout",
-			string.format("forcing idle after %d ticks with %d events still queued", SPECTATOR._settle_ticks, n),
-			true
-		)
 		SPECTATOR._settle_ticks = 0
 		SPECTATOR._settle_stuck = 0
 		return false
@@ -1606,11 +2476,8 @@ function SPECTATOR.drain_pending_replay_actions()
 	if not SPECTATOR.is_spectating or SPECTATOR.is_catching_up then
 		return
 	end
-	if sim_busy() then
-		return
-	end
 	local queue = SPECTATOR.pending_replay_queue
-	if #queue == 0 then
+	if not queue or #queue == 0 then
 		return
 	end
 
@@ -1620,10 +2487,20 @@ function SPECTATOR.drain_pending_replay_actions()
 		return
 	end
 
+	if sim_busy(entry.type) then
+		return
+	end
+
 	entry.attempts = entry.attempts + 1
-	if entry.attempts > PENDING_MAX_ATTEMPTS then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("replay_drop_timeout", { type = entry.type, step = entry.step })
+	local is_phase_action = entry.type == "CASH_OUT"
+		or entry.type == "SELECT_BLIND"
+		or entry.type == "TOGGLE_SHOP"
+		or entry.type == "END_PVP"
+
+	local max_attempts = is_phase_action and 1000 or PENDING_MAX_ATTEMPTS
+	if entry.attempts > max_attempts then
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("QUEUE", "drop_timeout", string.format("%s #%s (try=%d)", entry.type, tostring(entry.step or "?"), entry.attempts))
 		end
 		table.remove(queue, 1)
 		return
@@ -1631,30 +2508,23 @@ function SPECTATOR.drain_pending_replay_actions()
 
 	local window_closed = ACTION_WINDOW_CLOSED[entry.type]
 	if window_closed and window_closed() then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("replay_drop_window", { type = entry.type, step = entry.step })
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("QUEUE", "drop_window", string.format("%s #%s", entry.type, tostring(entry.step or "?")))
 		end
 		table.remove(queue, 1)
 		return
 	end
 
 	if not SPECTATOR.is_executing_action then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and (entry.type == "PLAY_HAND" or entry.type == "CASH_OUT") then
-			MP.SPECTATOR_LOG.emit("replay_try", { type = entry.type, step = entry.step, attempts = entry.attempts })
-		end
 		local ok, result = pcall(SPECTATOR.perform_action, entry.type, entry.data)
 		if ok and result == true then
-			if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and (entry.type == "PLAY_HAND" or entry.type == "CASH_OUT") then
-				MP.SPECTATOR_LOG.emit("replay_ok", { type = entry.type, step = entry.step })
+			if entry.step and tonumber(entry.step) then
+				SPECTATOR.current_step = math.max(SPECTATOR.current_step, tonumber(entry.step))
+			end
+			if MP.TESTING and MP.TESTING.log_spectator then
+				MP.TESTING.log_spectator("QUEUE", "exec_ok", string.format("%s #%s (try=%d)", entry.type, tostring(entry.step or "?"), entry.attempts))
 			end
 			table.remove(queue, 1)
-		elseif MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and (entry.type == "PLAY_HAND" or entry.type == "CASH_OUT") then
-			MP.SPECTATOR_LOG.emit("replay_retry", {
-				type = entry.type,
-				step = entry.step,
-				ok = ok,
-				result = tostring(result),
-			})
 		end
 	end
 end
@@ -1664,12 +2534,11 @@ function SPECTATOR.execute_action(action)
 		return
 	end
 
-	-- Same settle rule as the drain path (see sim_busy): commands queued by
-	-- catch-up replay must not run against half-applied event chains.
-	if sim_busy() then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and (action.type == "PLAY_HAND" or action.type == "CASH_OUT") then
-			MP.SPECTATOR_LOG.emit("exec_busy_enqueue", { type = action.type, step = action.step })
-		end
+	-- In-order pipeline: if earlier actions are waiting in the replay queue,
+	-- or the engine is busy processing animation chains, enqueue this action
+	-- so actions execute strictly in sequential step order.
+	local queue = SPECTATOR.pending_replay_queue or {}
+	if #queue > 0 or sim_busy(action.type) then
 		SPECTATOR.enqueue_replay_action(action.type, action.data, tonumber(action.step))
 		return
 	end
@@ -1677,9 +2546,6 @@ function SPECTATOR.execute_action(action)
 	local step = tonumber(action.step)
 	if step then
 		if step <= SPECTATOR.current_step then
-			if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and (action.type == "PLAY_HAND" or action.type == "CASH_OUT") then
-				MP.SPECTATOR_LOG.emit("exec_skip_old_step", { type = action.type, step = step })
-			end
 			return
 		end
 		SPECTATOR.current_step = math.max(SPECTATOR.current_step, step)
@@ -1693,33 +2559,8 @@ function SPECTATOR.execute_action(action)
 	SPECTATOR.is_executing_action = true
 	local ok, result = pcall(SPECTATOR.perform_action, action_type, data)
 	SPECTATOR.is_executing_action = false
-	if action_type == "PLAY_HAND" or action_type == "CASH_OUT" or action_type == "SKIP_BLIND" or action_type == "SELECT_BLIND" then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("exec_result", {
-				type = action_type,
-				ok = ok,
-				result = tostring(result),
-				step = step,
-			})
-		end
-	end
 	if ok and result == false then
 		SPECTATOR.enqueue_replay_action(action_type, data, step)
-	end
-	if MP.TESTING and MP.TESTING.RNG_TRACER and MP.TESTING.RNG_TRACER.active then
-		local mods = G and G.GAME and G.GAME.modifiers
-		MP.TESTING.RNG_TRACER.act("S", step, action_type, string.format(
-			"res=%s stake=%s et=%s per=%s jr=%s tr=%s pr=%s sr=%s pcr=%s",
-			tostring(result),
-			tostring(G and G.GAME and G.GAME.stake),
-			tostring(mods and mods.enable_eternals_in_shop),
-			tostring(mods and mods.enable_perishables_in_shop),
-			tostring(G and G.GAME and G.GAME.joker_rate),
-			tostring(G and G.GAME and G.GAME.tarot_rate),
-			tostring(G and G.GAME and G.GAME.planet_rate),
-			tostring(G and G.GAME and G.GAME.spectral_rate),
-			tostring(G and G.GAME and G.GAME.playing_card_rate)
-		))
 	end
 end
 
@@ -1742,7 +2583,7 @@ local function to_game_number(value, fallback)
 	return tonumber(value) or fallback
 end
 
-local function resolve_blind_def(blind_info, board_state)
+local function resolve_snapshot_blind_def(blind_info, board_state)
 	local row = (blind_info and blind_info.blind_on_deck)
 		or (board_state and board_state.blind_on_deck)
 	local choices = (board_state and board_state.blind_choices)
@@ -1774,7 +2615,7 @@ local function restore_blind_from_snapshot(blind_info, board_state)
 	if not (G and G.GAME) then
 		return
 	end
-	local def = resolve_blind_def(blind_info, board_state)
+	local def = resolve_snapshot_blind_def(blind_info, board_state)
 	if not G.GAME.blind and Blind then
 		G.GAME.blind = Blind(0, 0, 2, 1)
 	end
@@ -1782,14 +2623,42 @@ local function restore_blind_from_snapshot(blind_info, board_state)
 		return
 	end
 	if def and G.GAME.blind.set_blind then
-		SPECTATOR.hide_blind_loc_debuff = true
+		-- reset=nil ensures Balatro configures name, chips, sprite, colours,
+		-- and dollars. Passing reset=true skipped the entire setup in set_blind.
+		-- Any Water/Needle/Manacle side effects are overwritten by the
+		-- authoritative board_state values.
+		local already_in_round = is_playing_round_state(board_state and board_state.state)
 		G.GAME.blind:set_blind(def, nil, true)
+		if already_in_round then
+			G.GAME.blind.config = G.GAME.blind.config or {}
+			G.GAME.blind.config.blind = def
+			if should_show_blind_hud(board_state and board_state.state) then
+				show_blind_hud_plaque()
+			end
+		end
 	end
-	if (not G.GAME.blind.chips or to_game_number(G.GAME.blind.chips, 0) == 0) and def and get_blind_amount then
-		local ante = (G.GAME.round_resets and G.GAME.round_resets.ante) or 1
-		local mult = def.mult or 1
-		local scaling = (G.GAME.starting_params and G.GAME.starting_params.ante_scaling) or 1
-		G.GAME.blind.chips = get_blind_amount(ante) * mult * scaling
+	local row = (blind_info and blind_info.blind_on_deck)
+		or (board_state and board_state.blind_on_deck)
+		or (G.GAME and G.GAME.blind_on_deck)
+	local pvp_choices = board_state and board_state.pvp_blind_choices
+	local is_pvp = (def and def.key == "bl_mp_nemesis")
+		or (G.GAME.blind and (G.GAME.blind.pvp or G.GAME.blind.name == "bl_mp_nemesis"))
+		or (row and pvp_choices and pvp_choices[row])
+		or (MP.is_pvp_boss and MP.is_pvp_boss())
+		or (MP.is_pvp and MP.is_pvp())
+		or (MP.GAME and (MP.GAME.end_pvp or MP.GAME.pvp))
+	if is_pvp and G.GAME.blind then
+		G.GAME.blind.pvp = true
+	end
+	-- PvP does not use vanilla "score at least N". Filling get_blind_amount
+	-- here is what painted 800 after skip/switch.
+	if not is_pvp then
+		if (not G.GAME.blind.chips or to_game_number(G.GAME.blind.chips, 0) == 0) and def and get_blind_amount then
+			local ante = (G.GAME.round_resets and (G.GAME.round_resets.blind_ante or G.GAME.round_resets.ante)) or 1
+			local mult = def.mult or 1
+			local scaling = (G.GAME.starting_params and G.GAME.starting_params.ante_scaling) or 1
+			G.GAME.blind.chips = get_blind_amount(ante) * mult * scaling
+		end
 	end
 	local snap_chips = blind_info and to_game_number(blind_info.chips, nil)
 	local snap_text = blind_info and blind_info.chip_text
@@ -1803,9 +2672,25 @@ local function restore_blind_from_snapshot(blind_info, board_state)
 	elseif G.GAME.blind.chips and number_format then
 		G.GAME.blind.chip_text = number_format(G.GAME.blind.chips)
 	end
+	if is_pvp and (not text_from_snap or G.GAME.blind.chip_text == "0") and MP.UI and MP.UI.get_pvp_score_to_beat then
+		local score_int, score_text = MP.UI.get_pvp_score_to_beat()
+		if score_text and score_text ~= "" and score_text ~= "0" then
+			G.GAME.blind.chip_text = score_text
+			if not chips_from_snap and score_int then
+				G.GAME.blind.chips = (MP.INSANE_INT and MP.INSANE_INT.to_safe_number(score_int)) or G.GAME.blind.chips
+			elseif not chips_from_snap and score_text then
+				local num = tonumber((string.gsub(tostring(score_text), ",", "")))
+				if num then G.GAME.blind.chips = num end
+			end
+		end
+	end
 	local snap_dollars = blind_info and tonumber(blind_info.dollars)
 	if snap_dollars and snap_dollars > 0 then
 		G.GAME.blind.dollars = snap_dollars
+	end
+	if G.GAME.current_round and G.GAME.blind.dollars then
+		local loc_dollar = (type(localize) == "function" and localize('$')) or "$"
+		G.GAME.current_round.dollars_to_be_earned = G.GAME.blind.dollars > 0 and string.rep(loc_dollar, G.GAME.blind.dollars) or ""
 	end
 	if blind_info and blind_info.name and blind_info.name ~= "" then
 		G.GAME.blind.name = blind_info.name
@@ -1942,6 +2827,9 @@ local function restore_shop_sim_inputs(board_state)
 	if board_state.enable_rentals_in_shop ~= nil then
 		G.GAME.modifiers.enable_rentals_in_shop = not not board_state.enable_rentals_in_shop
 	end
+	if board_state.first_shop_buffoon ~= nil then
+		G.GAME.first_shop_buffoon = not not board_state.first_shop_buffoon
+	end
 	if type(board_state.locked_jokers) == "table" then
 		local locked = {}
 		for k, v in pairs(board_state.locked_jokers) do
@@ -1968,30 +2856,106 @@ function SPECTATOR.perform_start_run(data)
 	if type(sim_inputs) == "table" then
 		restore_shop_sim_inputs(sim_inputs)
 	end
+	if data and data.sort_id ~= nil then
+		G.sort_id = tonumber(data.sort_id) or G.sort_id
+	end
 	return true
 end
 
 -- Comeback $ (Total Lives Lost / sandbox comeback money) is stored on
 -- MP.GAME, not G.GAME. The spectator client's flags stay at the initial
 -- "already given" state unless we copy the target's values before
--- Game:update_round_eval builds the cash-out rows.
+-- evaluate_round builds the cash-out rows.
 --
--- Vanilla queues two events after the kick: one creates G.round_eval, the
--- next indexes it to slide the panel in. Removing the UIBox without
--- clearing that queue is game.lua:3534 (round_eval is nil).
+-- Game:update_round_eval queues create-then-wait-for-VT-then-evaluate_round.
+-- A switch snapshot never finishes that ease (same as skip packs), so the
+-- first row never appears. Build the overlay on-screen and call
+-- evaluate_round the same way vanilla does after the panel lands.
 local function rebuild_round_eval_ui()
-	if not (G and G.update_round_eval) then
+	if not (G and G.GAME) then
 		return
 	end
-	clear_pending_game_events()
 	remove_ui_box_safely("round_eval")
-	if MP.GAME then
-		MP.GAME.prevent_eval = false
+	clear_pending_game_events()
+	if G.HUD_blind and G.HUD_blind.alignment and G.HUD_blind.alignment.offset then
+		G.HUD_blind.alignment.offset.y = -10
 	end
-	G.STATE_COMPLETE = false
+	if G.I and G.I.UIBOX then
+		for i = #G.I.UIBOX, 1, -1 do
+			local box = G.I.UIBOX[i]
+			if box and not box.REMOVED and box.get_UIE_by_ID and box:get_UIE_by_ID("cash_out_button") then
+				pcall(function()
+					box:remove()
+				end)
+			end
+		end
+	end
+	if G.buttons then
+		pcall(function()
+			G.buttons:remove()
+		end)
+		G.buttons = nil
+	end
+	if stop_use then
+		pcall(stop_use)
+	end
+	if MP.GAME then
+		MP.GAME.prevent_eval = true
+	end
+	G.STATE_COMPLETE = true
+	G.GAME.facing_blind = nil
+	if ease_background_colour_blind then
+		pcall(ease_background_colour_blind, G.STATES.ROUND_EVAL)
+	end
+	if not create_UIBox_round_evaluation then
+		return
+	end
+	local pack_major = G.hand
+	if not (pack_major and pack_major.T) then
+		pack_major = G.ROOM_ATTACH or G.ROOM
+	end
+	G.round_eval = UIBox({
+		definition = create_UIBox_round_evaluation(),
+		config = {
+			align = "bm",
+			offset = { x = 0, y = -7.8 },
+			major = pack_major,
+			bond = "Weak",
+		},
+	})
 	pcall(function()
-		G:update_round_eval(0.016)
+		if G.round_eval.align_to_major then
+			G.round_eval:align_to_major()
+		end
+		if G.round_eval.T and G.round_eval.VT then
+			G.round_eval.VT.x = G.round_eval.T.x
+			G.round_eval.VT.y = G.round_eval.T.y
+			G.round_eval.VT.w = G.round_eval.T.w
+			G.round_eval.VT.h = G.round_eval.T.h
+		end
+		if G.round_eval.UIRoot and G.round_eval.UIRoot.initialize_VT then
+			G.round_eval.UIRoot:initialize_VT(true)
+		end
 	end)
+	local is_pvp = (G.GAME.blind and (G.GAME.blind.pvp or G.GAME.blind.name == "bl_mp_nemesis"))
+		or (MP.is_pvp_boss and MP.is_pvp_boss())
+		or (MP.is_pvp and MP.is_pvp())
+		or (MP.GAME and (MP.GAME.end_pvp or MP.GAME.pvp))
+	if is_pvp and G.GAME.blind and (not G.GAME.blind.chip_text or G.GAME.blind.chip_text == "" or G.GAME.blind.chip_text == "0") and MP.UI and MP.UI.get_pvp_score_to_beat then
+		local score_int, score_text = MP.UI.get_pvp_score_to_beat()
+		if score_text and score_text ~= "" and score_text ~= "0" then
+			G.GAME.blind.chip_text = score_text
+			if (not G.GAME.blind.chips or G.GAME.blind.chips == 0) and score_int then
+				G.GAME.blind.chips = (MP.INSANE_INT and MP.INSANE_INT.to_safe_number(score_int)) or G.GAME.blind.chips
+			elseif (not G.GAME.blind.chips or G.GAME.blind.chips == 0) and score_text then
+				local num = tonumber((string.gsub(tostring(score_text), ",", "")))
+				if num then G.GAME.blind.chips = num end
+			end
+		end
+	end
+	if G.FUNCS and G.FUNCS.evaluate_round then
+		pcall(G.FUNCS.evaluate_round)
+	end
 end
 
 function SPECTATOR.apply_comeback_state(data)
@@ -2000,12 +2964,16 @@ function SPECTATOR.apply_comeback_state(data)
 	end
 	if data.lives ~= nil then
 		MP.GAME.lives = tonumber(data.lives) or MP.GAME.lives
+		MP.GAME.team_lives = MP.GAME.lives
 	end
 	if data.comeback_bonus ~= nil then
 		MP.GAME.comeback_bonus = tonumber(data.comeback_bonus) or 0
 	end
 	if data.round_failed ~= nil then
 		MP.GAME.round_failed = not not data.round_failed
+		if not data.round_failed then
+			MP.GAME.round_loss_processed = false
+		end
 	end
 	local gold_on_loss = MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gold_on_life_loss
 	local bonus = tonumber(MP.GAME.comeback_bonus) or 0
@@ -2018,7 +2986,7 @@ function SPECTATOR.apply_comeback_state(data)
 	-- Switch rebuild: evaluate_round consumes comeback_bonus_given, so a
 	-- snapshot taken on the cash-out screen has given=true. Pending means
 	-- this eval still owes the lives-lost gold row.
-	local target_state = data.state
+	local target_state = tonumber(data.state) or data.state
 	local eval_state = G and G.STATES and (
 		target_state == G.STATES.ROUND_EVAL or target_state == G.STATES.NEW_ROUND
 	)
@@ -2029,72 +2997,59 @@ function SPECTATOR.apply_comeback_state(data)
 	end
 end
 
--- Copy the watched player's lives onto the spectated board. A drop is a
--- life loss on their client (PvP or otherwise) and must arm comeback gold
--- the same way apply_local_player_info does, or evaluate_round never draws
--- the "Total Lives Lost" row.
-function SPECTATOR.sync_watched_player_lives()
-	if not (SPECTATOR.is_spectating and SPECTATOR.target_player_id and MP.GAME) then
-		return false
-	end
-	local target = nil
-	for _, player in ipairs((MP.LOBBY and MP.LOBBY.players) or {}) do
-		if player.id == SPECTATOR.target_player_id then
-			target = player
-			break
-		end
-	end
-	if not target or target.lives == nil then
-		return false
-	end
-	local new_lives = tonumber(target.lives)
-	if new_lives == nil then
-		return false
-	end
-	local prev = tonumber(MP.GAME.lives)
-	local armed_comeback = false
-	if prev ~= nil and new_lives < prev then
-		if MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.gold_on_life_loss then
-			MP.GAME.comeback_bonus_given = false
-			MP.GAME.comeback_eval_pending = true
-			MP.GAME.comeback_bonus = (tonumber(MP.GAME.comeback_bonus) or 0) + (prev - new_lives)
-			armed_comeback = true
-		end
-	end
-	if MP.GAME.lives ~= new_lives then
-		MP.GAME.lives = new_lives
-		if MP.UI and MP.UI.refresh_lives_hud_binding then
-			MP.UI.refresh_lives_hud_binding({ recalculate = true })
-		end
-	end
-	if armed_comeback and G and G.STATES and (
-		G.STATE == G.STATES.ROUND_EVAL or G.STATE == G.STATES.NEW_ROUND or G.round_eval
-	) then
-		rebuild_round_eval_ui()
-	end
-	return armed_comeback
-end
-
 function SPECTATOR.apply_live_board_state(board_state)
 	if not board_state or not G or not G.GAME then
 		return
 	end
 
 	SPECTATOR.applying_snapshot = true
-	SPECTATOR.hide_blind_loc_debuff = true
 
 	pcall(function()
 
+	local apply_state = tonumber(board_state.state) or board_state.state
+	local keep_shop_for_pack = is_booster_pack_state(apply_state)
+		and G.shop
+		and not G.shop.REMOVED
+
 	clear_pending_game_events()
 	reset_inherited_round_latch()
+	teardown_spectated_overlays({ keep_shop = keep_shop_for_pack })
+	if not is_booster_pack_state(apply_state) then
+		clear_pack_return_latch()
+	end
 
 	-- Only an eval-state snapshot (handled in step 6 below) keeps the hold.
 	SPECTATOR.eval_hold = false
 
+	if G.play then
+		wipe_card_area(G.play)
+	end
+	if G.hand and G.hand.unhighlight_all then
+		pcall(function() G.hand:unhighlight_all() end)
+	end
+
 	-- 1. Sync Game Values & HUD
-	G.GAME.dollars = to_game_number(board_state.dollars, G.GAME.dollars)
+	local eval_pre = board_state.eval_pre
+	local restoring_eval = G.STATES and apply_state == G.STATES.ROUND_EVAL
+	G.GAME.dollars = to_game_number(
+		(restoring_eval and eval_pre and eval_pre.dollars) or board_state.dollars,
+		G.GAME.dollars
+	)
 	G.GAME.chips = to_game_number(board_state.chips, G.GAME.chips)
 	SPECTATOR.apply_comeback_state(board_state)
+	-- Never clear a received/streamed PvP end from a lagging snapshot.
+	if board_state.end_pvp and MP.GAME then
+		MP.GAME.end_pvp = true
+	end
+	if board_state.timer ~= nil and MP.GAME then
+		MP.GAME.timer = tonumber(board_state.timer) or MP.GAME.timer
+	end
+	if board_state.nemesis_timer_started ~= nil and MP.GAME then
+		MP.GAME.nemesis_timer_started = not not board_state.nemesis_timer_started
+	end
+	if MP.UI and MP.UI.refresh_lives_hud_binding then
+		MP.UI.refresh_lives_hud_binding({ force = true })
+	end
 	if board_state.reroll_cost ~= nil then
 		G.GAME.reroll_cost = tonumber(board_state.reroll_cost) or G.GAME.reroll_cost
 	end
@@ -2106,9 +3061,46 @@ function SPECTATOR.apply_live_board_state(board_state)
 		G.GAME.current_round.discards_left = tonumber(board_state.discards_left) or G.GAME.current_round.discards_left
 		G.GAME.current_round.hands_sub = tonumber(board_state.hands_sub) or G.GAME.current_round.hands_sub
 		G.GAME.current_round.discards_sub = tonumber(board_state.discards_sub) or G.GAME.current_round.discards_sub
+		if board_state.used_packs then
+			local used_packs = {}
+			for pack_pos, pack_key in pairs(board_state.used_packs) do
+				local pos = tonumber(pack_pos) or pack_pos
+				used_packs[pos] = tostring(pack_key)
+			end
+			G.GAME.current_round.used_packs = used_packs
+		end
 	end
 	if G.GAME.round_resets then
-		G.GAME.round_resets.ante = tonumber(board_state.ante) or G.GAME.round_resets.ante
+		if board_state.ante ~= nil then
+			G.GAME.round_resets.ante = to_game_number(board_state.ante, G.GAME.round_resets.ante)
+		end
+		if board_state.blind_ante ~= nil then
+			G.GAME.round_resets.blind_ante = to_game_number(board_state.blind_ante, G.GAME.round_resets.blind_ante)
+		elseif board_state.ante ~= nil then
+			G.GAME.round_resets.blind_ante = to_game_number(board_state.ante, G.GAME.round_resets.ante)
+		end
+		if board_state.ante_disp then
+			G.GAME.round_resets.ante_disp = tostring(board_state.ante_disp)
+		elseif G.GAME.round_resets.ante and number_format then
+			G.GAME.round_resets.ante_disp = number_format(G.GAME.round_resets.ante)
+		end
+		if board_state.round ~= nil then
+			G.GAME.round = to_game_number(board_state.round, G.GAME.round)
+		end
+		if board_state.ante_scaling ~= nil then
+			G.GAME.starting_params = G.GAME.starting_params or {}
+			G.GAME.starting_params.ante_scaling = to_game_number(
+				board_state.ante_scaling,
+				G.GAME.starting_params.ante_scaling
+			)
+		end
+		-- HUD DynaText reads round_resets.ante_disp by ref; force a layout
+		-- pass so a switch onto a later ante does not keep the old glyphs.
+		if G.HUD and G.HUD.recalculate then
+			pcall(function()
+				G.HUD:recalculate()
+			end)
+		end
 		if board_state.blind_choices then
 			G.GAME.round_resets.blind_choices = board_state.blind_choices
 		end
@@ -2118,19 +3110,114 @@ function SPECTATOR.apply_live_board_state(board_state)
 		if board_state.blind_states then
 			G.GAME.round_resets.blind_states = board_state.blind_states
 		end
+		if board_state.blind_tags then
+			G.GAME.round_resets.blind_tags = board_state.blind_tags
+		end
+		if board_state.orbital_choices then
+			G.GAME.orbital_choices = board_state.orbital_choices
+		end
+		if board_state.base_hands ~= nil then
+			G.GAME.round_resets.hands = tonumber(board_state.base_hands) or G.GAME.round_resets.hands
+		end
+		if board_state.base_discards ~= nil then
+			G.GAME.round_resets.discards = tonumber(board_state.base_discards) or G.GAME.round_resets.discards
+		end
+		if board_state.temp_handsize ~= nil then
+			G.GAME.round_resets.temp_handsize = tonumber(board_state.temp_handsize) or G.GAME.round_resets.temp_handsize
+		end
+	end
+
+	if board_state.probabilities_normal ~= nil and G.GAME and G.GAME.probabilities then
+		G.GAME.probabilities.normal = tonumber(board_state.probabilities_normal) or 1
+	end
+	if board_state.discount_percent ~= nil and G.GAME then
+		G.GAME.discount_percent = tonumber(board_state.discount_percent) or 0
+	end
+	if board_state.interest_cap ~= nil and G.GAME then
+		G.GAME.interest_cap = tonumber(board_state.interest_cap) or 25
+	end
+	if board_state.last_tarot_planet and G.GAME then
+		G.GAME.last_tarot_planet = board_state.last_tarot_planet
+	end
+
+	-- Sync Poker Hands
+	if board_state.hands and G.GAME then
+		reset_hands_to_base()
+		G.GAME.hands = G.GAME.hands or {}
+		for name, h_info in pairs(board_state.hands) do
+			if G.GAME.hands[name] then
+				if h_info.level ~= nil then G.GAME.hands[name].level = to_game_number(h_info.level, G.GAME.hands[name].level) end
+				if h_info.chips ~= nil then G.GAME.hands[name].chips = to_game_number(h_info.chips, G.GAME.hands[name].chips) end
+				if h_info.mult ~= nil then G.GAME.hands[name].mult = to_game_number(h_info.mult, G.GAME.hands[name].mult) end
+				if h_info.s_chips ~= nil then G.GAME.hands[name].s_chips = to_game_number(h_info.s_chips, G.GAME.hands[name].s_chips) end
+				if h_info.s_mult ~= nil then G.GAME.hands[name].s_mult = to_game_number(h_info.s_mult, G.GAME.hands[name].s_mult) end
+				if h_info.l_chips ~= nil then G.GAME.hands[name].l_chips = to_game_number(h_info.l_chips, G.GAME.hands[name].l_chips) end
+				if h_info.l_mult ~= nil then G.GAME.hands[name].l_mult = to_game_number(h_info.l_mult, G.GAME.hands[name].l_mult) end
+				if h_info.played ~= nil then G.GAME.hands[name].played = tonumber(h_info.played) or 0 end
+				if h_info.played_this_round ~= nil then G.GAME.hands[name].played_this_round = tonumber(h_info.played_this_round) or 0 end
+				if h_info.visible ~= nil then G.GAME.hands[name].visible = not not h_info.visible end
+				if h_info.order ~= nil then G.GAME.hands[name].order = tonumber(h_info.order) or G.GAME.hands[name].order end
+			else
+				G.GAME.hands[name] = {
+					level = to_game_number(h_info.level, 1),
+					chips = to_game_number(h_info.chips, 0),
+					mult = to_game_number(h_info.mult, 0),
+					s_chips = to_game_number(h_info.s_chips, 0),
+					s_mult = to_game_number(h_info.s_mult, 0),
+					l_chips = to_game_number(h_info.l_chips, 0),
+					l_mult = to_game_number(h_info.l_mult, 0),
+					played = tonumber(h_info.played) or 0,
+					played_this_round = tonumber(h_info.played_this_round) or 0,
+					visible = not not h_info.visible,
+					order = tonumber(h_info.order) or 1,
+				}
+			end
+		end
+	end
+
+	-- Collected skip tags (Investment etc.) must be B's before the select
+	-- UI spawns. Leaving A's tags here is what made B still "use" A's skips.
+	-- evaluate_round's Tag:yep removes Investment; eval_pre is the list from
+	-- the start of that call so the spectator still has a row to show.
+	local tag_source = board_state.tags
+	if restoring_eval and eval_pre and type(eval_pre.tags) == "table" then
+		tag_source = eval_pre.tags
+	end
+	if tag_source then
+		if G.GAME.tags then
+			for i = #G.GAME.tags, 1, -1 do
+				local existing = G.GAME.tags[i]
+				pcall(function()
+					if existing and existing.remove then
+						existing:remove()
+					end
+				end)
+			end
+		end
+		G.GAME.tags = {}
+		for _, tag_info in ipairs(tag_source) do
+			if tag_info and tag_info.key and not tag_info.triggered then
+				pcall(function()
+					local tag = Tag(tag_info.key)
+					tag.from_load = true
+					if add_tag then
+						add_tag(tag)
+					else
+						G.GAME.tags[#G.GAME.tags + 1] = tag
+					end
+				end)
+			end
+		end
 	end
 
 	-- 2. Sync Jokers (cleanly remove old cards and instantiate player's exact cards)
-	if G.jokers and board_state.jokers then
-		for i = #G.jokers.cards, 1, -1 do
-			local c = G.jokers.cards[i]
-			c:remove()
-		end
-		G.jokers.cards = {}
-		for _, j_info in ipairs(board_state.jokers) do
+	if G.jokers then
+		wipe_card_area(G.jokers)
+		for _, j_info in ipairs(board_state.jokers or {}) do
 			if j_info.key and G.P_CENTERS[j_info.key] then
 				local empty_card = (G.P_CARDS and G.P_CARDS.empty) or {}
 				local card = Card(G.jokers.T.x, G.jokers.T.y, G.CARD_W, G.CARD_H, empty_card, G.P_CENTERS[j_info.key])
+				if j_info.sort_id then card.sort_id = tonumber(j_info.sort_id) or j_info.sort_id end
 				if j_info.edition then card:set_edition(j_info.edition, true) end
 				if j_info.eternal then card:set_eternal(true) end
 				if j_info.pinned then card.pinned = true end
@@ -2146,8 +3233,12 @@ function SPECTATOR.apply_live_board_state(board_state)
 				G.jokers:emplace(card)
 			end
 		end
-		G.jokers:align_cards()
-		G.jokers:hard_set_cards()
+		if G.jokers.align_cards then
+			G.jokers:align_cards()
+		end
+		if G.jokers.hard_set_cards then
+			G.jokers:hard_set_cards()
+		end
 	end
 
 	-- 3. Sync Consumables
@@ -2157,26 +3248,51 @@ function SPECTATOR.apply_live_board_state(board_state)
 			c:remove()
 		end
 		G.consumeables.cards = {}
-		local consumable_keys = {}
 		for _, c_info in ipairs(board_state.consumeables) do
 			if c_info.key and G.P_CENTERS[c_info.key] then
 				local empty_card = (G.P_CARDS and G.P_CARDS.empty) or {}
 				local card = Card(G.consumeables.T.x, G.consumeables.T.y, G.CARD_W, G.CARD_H, empty_card, G.P_CENTERS[c_info.key])
+				if c_info.sort_id then card.sort_id = tonumber(c_info.sort_id) or c_info.sort_id end
 				if c_info.edition then card:set_edition(c_info.edition, true) end
 				G.consumeables:emplace(card)
-				consumable_keys[#consumable_keys + 1] = tostring(c_info.key)
-					.. (c_info.edition and ("+" .. tostring(c_info.edition)) or "")
 			end
 		end
 		G.consumeables:align_cards()
 		G.consumeables:hard_set_cards()
-		if MP.TESTING and MP.TESTING.log_spectator then
-			MP.TESTING.log_spectator("CONSUMABLES", "stamp", string.format(
-				"count=%d [%s]",
-				#consumable_keys,
-				table.concat(consumable_keys, ", ")
-			))
+	end
+
+	-- Determine target state and pack status early so CardArea alignments
+	-- (especially G.hand during booster packs) know the correct layout branch.
+	local target_state = tonumber(board_state.state) or board_state.state
+	local is_pack_state = is_booster_pack_state(target_state)
+	if is_pack_state then
+		restore_opened_booster(board_state)
+		local has_cards = board_state.pack_cards and #board_state.pack_cards > 0
+		if not opened_booster_center() and not has_cards then
+			teardown_pack_fx()
+			if SMODS then
+				SMODS.OPENED_BOOSTER = nil
+			end
+			is_pack_state = false
+			target_state = tonumber(board_state.pack_interrupt)
+				or ((board_state.shop_cards and #board_state.shop_cards > 0) and G.STATES.SHOP)
+				or G.STATES.BLIND_SELECT
+			remove_ui_box_safely("shop")
+			remove_ui_box_safely("SHOP_SIGN")
+			clear_pack_return_latch()
 		end
+	end
+
+	-- Snap G.hand to resting or round-play position before syncing hand cards
+	if G.hand and G.hand.T and G.hand.VT and G.TILE_H and G.hand.T.h then
+		local in_round = not G.deck_preview and (target_state == G.STATES.SELECTING_HAND or target_state == G.STATES.DRAW_TO_HAND)
+		local desired_y = G.TILE_H - G.hand.T.h - 1.9 * (in_round and 1 or 0)
+		G.hand.T.y = desired_y
+		G.hand.VT.y = desired_y
+	end
+
+	if target_state then
+		G.STATE = target_state
 	end
 
 	-- 4. Sync Hand Cards
@@ -2192,8 +3308,48 @@ function SPECTATOR.apply_live_board_state(board_state)
 	end
 	if is_playing_round_state(board_state.state) then
 		restore_blind_from_snapshot(board_state.blind, board_state)
+		if restoring_eval and G.GAME.blind then
+			if eval_pre and eval_pre.blind_dollars ~= nil then
+				G.GAME.blind.dollars = to_game_number(eval_pre.blind_dollars, G.GAME.blind.dollars)
+			end
+			if eval_pre and eval_pre.blind_chips ~= nil and eval_pre.blind_chips ~= 0 then
+				G.GAME.blind.chips = to_game_number(eval_pre.blind_chips, G.GAME.blind.chips)
+			end
+			if eval_pre and eval_pre.chip_text and eval_pre.chip_text ~= "" and eval_pre.chip_text ~= "0" then
+				G.GAME.blind.chip_text = eval_pre.chip_text
+			end
+			local is_pvp = (G.GAME.blind and (G.GAME.blind.pvp or G.GAME.blind.name == "bl_mp_nemesis"))
+				or (MP.is_pvp_boss and MP.is_pvp_boss())
+				or (MP.is_pvp and MP.is_pvp())
+				or (MP.GAME and (MP.GAME.end_pvp or MP.GAME.pvp))
+			if is_pvp and (not G.GAME.blind.chip_text or G.GAME.blind.chip_text == "" or G.GAME.blind.chip_text == "0") and MP.UI and MP.UI.get_pvp_score_to_beat then
+				local score_int, score_text = MP.UI.get_pvp_score_to_beat()
+				if score_text and score_text ~= "" and score_text ~= "0" then
+					G.GAME.blind.chip_text = score_text
+					if (not G.GAME.blind.chips or G.GAME.blind.chips == 0) and score_int then
+						G.GAME.blind.chips = (MP.INSANE_INT and MP.INSANE_INT.to_safe_number(score_int)) or G.GAME.blind.chips
+					elseif (not G.GAME.blind.chips or G.GAME.blind.chips == 0) and score_text then
+						local num = tonumber((string.gsub(tostring(score_text), ",", "")))
+						if num then G.GAME.blind.chips = num end
+					end
+				end
+			end
+		end
+		local last = (eval_pre and {
+			boss = eval_pre.last_blind_boss,
+			name = eval_pre.last_blind_name,
+		}) or board_state.last_blind
+		if last then
+			G.GAME.last_blind = {
+				boss = not not last.boss,
+				name = last.name,
+			}
+		end
 	else
 		park_blind_hud()
+	end
+	if MP.OPPONENTS and MP.OPPONENTS.refresh_primary_enemy_view then
+		pcall(MP.OPPONENTS.refresh_primary_enemy_view)
 	end
 
 	-- Pool/shop-roll inputs must land BEFORE the state UI transitions below:
@@ -2208,14 +3364,11 @@ function SPECTATOR.apply_live_board_state(board_state)
 	-- G.blind_select and G.blind_prompt_box are managed as a pair: vanilla
 	-- indexes both whenever either exists, so they are only ever removed
 	-- together.
-	local target_state = board_state.state
-	if target_state and G.STATES and target_state == G.STATES.SMODS_BOOSTER_OPENED then
-		restore_opened_booster(board_state)
-	end
-	local is_pack_state = get_pack_ui_builder(target_state) ~= nil
-
 	if not is_pack_state then
-		remove_ui_box_safely("booster_pack")
+		teardown_pack_fx()
+		if SMODS then
+			SMODS.OPENED_BOOSTER = nil
+		end
 	end
 	remove_ui_box_safely("deck_preview")
 
@@ -2232,6 +3385,10 @@ function SPECTATOR.apply_live_board_state(board_state)
 			remove_ui_box_safely("shop")
 			remove_ui_box_safely("SHOP_SIGN")
 			remove_ui_box_safely("round_eval")
+			if target_state == G.STATES.HAND_PLAYED or target_state == G.STATES.DRAW_TO_HAND then
+				G.STATE = G.STATES.SELECTING_HAND
+				G.STATE_COMPLETE = false
+			end
 		elseif target_state == G.STATES.BLIND_SELECT then
 			remove_ui_box_safely("shop")
 			remove_ui_box_safely("SHOP_SIGN")
@@ -2243,7 +3400,6 @@ function SPECTATOR.apply_live_board_state(board_state)
 			-- it ourselves stacked with that update and with failed HUD
 			-- majors that retry every tick.
 			G.STATE_COMPLETE = false
-			spec_blind_log("snap_leave_select", blind_select_debug_snapshot("snapshot BLIND_SELECT, wait for vanilla"))
 		elseif target_state == G.STATES.SHOP then
 			remove_ui_box_safely("blind_select")
 			remove_ui_box_safely("blind_prompt_box")
@@ -2257,33 +3413,39 @@ function SPECTATOR.apply_live_board_state(board_state)
 				end)
 			end
 		elseif is_pack_state then
-			-- Target is mid-pack: rebuild their pack overlay with their real
-			-- contents instead of leaving a blank pack state.
-			remove_ui_box_safely("shop")
-			remove_ui_box_safely("SHOP_SIGN")
+			local interrupt = tonumber(board_state.pack_interrupt) or board_state.pack_interrupt
+			if not interrupt then
+				if board_state.shop_cards and #board_state.shop_cards > 0 then
+					interrupt = G.STATES.SHOP
+				else
+					interrupt = G.STATES.BLIND_SELECT
+				end
+			end
+			SPECTATOR.pack_interrupt = interrupt
+			if board_state.shop_cards and #board_state.shop_cards > 0 then
+				SPECTATOR.cached_pack_return_shop_cards = board_state.shop_cards
+				SPECTATOR.cached_pack_return_round = board_state.round
+			end
 			remove_ui_box_safely("round_eval")
 			remove_ui_box_safely("blind_select")
 			remove_ui_box_safely("blind_prompt_box")
-			rebuild_pack_ui(target_state, board_state)
-			-- update_pack / update_*_pack would spawn a second overlay if
-			-- STATE_COMPLETE is still false after we already built one.
-			G.STATE_COMPLETE = true
+			park_shop_for_pack()
+			if G and G.GAME then
+				G.GAME.PACK_INTERRUPT = interrupt
+			end
+			local pack_ok = rebuild_pack_ui(target_state, board_state)
+			G.STATE = target_state
+			G.STATE_COMPLETE = not not pack_ok
 		elseif target_state == G.STATES.ROUND_EVAL or target_state == G.STATES.NEW_ROUND then
 			remove_ui_box_safely("blind_select")
 			remove_ui_box_safely("blind_prompt_box")
 			remove_ui_box_safely("shop")
 			remove_ui_box_safely("SHOP_SIGN")
-			remove_ui_box_safely("booster_pack")
 			remove_ui_box_safely("deck_preview")
 			remove_ui_box_safely("round_eval")
 			SPECTATOR.eval_hold = true
 			if target_state == G.STATES.ROUND_EVAL then
-				-- Same kick as shop / blind select: vanilla only builds the
-				-- cash-out rows from Game:update_round_eval when
-				-- STATE_COMPLETE is false. The MP prevent_eval latch would
-				-- skip that after the first eval this client ever saw.
 				rebuild_round_eval_ui()
-				park_blind_hud()
 			else
 				G.STATE = G.STATES.BLIND_SELECT
 				G.STATE_COMPLETE = true
@@ -2291,9 +3453,12 @@ function SPECTATOR.apply_live_board_state(board_state)
 		end
 	end
 
-	-- 7. On a switch snapshot only: place the captured shop through vanilla
-	-- constructors. Live cash-out / reroll roll their own shop from the seed.
-	if board_state.shop_cards and #board_state.shop_cards > 0 then
+	-- 7. Stamp shop cards only onto an actual shop screen. Pack snapshots
+	-- park the existing shop; blind select must never inherit shop_cards.
+	if target_state == G.STATES.SHOP
+		and board_state.shop_cards
+		and #board_state.shop_cards > 0
+	then
 		apply_stream_shop(board_state.shop_cards, board_state.round)
 	end
 
@@ -2305,49 +3470,25 @@ function SPECTATOR.apply_live_board_state(board_state)
 		rebuild_area_cards(G.discard, board_state.discard)
 	end
 	refresh_playing_cards()
-	if board_state.tags then
-		if G.GAME.tags then
-			for i = #G.GAME.tags, 1, -1 do
-				local existing = G.GAME.tags[i]
-				pcall(function()
-					if existing and existing.remove then
-						existing:remove()
-					end
-				end)
-			end
-		end
-		G.GAME.tags = G.GAME.tags or {}
-		for _, tag_info in ipairs(board_state.tags) do
-			if tag_info and tag_info.key then
-				pcall(function()
-					local tag = Tag(tag_info.key)
-					tag.from_load = true
-					if add_tag then
-						add_tag(tag)
-					else
-						G.GAME.tags[#G.GAME.tags + 1] = tag
-					end
-				end)
-			end
-		end
-	end
 	if board_state.vouchers_used then
 		G.GAME.used_vouchers = board_state.vouchers_used
 	end
 	if board_state.used_packs and G.GAME.current_round then
 		local used_packs = {}
 		for pack_pos, pack_key in pairs(board_state.used_packs) do
-			used_packs[tostring(pack_pos)] = tostring(pack_key)
+			local pos = tonumber(pack_pos) or pack_pos
+			used_packs[pos] = tostring(pack_key)
 		end
 		G.GAME.current_round.used_packs = used_packs
 	end
 	if board_state.joker_slots and G.jokers and G.jokers.config then
 		G.jokers.config.card_limit = tonumber(board_state.joker_slots) or G.jokers.config.card_limit
 	end
+	if board_state.consumeable_slots and G.consumeables and G.consumeables.config then
+		G.consumeables.config.card_limit = tonumber(board_state.consumeable_slots) or G.consumeables.config.card_limit
+	end
 	if G.hand and G.hand.config then
-		if board_state.hand_size then
-			G.hand.config.card_limit = tonumber(board_state.hand_size) or G.hand.config.card_limit
-		end
+		apply_snapshot_hand_size(board_state)
 		-- SMODS tracks hand limits in card_limits.old_slots / total_slots.
 		-- A snapshot rebuild that only sets card_limit leaves old_slots nil,
 		-- and Hanged Man's deletion then crashes handle_card_limit on
@@ -2364,8 +3505,18 @@ function SPECTATOR.apply_live_board_state(board_state)
 	if G.jokers and G.jokers.config and G.jokers.config.card_limits and G.jokers.config.card_limits.old_slots == nil then
 		G.jokers.config.card_limits.old_slots = G.jokers.config.card_limits.total_slots or G.jokers.config.card_limit
 	end
-	if G.consumeables and G.consumeables.config and G.consumeables.config.card_limits and G.consumeables.config.card_limits.old_slots == nil then
-		G.consumeables.config.card_limits.old_slots = G.consumeables.config.card_limits.total_slots or G.consumeables.config.card_limit
+	if G.consumeables and G.consumeables.config and G.consumeables.config.card_limits then
+		if G.consumeables.config.card_limits.total_slots == nil or board_state.consumeable_slots ~= nil then
+			G.consumeables.config.card_limits.total_slots = G.consumeables.config.card_limit or 2
+		end
+		if G.consumeables.config.card_limits.old_slots == nil or board_state.consumeable_slots ~= nil then
+			G.consumeables.config.card_limits.old_slots = G.consumeables.config.card_limits.total_slots
+		end
+	end
+	if board_state.round_special_cards and G.GAME and G.GAME.current_round then
+		for k, v in pairs(board_state.round_special_cards) do
+			G.GAME.current_round[k] = v
+		end
 	end
 
 	-- 9. Recalculate HUD & Blind HUD
@@ -2378,15 +3529,27 @@ function SPECTATOR.apply_live_board_state(board_state)
 	if target_state ~= G.STATES.ROUND_EVAL and MP.UI and MP.UI.update_blind_HUD then
 		MP.UI.update_blind_HUD()
 	end
+	if should_show_blind_hud(target_state) then
+		show_blind_hud_plaque()
+	end
 	if board_state.location and MP.GAME then
 		MP.GAME.location = board_state.location
-		local location_kind = tostring(board_state.location):match("^([^-]+)") or board_state.location
-		if location_kind == "loc_playing" then
-			if MP.UI and MP.UI.hide_enemy_location then
-				MP.UI.hide_enemy_location()
-			end
-		elseif MP.UI and MP.UI.show_enemy_location then
+	end
+	-- In a round the dollars/chips row is the score. Location belongs on
+	-- shop / blind-select. Always showing location here is why PvP switches
+	-- replaced the score with "Playing …".
+	if should_show_blind_hud(target_state)
+		or (G.STATES and (target_state == G.STATES.ROUND_EVAL or target_state == G.STATES.NEW_ROUND))
+	then
+		if MP.UI and MP.UI.hide_enemy_location then
+			MP.UI.hide_enemy_location()
+		end
+	else
+		if MP.UI and MP.UI.show_enemy_location then
 			MP.UI.show_enemy_location()
+		end
+		if MP.UI and MP.UI.refresh_enemy_location_ui then
+			pcall(MP.UI.refresh_enemy_location_ui)
 		end
 	end
 
@@ -2396,12 +3559,33 @@ function SPECTATOR.apply_live_board_state(board_state)
 	-- deleted ease cannot leave the previous boss room colour stuck.
 	refresh_spectated_blind_backdrop(board_state.state or (G and G.STATE))
 
+	if MP.UI and MP.UI.reapply_active_multiplayer_blind_ui then
+		pcall(MP.UI.reapply_active_multiplayer_blind_ui)
+	end
+
 	SPECTATOR.current_step = board_state.step or SPECTATOR.current_step
 	pcall(restore_shop_pseudorandom, board_state)
+	if board_state.sort_id ~= nil then
+		G.sort_id = tonumber(board_state.sort_id) or G.sort_id
+	end
 	SPECTATOR.shop_joker_queue = nil
 	SPECTATOR.applying_snapshot = false
+
+	if MP.TESTING and MP.TESTING.log_spectator then
+		local h_count = (G and G.hand and G.hand.cards and #G.hand.cards) or 0
+		local d_count = (G and G.deck and G.deck.cards and #G.deck.cards) or 0
+		local disc_left = (G and G.GAME and G.GAME.current_round and G.GAME.current_round.discards_left) or "?"
+		MP.TESTING.log_spectator("SNAP", "applied", string.format("step=%s st=%s hand=%d deck=%d disc=%s",
+			tostring(board_state.step or ""), tostring(board_state.state or ""),
+			h_count, d_count, tostring(disc_left)))
+	end
 	if MP.SYNC and MP.SYNC.TEAM_CARD and MP.SYNC.TEAM_CARD.flush_startup_remote_changes then
 		pcall(MP.SYNC.TEAM_CARD.flush_startup_remote_changes)
+	end
+	if MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL.apply_snapshot_phantoms then
+		pcall(MP.NETWORKING_INTERNAL.apply_snapshot_phantoms, board_state.phantoms)
+	elseif MP.NETWORKING_INTERNAL and MP.NETWORKING_INTERNAL.rebuild_spectator_phantoms then
+		pcall(MP.NETWORKING_INTERNAL.rebuild_spectator_phantoms)
 	end
 	if SPECTATOR.is_catching_up then
 		finish_catch_up()
@@ -2422,7 +3606,6 @@ function SPECTATOR.handle_spectator_history(payload)
 	end
 
 	SPECTATOR.is_spectating = true
-	SPECTATOR.hide_blind_loc_debuff = true
 	SPECTATOR.target_player_id = payload.targetPlayerId
 
 	local seed = payload.seed
@@ -2445,10 +3628,10 @@ function SPECTATOR.handle_spectator_history(payload)
 	elseif lobby_domain and lobby_domain.update_run_deck then
 		lobby_domain.update_run_deck(update)
 	end
-	if BALATRO.set_game_value and MP.UTILS and MP.UTILS.get_deck_key_from_name then
+	if MP.UTILS and MP.UTILS.get_deck_key_from_name then
 		local deck_key = MP.UTILS.get_deck_key_from_name(back)
-		if deck_key and BALATRO.get_center then
-			BALATRO.set_game_value("viewed_back", BALATRO.get_center(deck_key))
+		if deck_key and G and G.GAME then
+			G.GAME["viewed_back"] = (G and G.P_CENTERS and G.P_CENTERS[deck_key] or nil)
 		end
 	end
 
@@ -2491,23 +3674,18 @@ function SPECTATOR.handle_spectator_action_stream(parsed_action)
 
 	local step = tonumber(action_obj.step or parsed_action.stepIndex)
 	if step and step <= SPECTATOR.current_step then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and action_obj.type == "PLAY_HAND" then
-			MP.SPECTATOR_LOG.emit("stream_drop_old_step", { type = action_obj.type, step = step })
-		end
 		return
 	end
 
 	if SPECTATOR.is_catching_up then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit and action_obj.type == "PLAY_HAND" then
-			MP.SPECTATOR_LOG.emit("stream_buffer_catchup", { type = action_obj.type, step = step })
-		end
 		SPECTATOR.pending_actions[#SPECTATOR.pending_actions + 1] = action_obj
 		return
 	end
 
-	if step and step > SPECTATOR.current_step + 1 then
-		-- A dropped packet desyncs the sim. Do not snapshot because a step
-		-- was skipped — snapshots are only for switching targets.
+	local queue = SPECTATOR.pending_replay_queue or {}
+	if #queue > 0 or sim_busy(action_obj.type) or (step and step > SPECTATOR.current_step + 1) then
+		SPECTATOR.enqueue_replay_action(action_obj.type, action_obj.data, step)
+		return
 	end
 
 	SPECTATOR.execute_action(action_obj)
@@ -2525,15 +3703,9 @@ function SPECTATOR.handle_spectator_receive_snapshot(payload)
 	-- snapshot; marking it applied here would discard the only catch-up
 	-- board and leave us generating blind-select UI forever.
 	if not (G and G.GAME and G.STAGE == G.STAGES.RUN) then
-		SPECTATOR._snap_hold_logs = (SPECTATOR._snap_hold_logs or 0) + 1
-		local n = SPECTATOR._snap_hold_logs
-		if n <= 3 or n % 30 == 0 then
-			spec_blind_log("snap_hold", "run not ready, holding snapshot #" .. tostring(n))
-		end
 		SPECTATOR.pending_snapshot_payload = payload
 		return
 	end
-	SPECTATOR._snap_hold_logs = 0
 	SPECTATOR.pending_snapshot_payload = nil
 
 	local ok, board_state = pcall(json.decode, payload.snapshotData)
@@ -2555,41 +3727,21 @@ function SPECTATOR.handle_spectator_receive_snapshot(payload)
 		and last.target == fingerprint.target
 		and last.step == fingerprint.step
 		and last.len == fingerprint.len then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("snap_reject_dup", { snap_step = snapshot_step })
-		end
 		return
 	end
 	if snapshot_step and snapshot_step < SPECTATOR.current_step then
-		if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-			MP.SPECTATOR_LOG.emit("snap_reject_stale", { snap_step = snapshot_step })
-		end
 		return
 	end
 
-	if MP.TESTING and MP.TESTING.RNG_TRACER then
-		local mods = G and G.GAME and G.GAME.modifiers
-		MP.TESTING.RNG_TRACER.act("S", snapshot_step, "SNAPSHOT_APPLY", string.format(
-			"tgt=%s stake=%s et=%s per=%s jr=%s tr=%s pr=%s sr=%s pcr=%s",
-			tostring(payload.targetPlayerId):sub(1, 8),
-			tostring(G and G.GAME and G.GAME.stake),
-			tostring(mods and mods.enable_eternals_in_shop),
-			tostring(mods and mods.enable_perishables_in_shop),
-			tostring(G and G.GAME and G.GAME.joker_rate),
-			tostring(G and G.GAME and G.GAME.tarot_rate),
-			tostring(G and G.GAME and G.GAME.planet_rate),
-			tostring(G and G.GAME and G.GAME.spectral_rate),
-			tostring(G and G.GAME and G.GAME.playing_card_rate)
-		))
-	end
-
-	if MP.TESTING and MP.TESTING.log_spectator then
-		MP.TESTING.log_spectator("SNAP", "apply", string.format(
-			"target=%s step=%s shop_cards=%d",
-			tostring(payload.targetPlayerId):sub(1, 8),
-			tostring(snapshot_step),
-			board_state.shop_cards and #board_state.shop_cards or 0
-		))
+	-- Discard invalid mid-animation snapshots (HAND_PLAYED or DRAW_TO_HAND)
+	-- to prevent corrupting local state with missing/drawing cards.
+	local raw_st = tonumber(board_state.state) or board_state.state
+	if G and G.STATES and (raw_st == G.STATES.HAND_PLAYED or raw_st == G.STATES.DRAW_TO_HAND) then
+		if MP.TESTING and MP.TESTING.log_spectator then
+			MP.TESTING.log_spectator("SNAP", "reject_mid_anim", string.format("st=%s hand=%d",
+				tostring(raw_st), (board_state.hand and #board_state.hand) or 0))
+		end
+		return
 	end
 
 	-- The snapshot is the target's authoritative post-action board, so any
@@ -2599,16 +3751,18 @@ function SPECTATOR.handle_spectator_receive_snapshot(payload)
 		SPECTATOR.pending_replay_queue = {}
 	end
 
+	if MP.TESTING and MP.TESTING.log_spectator then
+		local tgt_short = tostring(payload.targetPlayerId or SPECTATOR.target_player_id):sub(1, 8)
+		local h_count = (board_state.hand and #board_state.hand) or 0
+		local d_count = (board_state.deck and #board_state.deck) or 0
+		local disc_left = board_state.discards_left or "?"
+		MP.TESTING.log_spectator("SNAP", "recv", string.format("tgt=%s step=%s st=%s hand=%d deck=%d disc=%s",
+			tgt_short, tostring(snapshot_step or ""), tostring(board_state.state or ""),
+			h_count, d_count, tostring(disc_left)))
+	end
+
 	SPECTATOR.apply_live_board_state(board_state)
 	SPECTATOR.last_applied_snapshot = fingerprint
-	spec_blind_log("snap_apply", blind_select_debug_snapshot("step=" .. tostring(snapshot_step)))
-	if MP.SPECTATOR_LOG and MP.SPECTATOR_LOG.emit then
-		MP.SPECTATOR_LOG.emit("snap_applied", {
-			snap_step = snapshot_step,
-			snap_state = board_state.state,
-			snap_hands = board_state.hands_left,
-		})
-	end
 end
 
 function SPECTATOR.flush_pending_snapshot()
@@ -2627,16 +3781,21 @@ end
 -- (or stop spectating when nobody is left) instead of freezing on a dead
 -- board.
 function SPECTATOR.ensure_target_valid()
-	if not (SPECTATOR.is_spectating and SPECTATOR.target_player_id and MP.LOBBY and MP.LOBBY.players) then
+	if not (SPECTATOR.is_spectating and SPECTATOR.target_player_id and ((MP.LOBBY and MP.LOBBY.players) or (MP.GAME and MP.GAME.enemies))) then
 		return
 	end
 
 	local target = nil
-	for _, player in ipairs(MP.LOBBY.players) do
-		if player.id == SPECTATOR.target_player_id then
-			target = player
-			break
+	if MP.LOBBY and MP.LOBBY.players then
+		for _, player in ipairs(MP.LOBBY.players) do
+			if player.id == SPECTATOR.target_player_id then
+				target = player
+				break
+			end
 		end
+	end
+	if not target and MP.GAME and MP.GAME.enemies then
+		target = MP.GAME.enemies[SPECTATOR.target_player_id]
 	end
 
 	local reason = nil
@@ -2644,8 +3803,12 @@ function SPECTATOR.ensure_target_valid()
 		reason = "left"
 	elseif target.is_disconnected then
 		reason = "disconnected"
-	elseif target.lives ~= nil and tonumber(target.lives) <= 0 then
-		reason = "eliminated"
+	else
+		local enemy = MP.GAME and MP.GAME.enemies and MP.GAME.enemies[target.id]
+		local lives = (enemy and enemy.lives ~= nil and enemy.lives) or target.lives
+		if lives ~= nil and tonumber(lives) <= 0 then
+			reason = "eliminated"
+		end
 	end
 	if not reason then
 		SPECTATOR.target_invalid_since = nil

@@ -4,15 +4,6 @@ function MP.UTILS.get_deck_key_from_name(_name)
 	end
 end
 
-function MP.UTILS.get_culled_pool(_type, _rarity, _legendary, _append)
-	local pool = get_current_pool(_type, _rarity, _legendary, _append)
-	local ret = {}
-	for i, v in ipairs(pool) do
-		if v ~= "UNAVAILABLE" then ret[#ret + 1] = v end
-	end
-	return ret
-end
-
 -- Drives the grim/familiar/incantation lovely patch. Returns center objects
 -- (not keys) to match the vanilla loop body the patch slots into.
 function MP.UTILS.get_spectral_enhancement_pool()

@@ -1,6 +1,6 @@
 if MP.PLATFORM.SMODS.is_mod_loadable("upgrademod") then
 	function action_asteroid()
-		local hand_type = MP.PLATFORM.BALATRO.get_highest_level_poker_hand(function(_, hand_state)
+		local hand_type = MP.UTILS.get_highest_level_poker_hand(function(_, hand_state)
 			return hand_state.visible
 		end)
 

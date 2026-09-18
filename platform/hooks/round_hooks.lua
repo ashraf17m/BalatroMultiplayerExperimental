@@ -65,6 +65,7 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 					return true
 				end,
 			}))
+			return
 		end
 		return ease_ante_ref(mod)
 	end
@@ -81,9 +82,35 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 		ease_round_ref(mod)
 	end
 
+	local function ensure_deterministic_orbital_choices(ante)
+		if not (G and G.GAME and G.GAME.hands) then
+			return
+		end
+		ante = ante or (G.GAME.round_resets and G.GAME.round_resets.ante) or 1
+		G.GAME.orbital_choices = G.GAME.orbital_choices or {}
+		G.GAME.orbital_choices[ante] = G.GAME.orbital_choices[ante] or {}
+
+		local _poker_hands = {}
+		for k, v in pairs(G.GAME.hands) do
+			if v.visible then
+				_poker_hands[#_poker_hands + 1] = k
+			end
+		end
+		table.sort(_poker_hands)
+
+		if #_poker_hands > 0 then
+			for _, blind_type in ipairs({ "Small", "Big", "Boss" }) do
+				if not G.GAME.orbital_choices[ante][blind_type] then
+					G.GAME.orbital_choices[ante][blind_type] = pseudorandom_element(_poker_hands, pseudoseed("orbital"))
+				end
+			end
+		end
+	end
+
 	local reset_blinds_ref = reset_blinds
 	function reset_blinds()
 		reset_blinds_ref()
+		ensure_deterministic_orbital_choices(G.GAME.round_resets and G.GAME.round_resets.ante)
 		G.GAME.round_resets.pvp_blind_choices = {}
 		G.GAME.round_resets.duel_bye_blind_choices = {}
 		if MP.LOBBY.code then
@@ -124,16 +151,6 @@ function MP.PLATFORM.HOOKS.install_round_hooks()
 			if self.name == "bl_mp_nemesis" then
 				ctx.skip_original = true
 				ctx.results = { G.GAME.blind_on_deck, n = 1 }
-			end
-		end,
-	})
-
-	MP.HOOKS.register_method_hook(EventManager, "EventManager", "add_event", "mp.round_hooks.suppress_next_event", {
-		before = function(ctx)
-			if MP.suppress_next_event then
-				MP.suppress_next_event = false
-				ctx.skip_original = true
-				ctx.results = { n = 0 }
 			end
 		end,
 	})

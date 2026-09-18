@@ -67,15 +67,28 @@ end
 
 local function run_steps(steps, phase, ctx)
 	for _, step in ipairs(steps) do
-		local ok, err = xpcall(function()
-			step.callback(ctx, ctx and ctx.self or nil)
-		end, build_cycle_traceback)
+		local ok, err = pcall(step.callback, ctx, ctx and ctx.self or nil)
 
 		if not ok then
 			warn_cycle("Multiplayer game update step failed (" .. step.key .. ":" .. phase .. ")")
-			trace_cycle(tostring(err))
+			trace_cycle(tostring(build_cycle_traceback(err)))
 		end
 	end
+end
+
+local function unregister_step(steps, key)
+	if type(key) ~= "string" or key == "" then
+		return false
+	end
+
+	for i = 1, #steps do
+		if steps[i].key == key then
+			table.remove(steps, i)
+			return true
+		end
+	end
+
+	return false
 end
 
 function UPDATE_CYCLE.register_before(key, callback, order)
@@ -84,6 +97,14 @@ end
 
 function UPDATE_CYCLE.register_after(key, callback, order)
 	return register_step(UPDATE_CYCLE.after_steps, key, callback, order)
+end
+
+function UPDATE_CYCLE.unregister_before(key)
+	return unregister_step(UPDATE_CYCLE.before_steps, key)
+end
+
+function UPDATE_CYCLE.unregister_after(key)
+	return unregister_step(UPDATE_CYCLE.after_steps, key)
 end
 
 function UPDATE_CYCLE.run_before(ctx)

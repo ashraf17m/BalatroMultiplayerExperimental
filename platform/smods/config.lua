@@ -1,8 +1,8 @@
 MP.PLATFORM = MP.PLATFORM or {}
 MP.PLATFORM.SMODS = MP.PLATFORM.SMODS or {}
 
-local MP_CONFIG_STORAGE_ID = "MPexperimental"
 local MP_CONFIG_LEGACY_STORAGE_IDS = {
+	"MPexperimental",
 	"multiplayer_experimental",
 	"MultiplayerExperimental",
 }
@@ -15,10 +15,15 @@ local function get_config_owner(mod)
 	return mod or MP.PLATFORM.SMODS.get_current_mod() or MP
 end
 
+local function get_primary_storage_id(owner)
+	owner = owner or get_config_owner()
+	return (owner and owner.id) or (MP and MP.BOOT_MOD_ID) or (MP and MP.id) or nil
+end
+
 local function build_mp_config_storage_mod(config, mod, storage_id)
 	local owner = get_config_owner(mod)
 	return {
-		id = storage_id or MP_CONFIG_STORAGE_ID,
+		id = storage_id or get_primary_storage_id(owner),
 		path = owner and owner.path or MP.path,
 		config_file = owner and owner.config_file or "config.lua",
 		config = config,
@@ -62,36 +67,6 @@ local function remove_non_persistent_config_values(config)
 	return config
 end
 
-local function load_default_mod_config(owner)
-	if not (NFS and type(NFS.read) == "function") then
-		return nil
-	end
-
-	owner = get_config_owner(owner)
-	local mod_path = owner and owner.path or MP.path
-	local config_file = owner and owner.config_file or "config.lua"
-	if type(mod_path) ~= "string" then
-		return nil
-	end
-
-	local contents = NFS.read(mod_path .. config_file)
-	if type(contents) ~= "string" then
-		return nil
-	end
-
-	local chunk = load(contents, ("=[SMODS %s \"default_config\"]"):format(owner and owner.id or MP_CONFIG_STORAGE_ID))
-	if type(chunk) ~= "function" then
-		return nil
-	end
-
-	local ok, config = pcall(chunk)
-	if ok and type(config) == "table" then
-		return config
-	end
-
-	return nil
-end
-
 local function load_config_for_storage_id(storage_id, owner)
 	if not has_saved_config(storage_id) then
 		return nil
@@ -101,7 +76,7 @@ local function load_config_for_storage_id(storage_id, owner)
 end
 
 local function migrate_legacy_config(owner, config, preloaded_config)
-	if has_saved_config(MP_CONFIG_STORAGE_ID) then
+	if has_saved_config(get_primary_storage_id(owner)) then
 		return config
 	end
 
@@ -166,7 +141,6 @@ function MP.PLATFORM.SMODS.load_config(mod)
 	local preloaded_config = owner and owner.config or nil
 	local config = SMODS.load_mod_config(build_mp_config_storage_mod(owner and owner.config or nil, owner))
 	config = migrate_legacy_config(owner, config, preloaded_config)
-	config = remove_non_persistent_config_values(config)
 	if type(config) == "table" then
 		owner.config = config
 	end
@@ -180,7 +154,13 @@ function MP.PLATFORM.SMODS.save_config(mod)
 	end
 
 	local owner = get_config_owner(mod)
-	local config = owner and owner.config or MP.config
+	local live_config = owner and owner.config or MP.config
+	local config = {}
+	if type(live_config) == "table" then
+		for key, value in pairs(live_config) do
+			config[key] = value
+		end
+	end
 	config = remove_non_persistent_config_values(config)
 	return SMODS.save_mod_config(build_mp_config_storage_mod(config, owner))
 end
@@ -247,7 +227,7 @@ function MP.PLATFORM.SMODS.set_config_value(path, value, mod)
 end
 
 function MP.PLATFORM.SMODS.get_connection_settings(mod)
-	local config = load_default_mod_config(mod)
+	local config = MP.PLATFORM.SMODS.get_config(mod)
 	local env = MP.ENV or {}
 	local env_port = tonumber(env.server_port)
 	return {

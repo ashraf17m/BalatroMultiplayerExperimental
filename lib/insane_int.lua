@@ -214,6 +214,7 @@ local function ease_display_score_as_safe_value(score_display, target_score, del
 		blockable = false,
 		blocking = false,
 		trigger = "ease",
+		timer = "REAL",
 		delay = delay,
 		ref_table = proxy,
 		ref_value = "value",
@@ -235,7 +236,7 @@ MP.INSANE_INT.ease_display_score = function(score_display, target_score, options
 		return false
 	end
 
-	local delay = options and options.delay or 1
+	local delay = options and options.delay or 0.8
 	if ease_display_score_as_safe_value(score_display, target_score, delay) then
 		return true
 	end
@@ -254,6 +255,7 @@ MP.INSANE_INT.ease_display_score = function(score_display, target_score, options
 		blockable = false,
 		blocking = false,
 		trigger = "ease",
+		timer = "REAL",
 		delay = delay,
 		ref_table = score_display,
 		ref_value = "coefficient",

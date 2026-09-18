@@ -121,7 +121,7 @@ function MP.UTILS.get_recommended_smods_version()
 	return MP.RUNTIME_POLICY
 		and MP.RUNTIME_POLICY.smods
 		and MP.RUNTIME_POLICY.smods.recommended_version
-		or "1.0.0-beta-1814a"
+		or "26.829.0"
 end
 
 function MP.UTILS.is_recommended_smods_version()
@@ -139,10 +139,6 @@ function MP.UTILS.check_smods_recommended_version()
 			vars = { recommended_smods_version },
 		})
 	end
-	return false
-end
-
-function MP.UTILS.check_smods_version()
 	return false
 end
 

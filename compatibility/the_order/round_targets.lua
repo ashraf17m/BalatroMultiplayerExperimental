@@ -2,7 +2,7 @@ local THE_ORDER = MP.COMPAT.THE_ORDER
 
 local original_reset_idol_card = reset_idol_card
 function reset_idol_card()
-	if MP.should_use_the_order() then
+	if MP.should_use_the_order() or MP.is_major_league_ruleset() then
 		G.GAME.current_round.idol_card.rank = "Ace"
 		G.GAME.current_round.idol_card.suit = "Spades"
 
@@ -22,7 +22,7 @@ function reset_idol_card()
 				return 0.95
 			end
 			if edition.holo then
-				return 0.50
+				return 0.15
 			end
 			if edition.foil then
 				return 0.15
@@ -36,12 +36,6 @@ function reset_idol_card()
 				return 0.95
 			end
 			if effect == "Lucky Card" then
-				return 0.45
-			end
-			if effect == "Steel Card" then
-				return 0.15
-			end
-			if effect == "Wild Card" then
 				return 0.15
 			end
 			if effect == "Bonus Card" then
@@ -50,25 +44,12 @@ function reset_idol_card()
 			if effect == "Mult Card" then
 				return 0.10
 			end
-			if effect == "Gold Card" then
-				return 0.05
-			end
 			return 0.0
 		end
 
 		local function seal_weight(card)
-			local seal = card.seal
-			if seal == "Red" then
+			if card.seal == "Red" then
 				return 1.2
-			end
-			if seal == "Purple" then
-				return 0.15
-			end
-			if seal == "Gold" then
-				return 0.30
-			end
-			if seal == "Blue" then
-				return 0.05
 			end
 			return 0.0
 		end
@@ -185,9 +166,9 @@ function reset_idol_card()
 		local weight_edition_a = 1.3
 		local weight_edition_b = 0.7
 		local weight_count_a = 0.5
-		local weight_main = 2.0
-		local weight_off = 1.0
-		local weight_strength = 1.0
+		local weight_main = 2.2
+		local weight_off = 0.8
+		local weight_strength = 0.7
 
 		for _, entry in ipairs(valid_idol_cards) do
 			local rank = entry.value
@@ -283,6 +264,28 @@ function reset_idol_card()
 				G.GAME.current_round.idol_card.rank = idol_card.base.value
 				G.GAME.current_round.idol_card.suit = idol_card.base.suit
 				G.GAME.current_round.idol_card.id = idol_card.base.id
+
+				local rank_codes = { Ace = "A", King = "K", Queen = "Q", Jack = "J", ["10"] = "T" }
+				local function card_token(value, suit)
+					return (rank_codes[value] or tostring(value)) .. tostring(suit):sub(1, 1)
+				end
+				local tokens = {}
+				for _, reel_entry in ipairs(valid_idol_cards) do
+					tokens[#tokens + 1] = string.format(
+						'"%s%s"',
+						card_token(reel_entry.value, reel_entry.suit),
+						tostring(reel_entry.count)
+					)
+				end
+				local idol_payload = string.format(
+					'{"roll":%s,"winner":"%s","cards":[%s]}',
+					tostring(raw_random),
+					card_token(idol_card.base.value, idol_card.base.suit),
+					table.concat(tokens, ",")
+				)
+				if love and love.data and love.data.encode then
+					sendDebugMessage("IDOL_ROLL::" .. love.data.encode("string", "base64", idol_payload), "IdolAlgo")
+				end
 				break
 			end
 		end

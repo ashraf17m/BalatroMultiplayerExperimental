@@ -7,7 +7,7 @@ local RESUME_RUN_FILENAME = "mp_resume_run.jkr"
 local RESUME_META_FILENAME = "mp_resume_meta.jkr"
 
 local function get_profile_prefix()
-	local profile = BALATRO.get_setting_value("profile", 1)
+	local profile = (G and G.SETTINGS and G.SETTINGS["profile"] or 1)
 	return tostring(profile) .. "/"
 end
 

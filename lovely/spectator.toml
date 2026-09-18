@@ -58,3 +58,25 @@ payload = '''if G.blind_select then G.blind_select:remove() end
             if G.blind_prompt_box then G.blind_prompt_box:remove() end'''
 match_indent = true
 times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = "G.booster_pack:remove()"
+position = "at"
+payload = "if G.booster_pack then G.booster_pack:remove() end"
+match_indent = true
+times = 1
+
+[[patches]]
+[patches.pattern]
+target = "functions/button_callbacks.lua"
+pattern = '''G.shop:remove()
+          G.shop = nil
+          G.SHOP_SIGN:remove()'''
+position = "at"
+payload = '''if G.shop then G.shop:remove() end
+          G.shop = nil
+          if G.SHOP_SIGN then G.SHOP_SIGN:remove() end'''
+match_indent = true
+times = 1

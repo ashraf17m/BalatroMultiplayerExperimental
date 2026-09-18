@@ -30,7 +30,11 @@ function MP.is_teams_mode()
 end
 
 function MP.is_coop_lobby_type()
-	return MP.LOBBY and MP.LOBBY.lobby_type == MP.LOBBY_TYPES.COOP
+	return MP.LOBBY and (
+		MP.LOBBY.lobby_type == (MP.LOBBY_TYPES and MP.LOBBY_TYPES.COOP)
+		or MP.LOBBY.lobby_type == "coop"
+		or MP.LOBBY.lobby_type == "lobby_mp_coop"
+	)
 end
 
 function MP.is_duels_bye()
@@ -46,8 +50,7 @@ function MP.is_duels_bye()
 end
 
 local function get_round_resets()
-	local balatro = MP.PLATFORM and MP.PLATFORM.BALATRO or nil
-	return balatro and balatro.get_round_resets and balatro.get_round_resets() or nil
+	return (G and G.GAME and G.GAME.round_resets or nil)
 end
 
 function MP.is_duel_bye_blind_row(row)
@@ -79,12 +82,16 @@ local function get_active_gamemode_key()
 end
 
 function MP.is_coop_gamemode()
-	return get_active_gamemode_key() == "gamemode_mp_coop"
+	local key = get_active_gamemode_key()
+		or (MP.LOBBY and (MP.LOBBY.gamemode or (MP.LOBBY.config and MP.LOBBY.config.gamemode)))
+	return key == "gamemode_mp_coop" or key == "coop"
 end
 
 function MP.is_coop_run()
-	return (MP.is_coop_gamemode and MP.is_coop_gamemode())
-		and (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
+	return not not (
+		(MP.is_coop_gamemode and MP.is_coop_gamemode())
+		or (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
+	)
 end
 
 function MP.is_survival_gamemode()
@@ -95,7 +102,7 @@ function MP.get_lobby_capabilities()
 	local is_teams_mode = not not (MP.is_teams_mode and MP.is_teams_mode())
 	local is_coop_gamemode = not not (MP.is_coop_gamemode and MP.is_coop_gamemode())
 	local is_coop_lobby_type = not not (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
-	local uses_shared_sync_group = is_teams_mode or is_coop_lobby_type
+	local uses_shared_sync_group = is_teams_mode or is_coop_lobby_type or is_coop_gamemode
 	local can_show_shared_progress_options = not not MP.LOBBY
 	local card_sync_option_enabled = is_lobby_config_enabled("team_card_sync")
 	local hand_level_sync_option_enabled = is_lobby_config_enabled("team_hand_level_sync")
@@ -144,7 +151,7 @@ function MP.lobby_players_share_sync_group(left, right, capabilities)
 		return false
 	end
 
-	if lobby_capabilities.is_coop_lobby_type then
+	if lobby_capabilities.is_coop_lobby_type or lobby_capabilities.is_coop_gamemode then
 		return true
 	end
 
@@ -155,84 +162,148 @@ function MP.lobby_players_share_sync_group(left, right, capabilities)
 	return ((left and left.team) or 1) == ((right and right.team) or 1)
 end
 
-local function get_coop_player_count()
+local function count_active_coop_players_in_list(list)
 	local count = 0
-	for _, player in pairs((MP.LOBBY and MP.LOBBY.players) or {}) do
-		if player and player.is_in_match ~= false and player.is_disconnected ~= true then
+	for _, player in pairs(list or {}) do
+		if player and player.is_disconnected ~= true and not (player.is_spectator or player.role == "spectator" or player.spectator == true) then
 			count = count + 1
 		end
 	end
+	return count
+end
+
+local function get_coop_player_count()
+	local count = 0
+	if MP.LOBBY and MP.LOBBY.players and next(MP.LOBBY.players) then
+		count = count_active_coop_players_in_list(MP.LOBBY.players)
+	end
+
+	if count == 0 and MP.GAME and MP.GAME.enemies then
+		local enemies_count = 0
+		for _, enemy in pairs(MP.GAME.enemies) do
+			if enemy and enemy.disconnected ~= true and enemy.is_disconnected ~= true and not (enemy.spectator or enemy.is_spectator) then
+				enemies_count = enemies_count + 1
+			end
+		end
+		count = 1 + enemies_count
+	end
+
 	return math.max(1, count)
 end
 
-local function get_coop_blind_multiplier()
+MP.get_coop_player_count = get_coop_player_count
+
+local function get_coop_target_multiplier(custom_count)
+	local count = math.max(1, custom_count or get_coop_player_count())
 	local per_player = tonumber(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.coop_blind_scaling_per_player) or 1
 	per_player = math.max(0, per_player)
-	return math.max(1, get_coop_player_count() * per_player)
+	local target_multiplier = count * per_player
+	local start_multiplier = 1.0
+	return target_multiplier, start_multiplier, per_player
 end
 
-local function is_big_number(value)
-	if type(is_big) == "function" then
-		local ok, result = pcall(is_big, value)
-		if ok and result then return true end
+local function get_coop_curve_exponent()
+	local exponent = tonumber(MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.coop_blind_scaling_curve)
+	if not exponent or exponent <= 0 then
+		exponent = 1.4
+	end
+	return exponent
+end
+
+local function get_coop_effective_ante(ante)
+	if type(ante) == "number" and ante >= 1 then
+		return ante
+	end
+	local round_resets = (BALATRO and (G and G.GAME and G.GAME.round_resets))
+		or (G and G.GAME and G.GAME.round_resets)
+		or nil
+	local game_ante = (round_resets and (round_resets.blind_ante or round_resets.ante))
+		or (BALATRO and (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or nil))
+		or 1
+	return math.max(1, tonumber(game_ante) or 1)
+end
+
+local function get_coop_blind_multiplier(ante, custom_count)
+	local target_multiplier, start_multiplier, per_player = get_coop_target_multiplier(custom_count)
+	if target_multiplier <= 1 and start_multiplier <= 1 then
+		return 1
 	end
 
-	if Big and type(Big.is) == "function" then
-		local ok, result = pcall(Big.is, value)
-		if ok and result then return true end
+	local current_ante = get_coop_effective_ante(ante)
+	if current_ante <= 1 then
+		return start_multiplier
 	end
 
-	if type(is_number) == "function" then
-		local ok, result = pcall(is_number, value)
-		if ok and result and type(value) ~= "number" then return true end
+	local t = math.min(1, (current_ante - 1) / 7)
+	local exponent = get_coop_curve_exponent()
+	local progress = t ^ exponent
+	return start_multiplier + (target_multiplier - start_multiplier) * progress
+end
+
+local function to_lua_number(value)
+	if type(value) == "number" then
+		return value
+	end
+	if type(to_number) == "function" then
+		local ok, n = pcall(to_number, value)
+		if ok and type(n) == "number" then
+			return n
+		end
+	end
+	if type(value) == "string" then
+		return tonumber((string.gsub(value, ",", "")))
+	end
+	if value == nil then
+		return nil
+	end
+	return tonumber(value) or tonumber((string.gsub(tostring(value), ",", "")))
+end
+
+local function round_coop_blind_amount(value, ante)
+	if ante ~= nil and get_coop_effective_ante(ante) > 8 then
+		return to_lua_number(value) or value
 	end
 
-	if type(value) == "table" and ((value.m ~= nil and value.e ~= nil) or (value.array ~= nil and value.sign ~= nil)) then
-		return true
+	local num = to_lua_number(value)
+	if not num or num <= 0 then
+		return value
 	end
 
-	return false
+	local mag = 10 ^ math.floor(math.log10(num) - 1)
+	local step = math.max(50, mag)
+	return math.ceil(num / step) * step
 end
 
-local function is_scalable_score_amount(value)
-	return type(value) == "number" or is_big_number(value)
-end
+MP.get_coop_target_multiplier = get_coop_target_multiplier
+MP.get_coop_blind_multiplier = get_coop_blind_multiplier
+MP.round_coop_blind_amount = round_coop_blind_amount
 
-local function one_like_score(value)
-	if is_big_number(value) and type(to_big) == "function" then
-		local ok, one = pcall(to_big, 1)
-		if ok and one then return one end
+
+function MP.scale_coop_blind_amount(amount, ante, blind_mult)
+	if not (MP.is_coop_run and MP.is_coop_run()) then
+		return amount
+	end
+	if amount == nil then
+		return amount
 	end
 
-	return 1
-end
+	local coop_mult = get_coop_blind_multiplier(ante)
+	if not coop_mult or coop_mult <= 1 then
+		return amount
+	end
 
-local function floor_score_amount(value)
-	local ok, floored = pcall(math.floor, value)
-	if ok then return floored end
+	local num_amount = to_lua_number(amount)
+	if not num_amount then
+		return amount
+	end
 
-	return value
-end
-
-local function max_score_amount(left, right)
-	local ok, result = pcall(math.max, left, right)
-	if ok then return result end
-
-	local ok_compare, left_is_smaller = pcall(function()
-		return left < right
-	end)
-	if ok_compare and left_is_smaller then return right end
-
-	return left
-end
-
-function MP.scale_coop_blind_amount(amount)
-	if not (MP.is_coop_run and MP.is_coop_run()) then return amount end
-
-	if not is_scalable_score_amount(amount) then return amount end
-
-	local scaled_amount = floor_score_amount(amount * get_coop_blind_multiplier() + 0.5)
-	return max_score_amount(one_like_score(scaled_amount), scaled_amount)
+	-- Round the 1x small-blind unit, then apply Small/Big/Boss (or special boss) mult.
+	local row_mult = to_lua_number(blind_mult)
+	if not row_mult or row_mult <= 0 then
+		row_mult = 1
+	end
+	local unit = num_amount / row_mult
+	return round_coop_blind_amount(unit * coop_mult, ante) * row_mult
 end
 
 function MP.is_coop_blind()

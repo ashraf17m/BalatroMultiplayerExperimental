@@ -42,13 +42,18 @@ function BALATRO.to_score_number(value)
 	return normalize_score_number(value)
 end
 
-function BALATRO.get_player_blind_pos(player)
-	local blind_key = MP.UTILS.blind_col_numtokey(clamp_blind_col(player and player.blind_col))
-	local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(blind_key) or nil
-	if not blind_def then
-		blind_def = BALATRO.get_blind_def and (BALATRO.get_blind_def("bl_small") or BALATRO.get_blind_def("bl_big")) or nil
-	end
+local function get_player_profile_atlas()
+	return BALATRO.get_animation_atlas("mp_player_blind_col")
+		or BALATRO.get_animation_atlas("player_blind_col")
+end
 
+function BALATRO.get_player_blind_pos(player)
+	local blind_col = player and player.blind_col
+	if blind_col == nil and player and player.is_self and MP.UTILS and MP.UTILS.get_blind_col then
+		blind_col = MP.UTILS.get_blind_col()
+	end
+	local blind_key = MP.UTILS and MP.UTILS.blind_col_numtokey and MP.UTILS.blind_col_numtokey(clamp_blind_col(blind_col)) or nil
+	local blind_def = blind_key and (G and G.P_BLINDS and G.P_BLINDS[blind_key]) or nil
 	local blind_pos = blind_def and blind_def.pos or { x = 0, y = 0 }
 	return {
 		x = blind_pos.x or 0,
@@ -57,7 +62,7 @@ function BALATRO.get_player_blind_pos(player)
 end
 
 function BALATRO.get_player_blind_main_colour(player, fallback)
-	local root = BALATRO.get_root and BALATRO.get_root() or nil
+	local root = G or nil
 	local default_col = fallback or (root and (root.C.MULTIPLAYER or root.C.DYN_UI.MAIN or root.C.RED)) or nil
 	if not (MP and MP.UTILS and MP.UTILS.blind_col_numtokey and get_blind_main_colour) then
 		return default_col
@@ -104,7 +109,7 @@ function BALATRO.get_stake_sprite(stake, scale)
 end
 
 function BALATRO.create_blind_style_palette(base_colour)
-	local root = BALATRO.get_root and BALATRO.get_root() or nil
+	local root = G or nil
 	local main = base_colour or (root and (root.C.MULTIPLAYER or root.C.DYN_UI.MAIN or root.C.RED)) or nil
 	local header_colour = main
 	local body_colour = mix_colours(main, root.C.BLACK, 0.54)
@@ -119,16 +124,20 @@ function BALATRO.create_blind_style_palette(base_colour)
 	}
 end
 
+-- Same object as the HUD blind chip: Blind (drag, hover zoom, Blind:align bob).
+-- Spawn is snapped once so a standings rebuild does not ease the sprite in from 0,0.
 local MPPlayerBlindIcon = Blind:extend()
 
 function MPPlayerBlindIcon:init(player, size)
 	local blind_size = size or 0.56
 	Blind.init(self, 0, 0, blind_size, blind_size)
 
-	local atlas = BALATRO.get_animation_atlas("player_blind_col")
-		or BALATRO.get_animation_atlas("mp_player_blind_col")
-		or BALATRO.get_animation_atlas("blind_chips")
+	local atlas = get_player_profile_atlas()
 	local blind_pos = BALATRO.get_player_blind_pos(player)
+	self.pos = blind_pos
+	self.config = self.config or {}
+	self.config.blind = self.config.blind or {}
+	self.config.blind.pos = blind_pos
 
 	self.float = true
 	self.zoom = true
@@ -139,36 +148,35 @@ function MPPlayerBlindIcon:init(player, size)
 	self.states.collide.can = true
 	self.states.click.can = false
 	self.states.release_on.can = false
+	self.created_on_pause = true
 
-	local sprite = self.children and self.children.animatedSprite
-	if sprite then
-		if atlas then
-			sprite.atlas = atlas
-		end
-		if sprite.set_sprite_pos then
-			sprite:set_sprite_pos(blind_pos)
-		else
-			sprite.sprite_pos = blind_pos
-		end
+	local previous_sprite = self.children and self.children.animatedSprite
+	local sprite
+	if atlas and BALATRO.create_animated_sprite then
+		sprite = BALATRO.create_animated_sprite(self.T.x, self.T.y, blind_size, blind_size, atlas, blind_pos)
 	else
-		self.children = self.children or {}
-		sprite = BALATRO.create_animated_sprite(
-			self.T.x,
-			self.T.y,
-			blind_size,
-			blind_size,
-			atlas,
-			blind_pos
-		)
-		self.children.animatedSprite = sprite
+		sprite = previous_sprite
+		if sprite and sprite.set_sprite_pos then
+			sprite:set_sprite_pos(blind_pos)
+		end
 	end
 
-	sprite.states = self.states
-	sprite.states.visible = true
-	sprite.states.drag.can = true
-	sprite.states.collide.can = true
-	sprite.states.click.can = false
-	sprite.states.release_on.can = false
+	if previous_sprite and previous_sprite ~= sprite and previous_sprite.remove then
+		previous_sprite:remove()
+	end
+
+	self.children = self.children or {}
+	self.children.animatedSprite = sprite
+	if sprite then
+		sprite.states = self.states
+		sprite.states.visible = true
+		sprite.states.drag.can = true
+		sprite.states.collide.can = true
+		sprite.created_on_pause = true
+		if sprite.rescale then
+			sprite:rescale()
+		end
+	end
 end
 
 local blind_align = Blind.align
@@ -180,15 +188,16 @@ function MPPlayerBlindIcon:align_to_major()
 	-- the vanilla Blind easing owns the movement (float, drift between slots).
 	if self.spawn_snapped then return end
 	self.spawn_snapped = true
+	if self.hard_set_VT then
+		self:hard_set_VT()
+	end
 	local sprite = self.children and self.children.animatedSprite
 	if sprite then
 		blind_align(self)
-		sprite:hard_set_VT()
+		if sprite.hard_set_VT then
+			sprite:hard_set_VT()
+		end
 	end
-end
-
-if sendDebugMessage then
-	sendDebugMessage("MPPlayerBlindIcon floating icons: position pin active", "MULTIPLAYER")
 end
 
 function BALATRO.create_player_blind_icon_object(player, size)
@@ -252,7 +261,7 @@ function BALATRO.set_hud_blind_panel_labels(top_label, bottom_label)
 end
 
 function BALATRO.set_current_blind_floating_icon_hidden(hidden)
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if not blind then
 		return false
 	end
@@ -262,7 +271,7 @@ function BALATRO.set_current_blind_floating_icon_hidden(hidden)
 end
 
 function BALATRO.set_current_blind_score(chips, chip_text)
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if not blind then
 		return false
 	end
@@ -278,7 +287,7 @@ function BALATRO.set_current_blind_score(chips, chip_text)
 end
 
 function BALATRO.set_current_blind_dollars(dollars)
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if not blind then
 		return false
 	end
@@ -288,12 +297,12 @@ function BALATRO.set_current_blind_dollars(dollars)
 end
 
 function BALATRO.apply_multiplayer_blind_sprite(blind_key)
-	local blind = BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = (G and G.GAME and G.GAME.blind) or nil
 	if not (blind and blind.children and blind.children.animatedSprite and blind_key) then
 		return false
 	end
 
-	local blind_def = BALATRO.get_blind_def and BALATRO.get_blind_def(blind_key) or nil
+	local blind_def = (G and G.P_BLINDS and G.P_BLINDS[blind_key]) or nil
 	if not blind_def then
 		return false
 	end

@@ -75,6 +75,39 @@ local function get_highlighted_area_indices(highlighted)
 	return indices
 end
 
+local function card_sort_id(card)
+	if not card then
+		return nil
+	end
+	return card.sort_id or card.ID
+end
+
+-- Hand first: tarots/spectrals target playing cards. Joker/consumable
+-- highlights are only the fallback (Wheel/Ectoplasm-style).
+local function capture_consumeable_targets()
+	local target_area = "hand"
+	local highlighted = G.hand and G.hand.highlighted
+	local target_indices = get_hand_indices(highlighted)
+	if #target_indices == 0 then
+		if G.jokers and G.jokers.highlighted and #G.jokers.highlighted > 0 then
+			target_area = "jokers"
+			highlighted = G.jokers.highlighted
+			target_indices = get_highlighted_area_indices(highlighted)
+		elseif G.consumeables and G.consumeables.highlighted and #G.consumeables.highlighted > 0 then
+			target_area = "consumeables"
+			highlighted = G.consumeables.highlighted
+			target_indices = get_highlighted_area_indices(highlighted)
+		else
+			highlighted = {}
+		end
+	end
+	local target_ids = {}
+	for _, card in ipairs(highlighted or {}) do
+		target_ids[#target_ids + 1] = card_sort_id(card)
+	end
+	return target_area, target_indices, target_ids
+end
+
 local function get_blind_row_from_event(e)
 	if MP.BLIND_CHOICE_INTERNAL and MP.BLIND_CHOICE_INTERNAL.get_blind_choice_row_type then
 		local row = MP.BLIND_CHOICE_INTERNAL.get_blind_choice_row_type(e)
@@ -98,27 +131,6 @@ local function get_blind_row_from_event(e)
 	end
 end
 
-local function get_current_selected_blind_row()
-	if G and G.GAME and G.GAME.blind then
-		local b = G.GAME.blind
-		if b.boss or (b.key and b.key ~= "bl_small" and b.key ~= "bl_big") then
-			return "Boss"
-		end
-		if b.key == "bl_big" or b.name == "Big Blind" then
-			return "Big"
-		end
-		if b.key == "bl_small" or b.name == "Small Blind" then
-			return "Small"
-		end
-	end
-
-	if G and G.GAME and G.GAME.blind_on_deck then
-		return G.GAME.blind_on_deck
-	end
-
-	return "Small"
-end
-
 local function is_spectating()
 	return not not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
 end
@@ -130,7 +142,7 @@ end
 local reorder_origin = {}
 
 local function is_reorder_tracked_area(area)
-	return not not (G and area and (area == G.hand or area == G.jokers))
+	return not not (G and area and (area == G.hand or area == G.jokers or area == G.consumeables))
 end
 
 local function copy_area_cards(area)
@@ -216,6 +228,7 @@ local function flush_tracked_reorders(keep_origin)
 	end
 	flush_area_reorder(G.hand, keep_origin)
 	flush_area_reorder(G.jokers, keep_origin)
+	flush_area_reorder(G.consumeables, keep_origin)
 end
 
 -- Switch snapshots may skip local shop RNG so the captured offer can be
@@ -234,12 +247,6 @@ local function install_stream_shop_joker_hook()
 	MP.HOOKS.register_method_hook(_G, "_G", "create_card_for_shop", "mp.spectator.stream_shop_jokers", {
 		before = function(ctx)
 			if not is_applying_switch_snapshot() then
-				-- Roll detector: while spectating, every shop card must come
-				-- from either a live seed roll (cash-out/reroll) or a stamp.
-				-- Logging which one fired makes unexplained boards traceable.
-				if is_spectating() and MP.TESTING and MP.TESTING.log_spectator then
-					MP.TESTING.log_spectator("SHOP", "roll", "live create_card_for_shop (seed)")
-				end
 				return
 			end
 			local take = MP.SPECTATOR and MP.SPECTATOR.take_queued_shop_joker
@@ -358,6 +365,12 @@ end
 if Tag and Tag.apply_to_run then
 	MP.HOOKS.register_method_hook(Tag, "Tag", "apply_to_run", "mp.spectator.skip_local_shop_tags", {
 		before = function(ctx)
+			local tag = ctx.self
+			if is_spectating() and tag and tag.triggered then
+				ctx.skip_original = true
+				ctx.results = { n = 1, [1] = nil }
+				return
+			end
 			if not is_applying_switch_snapshot() then
 				return
 			end
@@ -376,45 +389,6 @@ if Tag and Tag.apply_to_run then
 		end,
 	})
 end
-
--- Log every real vanilla spawn (STATE_COMPLETE is false). More than one
--- spawn while an overlay already exists is the overlap loop.
-MP.HOOKS.register_method_hook(Game, "Game", "update_blind_select", "mp.spectator.log_blind_select_spawn", {
-	before = function()
-		local spec = MP.SPECTATOR
-		if not (spec and spec.is_spectating) then
-			return
-		end
-		if G.STATE_COMPLETE then
-			return
-		end
-		spec._blind_select_spawns = (spec._blind_select_spawns or 0) + 1
-		local n = spec._blind_select_spawns
-		local detail = string.format(
-			"#%d catchup=%s has_select=%s events_base=%s uiboxes=%s",
-			n,
-			tostring(spec.is_catching_up),
-			tostring(not not G.blind_select),
-			tostring(G.E_MANAGER and G.E_MANAGER.queues and G.E_MANAGER.queues.base and #G.E_MANAGER.queues.base or 0),
-			tostring(G.I and G.I.UIBOX and #G.I.UIBOX or 0)
-		)
-		if n <= 8 or n % 30 == 0 or G.blind_select then
-			if MP.TESTING and MP.TESTING.log_spectator then
-				MP.TESTING.log_spectator("BLIND", "vanilla_spawn", detail)
-			else
-				print("[SPEC BLIND] vanilla_spawn " .. detail)
-			end
-			if G.blind_select and MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.flaw then
-				MP.SPECTATOR_DIAG.flaw("blind_select.spawn_while_existing", detail)
-			elseif MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.log then
-				MP.SPECTATOR_DIAG.log("blind_select.vanilla_spawn", detail)
-			end
-			if MP.SPECTATOR_DIAG and MP.SPECTATOR_DIAG.flush_buffer then
-				pcall(MP.SPECTATOR_DIAG.flush_buffer)
-			end
-		end
-	end,
-})
 
 -- Spectator input blocking is handled by MP.UI.isolate_spectator_input in
 -- spectator_viewport_view.lua (node-state isolation). No Controller hooks here.
@@ -448,6 +422,40 @@ if Node and type(Node.stop_drag) == "function" then
 	})
 end
 
+local function area_has_dragging_card(area)
+	if not (area and area.cards) then
+		return false
+	end
+	for i = 1, #area.cards do
+		local card = area.cards[i]
+		if card and card.states and card.states.drag and card.states.drag.is then
+			return true
+		end
+	end
+	return false
+end
+
+-- Joker (and hand) order is written by CardArea:align_cards sorting on T.x
+-- while a card is held. Node.stop_drag can be wrapped by other mods; this
+-- flush still sees the permutation after the drag ends.
+if CardArea and type(CardArea.align_cards) == "function" then
+	MP.HOOKS.register_method_hook(CardArea, "CardArea", "align_cards", "mp.spectator.record_joker_reorder", {
+		after = function(ctx, self)
+			if not is_reorder_tracked_area(self) then
+				return
+			end
+			if is_spectating() then
+				return
+			end
+			if area_has_dragging_card(self) then
+				remember_reorder_origin(self)
+			else
+				flush_area_reorder(self, false)
+			end
+		end,
+	})
+end
+
 MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.spectator.record_start_run", {
 	after = function(ctx)
 		if MP.RECORDER and MP.RECORDER.is_recording and not is_spectating() then
@@ -462,6 +470,7 @@ MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.spectator.record_st
 				back = back,
 				stake = stake,
 				challenge = challenge,
+				sort_id = G.sort_id,
 			})
 			reorder_origin = {}
 		end
@@ -480,10 +489,10 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "play_cards_from_highlighted",
 
 MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "discard_cards_from_highlighted", "mp.spectator.record_discard", {
 	before = function(ctx)
-		if not (MP.RECORDER and MP.RECORDER.is_recording and not is_spectating()) then
+		if not is_player_discard_event(ctx) then
 			return
 		end
-		if not is_player_discard_event(ctx) then
+		if not (MP.RECORDER and MP.RECORDER.is_recording and not is_spectating()) then
 			return
 		end
 		flush_tracked_reorders(true)
@@ -540,7 +549,12 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "buy_from_shop", "mp.spectator
 					local card_key = (card.config and card.config.center and card.config.center.key)
 						or (card.config and card.config.center_key)
 					local edition = card.edition and (card.edition.key or card.edition.type)
-					MP.RECORDER.record_buy_and_use(area_name, idx, card_key, edition)
+					local target_area, target_indices, target_ids = capture_consumeable_targets()
+					MP.RECORDER.record_buy_and_use(area_name, idx, card_key, edition, {
+						target_area = target_area,
+						target_indices = target_indices,
+						target_ids = target_ids,
+					})
 				end
 				return
 			end
@@ -576,29 +590,18 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "use_card", "mp.spectator.reco
 				local card_key = (card.config and card.config.center and card.config.center.key) or (card.config and card.config.center_key) or (card.ability and card.ability.name)
 				local edition = card.edition and (card.edition.key or card.edition.type)
 				if area_name == "pack_cards" then
-					MP.RECORDER.record_select_pack_card(idx)
-				elseif (card.ability and card.ability.set == "Booster") or area_name == "shop_booster" then
+					local target_area, target_indices, target_ids = capture_consumeable_targets()
+					MP.RECORDER.record_select_pack_card(idx, card_key, {
+						target_area = target_area,
+						target_indices = target_indices,
+						target_ids = target_ids,
+					})
+				elseif (area_name == "shop_booster" or (card.ability and card.ability.booster_pos)) and not card.from_tag then
 					-- Shop packs use use_card (can_open), not buy_from_shop.
 					MP.RECORDER.record_buy_booster(idx, card_key)
 				else
-					-- Consumable targets: hand is the default for tarots
-					-- (Death, Sun, etc.) — only fall back to jokers/
-					-- consumeables if the hand has no highlights. The old
-					-- priority checked jokers first, so a lingering highlight
-					-- there would steal the target from the hand, which is
-					-- exactly why Death/Sun appeared targetless on spectators.
-					local target_area = "hand"
-					local target_indices = get_hand_indices(G.hand and G.hand.highlighted)
-					if #target_indices == 0 then
-						if G.jokers and G.jokers.highlighted and #G.jokers.highlighted > 0 then
-							target_area = "jokers"
-							target_indices = get_highlighted_area_indices(G.jokers.highlighted)
-						elseif G.consumeables and G.consumeables.highlighted and #G.consumeables.highlighted > 0 then
-							target_area = "consumeables"
-							target_indices = get_highlighted_area_indices(G.consumeables.highlighted)
-						end
-					end
-					MP.RECORDER.record_use_card(area_name, idx, target_indices, target_area, card_key)
+					local target_area, target_indices, target_ids = capture_consumeable_targets()
+					MP.RECORDER.record_use_card(area_name, idx, target_indices, target_area, card_key, target_ids)
 				end
 			end
 		end
@@ -625,6 +628,14 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "toggle_shop", "mp.spectator.r
 	before = function(ctx)
 		if MP.RECORDER and MP.RECORDER.is_recording and not is_spectating() then
 			MP.RECORDER.record_toggle_shop()
+		end
+	end,
+})
+
+MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "evaluate_round", "mp.spectator.record_eval_context", {
+	before = function()
+		if MP.RECORDER and MP.RECORDER.is_recording and not is_spectating() then
+			MP.RECORDER.capture_eval_context()
 		end
 	end,
 })

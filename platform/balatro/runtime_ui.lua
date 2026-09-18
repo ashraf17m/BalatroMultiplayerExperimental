@@ -2,10 +2,9 @@ MP.PLATFORM = MP.PLATFORM or {}
 MP.PLATFORM.BALATRO = MP.PLATFORM.BALATRO or {}
 
 local BALATRO = MP.PLATFORM.BALATRO
-local get_root = BALATRO.get_root
 
 function BALATRO.ensure_ui_functions()
-	local root = get_root()
+	local root = G
 	if not root then
 		return nil
 	end
@@ -48,7 +47,7 @@ function BALATRO.create_event(config)
 end
 
 function BALATRO.add_event(event, queue, front)
-	local root = get_root()
+	local root = G
 	if not (root and root.E_MANAGER and event) then
 		return false
 	end
@@ -62,7 +61,7 @@ function BALATRO.queue_event(config, queue, front)
 end
 
 function BALATRO.get_overlay_menu()
-	local root = get_root()
+	local root = G
 	return root and root.OVERLAY_MENU or nil
 end
 
@@ -83,7 +82,7 @@ function BALATRO.open_overlay_menu(definition_or_payload, config)
 end
 
 function BALATRO.set_overlay_menu(value)
-	local root = get_root()
+	local root = G
 	if not root then
 		return false
 	end
@@ -93,17 +92,17 @@ function BALATRO.set_overlay_menu(value)
 end
 
 function BALATRO.get_overlay_element_by_id(id)
-	local overlay = BALATRO.get_overlay_menu()
+	local overlay = (G and G.OVERLAY_MENU or nil)
 	return overlay and overlay.get_UIE_by_ID and overlay:get_UIE_by_ID(id) or nil
 end
 
 function BALATRO.get_overlay_property(name)
-	local overlay = BALATRO.get_overlay_menu()
+	local overlay = (G and G.OVERLAY_MENU or nil)
 	return overlay and overlay[name] or nil
 end
 
 function BALATRO.set_overlay_property(name, value)
-	local overlay = BALATRO.get_overlay_menu()
+	local overlay = (G and G.OVERLAY_MENU or nil)
 	if not overlay or type(name) ~= "string" or name == "" then
 		return false
 	end

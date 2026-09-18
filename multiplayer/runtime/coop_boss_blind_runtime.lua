@@ -51,7 +51,7 @@ local function warn(message)
 end
 
 local function get_player_id()
-	return BALATRO.get_player_id and BALATRO.get_player_id() or nil
+	return (G and G.MP_ID or nil)
 end
 
 local function is_same_seed_coop_enabled()
@@ -63,18 +63,18 @@ local function is_same_seed_coop_enabled()
 		and MP.is_coop_lobby_type()
 		and MP.ACTIONS
 		and MP.ACTIONS.coop_boss_blind
-		and not (BALATRO.is_game_over_or_win and BALATRO.is_game_over_or_win())
+		and not ((G and (G.STATE == G.STATES.GAME_OVER or G.STATE == G.STATES.GAME_WIN) or false))
 end
 
 local function get_current_ante()
-	local round_resets = BALATRO.get_round_resets and BALATRO.get_round_resets() or nil
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
 	local ante = round_resets and (round_resets.ante or round_resets.blind_ante) or nil
 	return tonumber(ante)
 end
 
 local function is_blind_select_state()
-	local states = BALATRO.get_states and BALATRO.get_states() or nil
-	return states and BALATRO.get_state and BALATRO.get_state() == states.BLIND_SELECT
+	local states = (G and G.STATES) or nil
+	return states and (G and G.STATE) == states.BLIND_SELECT
 end
 
 local function is_current_ante(ante)
@@ -88,19 +88,17 @@ local function is_safe_boss_sync_context(ante)
 		and G
 		and G.blind_select_opts
 		and G.blind_select_opts.boss
-		and BALATRO.get_blind_on_deck
-		and BALATRO.get_blind_on_deck() ~= nil
+		and (G and G.GAME and G.GAME.blind_on_deck or nil) ~= nil
 end
 
 local function get_current_boss_key()
-	return BALATRO.get_blind_choice and BALATRO.get_blind_choice("Boss") or nil
+	return (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.blind_choices and G.GAME.round_resets.blind_choices["Boss"]) or nil
 end
 
 local function is_valid_local_boss_key(boss_key)
 	return boss_key
 		and boss_key ~= ""
-		and BALATRO.get_blind_def
-		and BALATRO.get_blind_def(boss_key) ~= nil
+		and (G and G.P_BLINDS and G.P_BLINDS[boss_key] or nil) ~= nil
 end
 
 local function record_local_boss(ante, boss_key)
@@ -226,7 +224,7 @@ local function increment_boss_usage(boss_key)
 end
 
 local function set_boss_choice(boss_key)
-	local round_resets = BALATRO.get_round_resets and BALATRO.get_round_resets() or nil
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
 	if not (round_resets and round_resets.blind_choices and boss_key) then
 		return false
 	end

@@ -34,31 +34,28 @@ local function preview_string(value)
 	return text
 end
 
-local function decode_preencoded_message(encoded_message)
-	if type(encoded_message) ~= "string" or type(json.decode) ~= "function" then
-		return nil
+local function is_valid_preencoded_message(encoded_message)
+	if type(encoded_message) ~= "string" or #encoded_message < 2 then
+		return false
 	end
 
-	local ok, decoded = pcall(json.decode, encoded_message)
-	if not ok or type(decoded) ~= "table" then
-		return nil
+	local first_char = string.match(encoded_message, "^%s*(%S)")
+	if first_char ~= "{" then
+		return false
 	end
 
-	if decoded.action == nil and decoded.family == nil then
-		return nil
-	end
-
-	return decoded
+	return string.find(encoded_message, '"action"') ~= nil or string.find(encoded_message, '"family"') ~= nil
 end
 
 function Client.queue_send(msg)
 	if type(msg) ~= "table" then
 		local caller = describe_send_caller()
 		if type(msg) == "string" then
-			local decoded = decode_preencoded_message(msg)
-			if decoded then
-				if decoded.action ~= "keepAliveAck" and is_runtime_trace_enabled() and sendTraceMessage then
-					sendTraceMessage(string.format("Client queued pre-encoded message: %s", msg), "MULTIPLAYER")
+			if is_valid_preencoded_message(msg) then
+				if is_runtime_trace_enabled() and sendTraceMessage then
+					if not string.find(msg, '"action"%s*:%s*"keepAliveAck"') then
+						sendTraceMessage(string.format("Client queued pre-encoded message: %s", preview_string(msg)), "MULTIPLAYER")
+					end
 				end
 				return push_ui_to_network(msg)
 			end
@@ -89,13 +86,17 @@ function Client.queue_send(msg)
 		return false
 	end
 
+	if msg.action == "keepAliveAck" and not msg.family and not msg.schemaId then
+		return push_ui_to_network('{"action":"keepAliveAck"}')
+	end
+
 	local encoded_message = json.encode(msg)
 	if not encoded_message then
 		return false
 	end
 
 	if encoded_message ~= '{"action":"keepAliveAck"}' and is_runtime_trace_enabled() and sendTraceMessage then
-		sendTraceMessage(string.format("Client queued message: %s", encoded_message), "MULTIPLAYER")
+		sendTraceMessage(string.format("Client queued message: %s", preview_string(encoded_message)), "MULTIPLAYER")
 	end
 
 	return push_ui_to_network(encoded_message)

@@ -2,10 +2,9 @@ MP.PLATFORM = MP.PLATFORM or {}
 MP.PLATFORM.BALATRO = MP.PLATFORM.BALATRO or {}
 
 local BALATRO = MP.PLATFORM.BALATRO
-local get_root = BALATRO.get_root
 
 function BALATRO.get_hud_blind()
-	local root = get_root()
+	local root = G
 	return root and root.HUD_blind or nil
 end
 
@@ -29,12 +28,12 @@ function BALATRO.recalculate_hud_blind()
 end
 
 function BALATRO.get_hud()
-	local root = get_root()
+	local root = G
 	return root and root.HUD or nil
 end
 
 function BALATRO.get_hud_element_by_id(id)
-	local hud = BALATRO.get_hud()
+	local hud = (G and G.HUD or nil)
 	return hud and hud.get_UIE_by_ID and hud:get_UIE_by_ID(id) or nil
 end
 
@@ -52,17 +51,17 @@ function BALATRO.recalculate_ui(node)
 end
 
 function BALATRO.get_room_attach()
-	local root = get_root()
+	local root = G
 	return root and root.ROOM_ATTACH or nil
 end
 
 function BALATRO.get_main_menu_ui()
-	local root = get_root()
+	local root = G
 	return root and root.MAIN_MENU_UI or nil
 end
 
 function BALATRO.set_main_menu_ui(ui)
-	local root = get_root()
+	local root = G
 	if not root then
 		return false
 	end
@@ -72,7 +71,7 @@ function BALATRO.set_main_menu_ui(ui)
 end
 
 function BALATRO.clear_main_menu_ui()
-	local main_menu_ui = BALATRO.get_main_menu_ui()
+	local main_menu_ui = (G and G.MAIN_MENU_UI or nil)
 	if main_menu_ui and main_menu_ui.remove then
 		main_menu_ui:remove()
 	end
@@ -81,7 +80,7 @@ function BALATRO.clear_main_menu_ui()
 end
 
 function BALATRO.get_ui_definition()
-	local root = get_root()
+	local root = G
 	return root and root.UIDEF or nil
 end
 
@@ -100,7 +99,7 @@ function BALATRO.align_to_major(node)
 end
 
 function BALATRO.snap_controller_to(node)
-	local root = get_root()
+	local root = G
 	if not (root and root.CONTROLLER and root.CONTROLLER.snap_to and node) then
 		return false
 	end
@@ -118,7 +117,7 @@ function BALATRO.snap_controller_to_ui_element(container, id)
 end
 
 function BALATRO.set_paused(value)
-	local settings = BALATRO.get_settings and BALATRO.get_settings() or nil
+	local settings = (G and G.SETTINGS or nil)
 	if not settings then
 		return false
 	end
@@ -128,7 +127,7 @@ function BALATRO.set_paused(value)
 end
 
 function BALATRO.set_no_saving(value)
-	local root = get_root()
+	local root = G
 	if not root then
 		return false
 	end
@@ -138,12 +137,12 @@ function BALATRO.set_no_saving(value)
 end
 
 function BALATRO.get_hud_connection_status()
-	local root = get_root()
+	local root = G
 	return root and root.HUD_connection_status or nil
 end
 
 function BALATRO.set_hud_connection_status(node)
-	local root = get_root()
+	local root = G
 	if not root then
 		return false
 	end
@@ -162,17 +161,12 @@ function BALATRO.clear_hud_connection_status()
 end
 
 function BALATRO.get_animation_atlas(key)
-	local root = get_root()
+	local root = G
 	return root and root.ANIMATION_ATLAS and root.ANIMATION_ATLAS[key] or nil
 end
 
-function BALATRO.get_language_font(key)
-	local root = get_root()
-	return root and root.LANGUAGES and root.LANGUAGES[key] and root.LANGUAGES[key].font or nil
-end
-
 function BALATRO.get_controller_locks()
-	local root = get_root()
+	local root = G
 	return root and root.CONTROLLER and root.CONTROLLER.locks or nil
 end
 
@@ -186,18 +180,8 @@ function BALATRO.set_controller_lock(key, value)
 	return true
 end
 
-function BALATRO.clear_controller_lock(key)
-	local locks = BALATRO.get_controller_locks()
-	if not locks then
-		return false
-	end
-
-	locks[key] = nil
-	return true
-end
-
 function BALATRO.is_controller_mouse_dragging()
-	local root = get_root()
+	local root = G
 	local controller = root and root.CONTROLLER or nil
 	return not not (controller and controller.dragging and controller.dragging.target and not controller.using_touch)
 end

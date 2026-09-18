@@ -1,3 +1,30 @@
+-- Consolidated session_runtime.lua
+-- Combines runtime_policy.lua, network_client_state.lua, and session_runtime.lua
+
+-- ==========================================================================
+-- Section 1: Runtime Policy & Defaults
+-- ==========================================================================
+
+MP.RUNTIME_POLICY = {
+	client = {
+		version = tostring(MP.version or ""),
+	},
+	lovely = {
+		minimum_version = "0.9",
+	},
+	smods = {
+		recommended_version = "26.829.0",
+	},
+}
+
+-- Player ID is assigned by the server and must be set before any game actions.
+-- If nil, it indicates a connection/initialization failure.
+G.MP_ID = nil
+
+-- ==========================================================================
+-- Section 2: Connection & Lobby Session State
+-- ==========================================================================
+
 local session_runtime = {}
 MP.CONNECTION_SESSION = MP.CONNECTION_SESSION or {}
 MP.LOBBY_SESSION = MP.LOBBY_SESSION or {}
@@ -102,11 +129,11 @@ function connection_session.set_client_connected(is_connected)
 end
 
 function connection_session.rebuild_normal_main_menu_shell()
-	if not (BALATRO.is_main_menu_stage and BALATRO.is_main_menu_stage()) then
+	if not ((G and G.STAGES and G.STAGE == G.STAGES.MAIN_MENU or false)) then
 		return false
 	end
 
-	local main_menu_ui = BALATRO.get_main_menu_ui and BALATRO.get_main_menu_ui() or nil
+	local main_menu_ui = (G and G.MAIN_MENU_UI or nil)
 	if not (main_menu_ui and main_menu_ui.is_mp_lobby_menu) then
 		return false
 	end
@@ -129,6 +156,12 @@ function connection_session.clear_local_lobby_session(opts)
 
 	if lobby_domain.clear_session then
 		lobby_domain.clear_session()
+	end
+	if MP.UI and type(MP.UI.reset_end_game_view_runtime) == "function" then
+		local ok, err = pcall(MP.UI.reset_end_game_view_runtime, { preserve_cache = false })
+		if not ok and sendWarnMessage then
+			sendWarnMessage("Failed to clear end-game cache on lobby exit: " .. tostring(err), "MULTIPLAYER")
+		end
 	end
 	if options.clear_reconnect then
 		connection_session.clear_reconnect_lobby_state()
@@ -221,4 +254,112 @@ function lobby_session.apply_initial_lobby_snapshot(options, players, is_host, i
 	return true
 end
 
+
+
+-- ==========================================================================
+-- Section 3: Connection Identity & Reconnect State
+-- ==========================================================================
+
+MP.NETWORKING_INTERNAL = MP.NETWORKING_INTERNAL or {}
+MP.CONNECTION_IDENTITY = MP.CONNECTION_IDENTITY or {}
+local connection_identity = MP.CONNECTION_IDENTITY
+local network_client_state = {}
+
+local function ensure_connection_session()
+	return connection_session
+end
+
+local function resend_identity_if_connected()
+	if
+		MP.LOBBY
+		and MP.LOBBY.client
+		and MP.LOBBY.client.connected
+		and MP.NETWORKING_INTERNAL
+		and MP.NETWORKING_INTERNAL.send_connection_identity
+	then
+		MP.NETWORKING_INTERNAL.send_connection_identity()
+	end
+end
+
+function connection_identity.set_username(username)
+	local next_username = lobby_domain.set_client_username and lobby_domain.set_client_username(username)
+		or (username or "Guest")
+	resend_identity_if_connected()
+	return next_username
+end
+
+function connection_identity.set_blind_col(num)
+	if MP.UTILS and MP.UTILS.clamp_blind_col then
+		num = MP.UTILS.clamp_blind_col(num)
+	end
+	local blind_col = lobby_domain.set_client_blind_col and lobby_domain.set_client_blind_col(num) or (num or 1)
+	resend_identity_if_connected()
+	return blind_col
+end
+
+function connection_identity.sync_blind_target_scale(scale)
+	if not (MP.LOBBY and MP.LOBBY.client) then
+		return nil
+	end
+
+	local numeric_scale = tonumber(scale)
+	if
+		not numeric_scale
+		or numeric_scale ~= numeric_scale
+		or numeric_scale == math.huge
+		or numeric_scale == -math.huge
+	then
+		return nil
+	end
+
+	numeric_scale = math.max(0, numeric_scale)
+	if MP.LOBBY.client.blind_target_scale == numeric_scale then
+		return numeric_scale
+	end
+
+	MP.LOBBY.client.blind_target_scale = numeric_scale
+	resend_identity_if_connected()
+	return numeric_scale
+end
+
+function network_client_state.clear_reconnect_lobby_state()
+	local connection_session = ensure_connection_session()
+	if connection_session and connection_session.clear_reconnect_lobby_state then
+		return connection_session.clear_reconnect_lobby_state()
+	end
+end
+
+function network_client_state.get_reconnect_lobby_state()
+	local connection_session = ensure_connection_session()
+	if connection_session and connection_session.get_reconnect_lobby_state then
+		return connection_session.get_reconnect_lobby_state()
+	end
+
+	return nil, nil
+end
+
+function network_client_state.set_reconnect_lobby_state(token, code)
+	local connection_session = ensure_connection_session()
+	if connection_session and connection_session.set_reconnect_lobby_state then
+		return connection_session.set_reconnect_lobby_state(token, code)
+	end
+end
+
+function network_client_state.ensure_server_player_id(player_id, failure_message)
+	if player_id then
+		return true
+	end
+
+	sendWarnMessage("Server error: playerId not provided. " .. failure_message, "MULTIPLAYER")
+	return false
+end
+
+MP.NETWORKING_INTERNAL.clear_reconnect_lobby_state = network_client_state.clear_reconnect_lobby_state
+MP.NETWORKING_INTERNAL.get_reconnect_lobby_state = network_client_state.get_reconnect_lobby_state
+MP.NETWORKING_INTERNAL.set_reconnect_lobby_state = network_client_state.set_reconnect_lobby_state
+MP.NETWORKING_INTERNAL.ensure_server_player_id = network_client_state.ensure_server_player_id
+
+
+
+session_runtime.IDENTITY = connection_identity
 return session_runtime

@@ -49,9 +49,10 @@ pattern = '''G.FUNCS.change_stake({to_key = G.viewed_stake})
 position = 'after'
 payload = '''if MP.LOBBY.code then
     local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
-    local lobby_deck = lobby_domain.get_run_deck and lobby_domain.get_run_deck() or lobby_domain.build_initial_run_deck_state()
-    G.viewed_stake = lobby_deck.stake
-    G.FUNCS.change_stake({to_key = G.viewed_stake})
+    local lobby_deck = lobby_domain.get_effective_lobby_deck and lobby_domain.get_effective_lobby_deck() or (lobby_domain.get_run_deck and lobby_domain.get_run_deck()) or lobby_domain.build_initial_run_deck_state()
+    local stake_idx = tonumber(lobby_deck.stake) or (MP.get_stake_index and MP.get_stake_index(lobby_deck.stake)) or 1
+    G.viewed_stake = stake_idx
+    G.FUNCS.change_stake({to_key = G.viewed_stake, to_val = G.viewed_stake})
   end'''
 match_indent = true
 times = 1
@@ -71,7 +72,7 @@ target = "functions/UI_definitions.lua"
 pattern = '''G.GAME.viewed_back = Back(get_deck_from_name(G.PROFILES[G.SETTINGS.profile].MEMORY.deck))'''
 position = 'at'
 payload = '''local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
-local lobby_deck = lobby_domain.get_run_deck and lobby_domain.get_run_deck() or lobby_domain.build_initial_run_deck_state()
+local lobby_deck = lobby_domain.get_effective_lobby_deck and lobby_domain.get_effective_lobby_deck() or (lobby_domain.get_run_deck and lobby_domain.get_run_deck()) or lobby_domain.build_initial_run_deck_state()
 G.GAME.viewed_back = MP.LOBBY.code and Back(get_deck_from_name(lobby_deck.back)) or Back(get_deck_from_name(G.PROFILES[G.SETTINGS.profile].MEMORY.deck))'''
 match_indent = true
 times = 1

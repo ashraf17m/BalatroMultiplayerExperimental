@@ -1,7 +1,78 @@
+MP = MP or {}
 MP.UI = MP.UI or {}
+MP.UTILS = MP.UTILS or {}
 
 local ui_api = MP.UI
 local load_required_service = MP.UTILS.load_required_service
+local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
+
+local ui_state_store = {}
+
+function ui_state_store.get_runtime_store()
+	MP.UI.RUNTIME = MP.UI.RUNTIME or {}
+	return MP.UI.RUNTIME
+end
+
+function ui_state_store.get_lobby_overlay_runtime()
+	local runtime = ui_state_store.get_runtime_store()
+	runtime.lobby_overlay = runtime.lobby_overlay or {
+		pending_surface = nil,
+		active_surface = nil,
+		active_team_picker_player_id = nil,
+		suppress_next_team_picker_refresh = nil,
+	}
+	return runtime.lobby_overlay
+end
+
+function ui_state_store.get_match_lobby_info_runtime()
+	local runtime = ui_state_store.get_runtime_store()
+	runtime.match_lobby_info = runtime.match_lobby_info or {
+		pending_refresh = false,
+		active = false,
+		players_page = 1,
+	}
+	return runtime.match_lobby_info
+end
+
+function ui_state_store.get_lobby_session_runtime()
+	local runtime = ui_state_store.get_runtime_store()
+	runtime.lobby_session = runtime.lobby_session or {
+		pending_option_failure_message = nil,
+	}
+	return runtime.lobby_session
+end
+
+function ui_state_store.close_active_overlay_menu()
+	if (G and G.OVERLAY_MENU) then
+		return not not (BALATRO.exit_overlay_menu and BALATRO.exit_overlay_menu())
+	end
+
+	return false
+end
+
+function ui_state_store.get_player_list_runtime()
+	local runtime = ui_state_store.get_runtime_store()
+	runtime.player_list = runtime.player_list or {
+		ui = nil,
+		ui_boxes = nil,
+		saved_theme = nil,
+		hud_is_standings = false,
+		ui_signature = nil,
+		ui_mode = nil,
+		ui_major = nil,
+		ffa_standings = {
+			scroll_index = 1,
+		},
+		full_standings_page = 1,
+		full_standings_page_count = 1,
+		teams_standings = {
+			scroll_index = 1,
+		},
+		full_teams_standings_page = 1,
+		full_teams_standings_page_count = 1,
+	}
+	return runtime.player_list
+end
 
 local state_store_api_methods = {
 	"get_runtime_store",
@@ -35,26 +106,18 @@ local function bind_ui_api_methods(source, method_names)
 	end
 end
 
-local ui_state_store = load_required_service(
-	"multiplayer/ui/ui_state_store.lua",
-	state_store_api_methods,
-	"Multiplayer UI state runtime service is missing."
-)
-if not ui_state_store then
-	return nil
-end
-
-local ui_refresh = load_required_service(
-	"multiplayer/runtime/ui_refresh_queue.lua",
-	refresh_api_methods,
-	"Multiplayer UI refresh runtime service is missing."
-)
-if not ui_refresh then
-	return nil
-end
-
 bind_ui_api_methods(ui_state_store, state_store_api_methods)
-bind_ui_api_methods(ui_refresh, refresh_api_methods)
+
+if load_required_service then
+	local ui_refresh = load_required_service(
+		"multiplayer/runtime/ui_refresh_queue.lua",
+		refresh_api_methods,
+		"Multiplayer UI refresh runtime service is missing."
+	)
+	if ui_refresh then
+		bind_ui_api_methods(ui_refresh, refresh_api_methods)
+	end
+end
 
 function ui_api.add_nemesis_info(info_queue)
 	if not info_queue or not MP or not MP.LOBBY or not MP.LOBBY.code then

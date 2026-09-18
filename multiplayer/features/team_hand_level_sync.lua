@@ -10,115 +10,74 @@ team_hand_level_sync._loaded = true
 
 local is_applying_remote_change = false
 local pending_remote_syncs = {}
-local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
-
-local function is_finite_number(value)
-	return type(value) == "number"
-		and value == value
-		and value ~= math.huge
-		and value ~= -math.huge
-end
-
-local function normalize_level_text(value)
-	if value == nil then
-		return nil
-	end
-
-	local text = tostring(value)
-	text = string.gsub(text, ",", "")
-	text = string.gsub(text, "^%s+", "")
-	text = string.gsub(text, "%s+$", "")
-
-	if text == "" or text == "nan" or text == "inf" or text == "-inf" then
-		return nil
-	end
-	return text
-end
-
-local function to_local_finite_number(value)
-	if is_finite_number(value) then
-		return value
-	end
-
-	if type(to_number) ~= "function" then
-		return nil
-	end
-
-	local ok, numeric_value = pcall(to_number, value)
-	if ok and is_finite_number(numeric_value) then
-		return numeric_value
-	end
-	return nil
-end
 
 local function serialize_hand_level(level)
-	local numeric_level = to_local_finite_number(level)
-	if numeric_level ~= nil then
-		return normalize_level_text(numeric_level)
+	if level == nil then
+		return nil
 	end
-
-	return normalize_level_text(level)
+	if type(level) == "number" then
+		return tostring(math.floor(level))
+	end
+	return tostring(level)
 end
 
 local function parse_hand_level(level)
-	if is_finite_number(level) then
+	if type(level) == "number" then
 		return level
 	end
-
-	local level_text = normalize_level_text(level)
-	if not level_text then
+	if level == nil then
 		return nil
 	end
-
-	local numeric_level = tonumber(level_text)
-	if is_finite_number(numeric_level) then
-		return numeric_level
+	local num = tonumber(level)
+	if num ~= nil then
+		return num
 	end
-
-	if type(to_big) ~= "function" then
-		return nil
-	end
-
-	local ok, parsed_level = pcall(to_big, level_text)
-	if ok and parsed_level ~= nil and type(parsed_level) ~= "string" then
-		return parsed_level
+	if type(to_big) == "function" then
+		local ok, big_val = pcall(to_big, level)
+		if ok and big_val ~= nil then
+			return big_val
+		end
 	end
 	return nil
 end
 
-local function game_numbers_equal(left, right)
-	if left == right then
-		return true
-	end
-
-	if type(to_big) ~= "function" then
-		return false
-	end
-
-	local ok, equal = pcall(function()
-		return to_big(left) == to_big(right)
-	end)
-	return ok and equal or false
-end
-
-local function subtract_game_numbers(left, right)
-	local ok, delta = pcall(function()
-		return left - right
-	end)
-	if ok then
-		return delta
-	end
-
-	if type(to_big) ~= "function" then
+local function calculate_hand_level_delta(target_level, current_level)
+	if target_level == nil or current_level == nil then
 		return nil
 	end
 
-	ok, delta = pcall(function()
-		return to_big(left) - to_big(right)
+	-- Fast path: standard numbers
+	if type(target_level) == "number" and type(current_level) == "number" then
+		local delta = target_level - current_level
+		if delta > 0 then
+			return delta
+		end
+		return nil -- Monotonic: do not downlevel or no-op
+	end
+
+	-- Talisman / BigNumber path
+	if type(to_big) == "function" then
+		local ok, is_greater = pcall(function()
+			return to_big(target_level) > to_big(current_level)
+		end)
+		if ok and is_greater then
+			local sub_ok, diff = pcall(function()
+				return to_big(target_level) - to_big(current_level)
+			end)
+			if sub_ok and diff ~= nil then
+				return diff
+			end
+		end
+		return nil
+	end
+
+	local ok, delta = pcall(function()
+		return target_level - current_level
 	end)
-	if ok then
+	if ok and type(delta) == "number" and delta > 0 then
 		return delta
 	end
+
 	return nil
 end
 
@@ -126,16 +85,17 @@ local function is_team_hand_level_sync_active()
 	-- Not gated on the shared hand-level option: that option only controls
 	-- teammate routing (owned by the server). Spectators of this player rely
 	-- on these syncs reaching the server.
-	return BALATRO.is_run_stage and BALATRO.is_run_stage()
-		and BALATRO.get_hands and BALATRO.get_hands()
+	return (G and G.STAGES and G.STAGE == G.STAGES.RUN or false)
+		and (G and G.GAME and G.GAME.hands)
 		and MP.LOBBY
 		and MP.LOBBY.code
-		and BALATRO.is_game_over_or_win and not BALATRO.is_game_over_or_win()
+		and not (G and (G.STATE == G.STATES.GAME_OVER or G.STATE == G.STATES.GAME_WIN) or false)
 		and not (MP.GAME and MP.GAME.won)
+		and not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
 end
 
 local function get_hand_level(hand)
-	return BALATRO.get_hand_level and BALATRO.get_hand_level(hand) or nil
+	return (G and G.GAME and G.GAME.hands and G.GAME.hands[hand] and G.GAME.hands[hand].level or nil)
 end
 
 team_hand_level_sync.get_hand_level = get_hand_level
@@ -173,10 +133,7 @@ function team_hand_level_sync.handle_sync(data)
 	local hand = type(data) == "table" and data.hand or nil
 	local target_level = type(data) == "table" and parse_hand_level(data.level) or nil
 
-	if type(hand) ~= "string" or hand == "" then
-		return
-	end
-	if target_level == nil then
+	if type(hand) ~= "string" or hand == "" or target_level == nil then
 		return
 	end
 
@@ -186,8 +143,8 @@ function team_hand_level_sync.handle_sync(data)
 		return
 	end
 
-	local delta = subtract_game_numbers(target_level, current_level)
-	if delta == nil or game_numbers_equal(delta, 0) then
+	local delta = calculate_hand_level_delta(target_level, current_level)
+	if delta == nil then
 		return
 	end
 
@@ -211,3 +168,4 @@ function team_hand_level_sync.handle_sync(data)
 end
 
 -- Team hand-level host hooks now live in `overrides/team_hand_level_sync.lua`.
+return team_hand_level_sync

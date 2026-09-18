@@ -90,18 +90,12 @@ MP.UTILS.build_traceback = (MP.BOOTSTRAP_INTERNAL and MP.BOOTSTRAP_INTERNAL.buil
 	return tostring(err)
 end
 
-local unpack_values = table.unpack or unpack
-
 function MP.UTILS.pack_values(...)
-	return { n = select("#", ...), ... }
+	return MP.BOOTSTRAP_INTERNAL.pack_values(...)
 end
 
 function MP.UTILS.unpack_packed(values)
-	if not values then
-		return
-	end
-
-	return unpack_values(values, 1, values.n or #values)
+	return MP.BOOTSTRAP_INTERNAL.unpack_packed(values)
 end
 
 function MP.UTILS.has_required_methods(surface, methods)

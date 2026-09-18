@@ -20,7 +20,7 @@ local beginReconnect
 local keepAliveInitialTimeout = 20
 local keepAliveRetryTimeout = 5
 local keepAliveRetryCount = 4
-local maxOutgoingBufferBytes = 262144
+local maxOutgoingBufferBytes = 1048576
 
 local isRetry = false
 local retryCount = 0
@@ -172,6 +172,10 @@ end
 sendToServer = function(message)
 	if not Networking.Client or isSocketClosed then return false end
 	if message and message ~= "" then
+		if outgoingBuffer ~= "" then
+			flushServerOutgoingBuffer()
+		end
+
 		if (#outgoingBuffer + #message) > maxOutgoingBufferBytes then
 			beginReconnect()
 			return false

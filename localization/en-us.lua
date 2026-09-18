@@ -139,233 +139,6 @@ return {
 					"{X:mult,C:white} X#3# {} Mult when scored",
 				},
 			},
-			j_mp_magnet_sandbox = {
-				name = "Magnet",
-				text = {
-					"After {C:attention}#1#{} rounds, sell",
-					"this card to {C:attention}Copy{} your {X:purple,C:white}Nemesis'{}",
-					"highest sell cost {C:attention}Joker{}",
-					"polarity inverts after {C:attention}#3#{} rounds",
-					"BECOMING WORTHLESS SCRAP METAL!!!!",
-					"{C:inactive}(Currently {C:attention}#2#{C:inactive}/#1# rounds)",
-				},
-			},
-			j_mp_cloud_9_sandbox = {
-				name = "Cloud 9",
-				text = {
-					"NUMERAL MONOCULTURE FARMER",
-					"converting your DIVERSE DECK into",
-					"PROFITABLE NINE PLANTATION!!!!",
-					"{C:inactive}({C:green}#1# in #2#{} {C:inactive}chance, currently {C:money}$#3#{}{C:inactive})",
-				},
-			},
-			j_mp_lucky_cat_sandbox = {
-				name = "Lucky Cat",
-				text = {
-					"FORTUNE-TO-FRAGILITY PIPELINE OPERATOR",
-					"lucky cats become GLASS CATS",
-					"with EXPONENTIAL POWER!!!!",
-					"{C:inactive}(Currently {X:mult,C:white} X#2# {C:inactive} Mult)",
-				},
-			},
-			j_mp_constellation_sandbox = {
-				name = "Constellation",
-				text = {
-					"planet maintenance anxiety disorder",
-					"MUST FEED THE TAMAGOCHI",
-					"or it WITHERS AWAY!!!!",
-					"{C:inactive}(Currently {X:mult,C:white} X#1# {C:inactive} Mult)",
-				},
-			},
-			j_mp_bloodstone_sandbox = {
-				name = "Bloodstone",
-				text = {
-					"{V:1}PATCH NOTE REGRESSION SYNDROME",
-					"reverting to LAUNCH DAY TRAUMA",
-					"for NOSTALGIC {X:mult,C:white}X#3#{} POWER SPIKES!!!!",
-					"{C:inactive}({C:green}#1# in #2#{} {C:inactive}chance)",
-				},
-			},
-			j_mp_juggler_sandbox = {
-				name = "Juggler",
-				text = {
-					"HAND SIZE PERFECTIONIST",
-					"who must keep ALL THE CARDS",
-					"in the air AT ALL TIMES!!!!",
-					"{C:inactive}(Currently {C:attention}+#1#{C:inactive} hand size)",
-				},
-			},
-			j_mp_mail_sandbox = {
-				name = "Mail-in Rebate",
-				text = {
-					"Earn {C:money}$#1#{} for each",
-					"discarded {C:attention}#2#{}",
-					"{s:0.8}Rank never changes",
-				},
-			},
-			j_mp_hit_the_road_sandbox = {
-				name = "Hit the Road",
-				text = {
-					"This Joker gains {X:mult,C:white}X0.75{} Mult",
-					"for every {C:attention}Jack{} discarded",
-					"Discarded Jacks are {C:attention}destroyed{}",
-					"{C:inactive}(Currently {X:mult,C:white} X#2# {C:inactive} Mult)",
-				},
-			},
-			j_mp_misprint_sandbox = {
-				name = "Misprint",
-				text = {
-					"{V:1}#1#{} Mult",
-					"{C:attention}Value revealed on purchase{}",
-					"{C:green}Printing errors compound{}",
-				},
-			},
-			j_mp_castle_sandbox = {
-				name = "Castle",
-				text = {
-					"This Joker gains {C:chips}#3{} Chips",
-					"per discarded {V:1}#1#{}",
-					"Suit locked on purchase",
-					"{C:inactive}(Currently {C:chips}+#2#{C:inactive} Chips)",
-				},
-			},
-			j_mp_runner_sandbox = {
-				name = "Runner",
-				text = {
-					"SEQUENTIAL CARD SUPREMACIST",
-					"who believes ALL other",
-					"POKER HANDS are INFERIOR!!!!",
-					"{C:inactive}(Currently {C:chips}+#1#{C:inactive})",
-				},
-			},
-			j_mp_order_sandbox = {
-				name = "The Order",
-				text = {
-					"{X:mult,C:white}X3{} Mult if played hand contains a {C:attention}Straight{}",
-					"Gains {X:mult,C:white}X#1#{} Mult for each consecutive {C:attention}Straight{} played",
-					"Resets when any other hand is played",
-					"{C:inactive}(Currently {X:mult,C:white}X#2#{C:inactive} Mult)",
-				},
-			},
-			j_mp_photograph_sandbox = {
-				name = "Photograph",
-				text = {
-					"SINGLE SHOT PHOTOGRAPHER who gets",
-					"ONE PERFECT FRAME PER HAND!!!!",
-				},
-			},
-			j_mp_ride_the_bus_sandbox = {
-				name = "Ride the Bus",
-				text = {
-					"FACE CARD SOBRIETY PROGRAM",
-					"ONE FACE CARD and you're",
-					"KICKED OFF THE BUS!!!!",
-					"{C:inactive}(Currently {C:mult}+#1#{C:inactive} Mult)",
-				},
-			},
-			j_mp_loyalty_card_sandbox = {
-				name = "Loyalty Card",
-				text = {
-					"{X:mult,C:white}X6{} Mult every {C:attention}#3#{}",
-					"hands played of {C:attention}#1#{}",
-					"{C:inactive}(#2#/#3#)",
-				},
-			},
-			j_mp_faceless_sandbox = {
-				name = "Faceless Joker",
-				text = {
-					"ELITE FACE CARD SOMMELIER",
-					"who curates artisanal",
-					"THREE-VARIETY TASTING FLIGHTS",
-					"for PREMIUM DISPOSAL EXPERIENCES!!!!",
-				},
-			},
-			j_mp_square_sandbox = {
-				name = "Square Joker",
-				text = {
-					"This Joker gains {C:chips}+#2#{} Chips",
-					"if played hand has",
-					"exactly {C:attention}4{} cards",
-					"{C:attention}Only applies with 4-card hands{}",
-					"{C:inactive}(Currently {C:chips}+#1#{C:inactive} Chips)",
-				},
-			},
-			j_mp_throwback_sandbox = {
-				name = "Throwback",
-				text = {
-					"{X:mult,C:white}X#2#{} Base Mult for each",
-					"{C:attention}Blind{} skipped this run",
-					"{X:mult,C:white}X#3#{} Mult next Blind after skipping",
-					"Loses {X:mult,C:white}X#4#{} when Blind not skipped",
-					"{C:inactive}(Currently {X:mult,C:white} X#1# {C:inactive} Mult)",
-				},
-			},
-			j_mp_vampire_sandbox = {
-				name = "Vampire",
-				text = {
-					"This Joker gains {X:mult,C:white}X#1#{} Mult per",
-					"scoring {C:attention}Enhanced card{} played",
-					"Played enhanced cards become {C:attention}Stone{}",
-					"Stone cards give {C:money}$#3#{} when played",
-					"{C:inactive}(Currently {X:mult,C:white} X#2# {C:inactive} Mult)",
-				},
-			},
-			j_mp_baseball_sandbox = {
-				name = "Baseball Card",
-				text = {
-					"{C:green}Uncommon{} Jokers",
-					"each give",
-					"{X:mult,C:white}X#1#{} Mult",
-				},
-			},
-			j_mp_steel_joker_sandbox = {
-				name = "Steel Joker",
-				text = {
-					"Played Steel cards",
-					"are {C:attention}retriggered{}",
-				},
-			},
-			j_mp_golden_ticket_sandbox = {
-				name = "Golden Ticket",
-				text = {
-					"{C:green}#2# in #3#{} chance for",
-					"{C:attention}Gold{} cards to earn",
-					"{C:money}$#1#{} when played",
-				},
-			},
-			j_mp_satellite_sandbox = {
-				name = "Satellite",
-				text = {
-					"chronic satellite degradation anxiety",
-					"INFRASTRUCTURE SLOWLY FALLS APART",
-					"WITHOUT CONSTANT PLANETARY UPGRADES!!!!",
-					"{C:inactive}(Currently {C:money}$#1#{C:inactive})",
-				},
-			},
-			j_mp_idol_sandbox_zealot = {
-				name = "Zealot Idol",
-				text = {
-					"Each played {C:attention}#1#{}",
-					"gives {X:mult,C:white}X#2#{} Mult",
-					"when scored",
-					"{s:0.8}Card changes every round",
-				},
-			},
-			j_mp_idol_sandbox_collector = {
-				name = "Collector's Idol",
-				text = {
-					"Most common card gives",
-					"{X:mult,C:white}X#3#{} Mult when scored",
-					"({X:mult,C:white}+X#4#{} per copy in deck)",
-					"{C:inactive}(Currently {C:attention}#1#{} of {V:1}#2#{})",
-				},
-			},
-			j_mp_error_sandbox = {
-				name = "????",
-				text = {
-					"{X:purple,C:white,s:0.85}something's{} {X:purple,C:white,s:0.85}wrong",
-				},
-			},
 			j_mp_clowncollege_sandbox = {
 				name = "Clown College",
 				text = {
@@ -992,6 +765,7 @@ return {
 			b_opts_diff_seeds = "Players have different seeds",
 			b_opts_lives = "Lives",
 			k_opts_coop_blind_scaling = "Co-op Blind Scale",
+			k_opts_coop_blind_curve = "Co-op Scaling Curve",
 			b_opts_multiplayer_jokers = "Enable Multiplayer Cards",
 			b_opts_player_diff_deck = "Players have different decks",
 			b_opts_random_loadout = "Randomize deck & stake",
@@ -1177,7 +951,7 @@ return {
 			k_random = "Random",
 			k_standard = "Standard",
 			k_sandbox = "Sandbox: Extra Credit",
-			k_sandbox_description = "26 new jokers from Extra Credit join the roster.\nIdol splits into two: Zealot and Collector's. You pick one, the other's gone.\nNew Spectrals, reworked comeback gold, no score preview.\nThe meta's wide open. Built with friends at Balatro University.\n",
+			k_sandbox_description = "26 new jokers from Extra Credit join the roster.\nNew Spectrals, reworked comeback gold, no score preview.\nThe meta's wide open. Built with friends at Balatro University.\n",
 			k_vanilla = "Vanilla",
 			k_vanilla_description = "The original Balatro experience.\n\nNo Multiplayer jokers, no balance changes.\nJust the base game as it was designed.\n\nMultiplayer features like the timer are still available\nbut can be disabled in Lobby Options.",
 			k_blitz = "Standard",
@@ -1256,6 +1030,10 @@ return {
 			k_major_contributors = "Major contributions by",
 			ml_enemy_loc = {
 				"Enemy",
+				"location",
+			},
+			ml_teammate_loc = {
+				"Teammate",
 				"location",
 			},
 			k_hide_mp_content = "Hide Multiplayer content*",

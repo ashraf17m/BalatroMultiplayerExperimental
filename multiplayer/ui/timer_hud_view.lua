@@ -22,6 +22,9 @@ local function get_timer_value()
 end
 
 local function is_timer_warning()
+	if MP.is_ruleset_active and MP.is_ruleset_active("speedlatro") then
+		return false
+	end
 	return MP.GAME and MP.GAME.timer ~= nil and get_timer_value() < 10
 end
 
@@ -46,16 +49,6 @@ local function get_timer_display_ref()
 	})
 end
 
-local function get_local_score_int()
-	if MP.GAME and MP.GAME.score_display then
-		return MP.GAME.score_display
-	end
-	if MP.INSANE_INT and MP.INSANE_INT.from_string then
-		return MP.INSANE_INT.from_string(tostring(MP.GAME and MP.GAME.score_text or "0"))
-	end
-	return nil
-end
-
 function MP.UI.cam_timer_opponent()
 	if not (MP.LOBBY and MP.LOBBY.config and MP.LOBBY.config.timer) then
 		return false
@@ -65,24 +58,13 @@ function MP.UI.cam_timer_opponent()
 	end
 
 	if MP.is_pvp_boss and MP.is_pvp_boss() and MP.is_layer_active and MP.is_layer_active("pvp_timer") then
-		local states = BALATRO.get_states and BALATRO.get_states() or nil
-		local state = BALATRO.get_state and BALATRO.get_state() or nil
+		local states = (G and G.STATES) or nil
+		local state = (G and G.STATE) or nil
 		if states and (state == states.ROUND_EVAL or state == states.NEW_ROUND) then
 			return false
 		end
 
-		local local_score = get_local_score_int()
-		local enemy_score = MP.GAME and MP.GAME.enemy and MP.GAME.enemy.score or nil
-		if not (local_score and enemy_score and MP.INSANE_INT) then
-			return false
-		end
-		if MP.INSANE_INT.greater_than(local_score, enemy_score) then
-			return true
-		end
-		if MP.INSANE_INT.equal and MP.INSANE_INT.equal(local_score, enemy_score) then
-			return not not MP.GAME.pvp_reached_first
-		end
-		return false
+		return not not (MP.is_local_winning_pvp and MP.is_local_winning_pvp())
 	end
 
 	return not not (MP.GAME and MP.GAME.ready_blind)
@@ -184,10 +166,6 @@ function MP.UI.timer_hud()
 end
 
 function MP.UI.refresh_timer_hud_binding()
-	if not (BALATRO.get_hud and BALATRO.get_hud_element_by_id) then
-		return false
-	end
-
 	local timer_count = BALATRO.get_hud_element_by_id("timer_UI_count")
 	if not (timer_count and timer_count.config) then
 		return false
@@ -209,7 +187,7 @@ function MP.UI.refresh_timer_hud_binding()
 		BALATRO.call_ui_function("set_timer_box", timer_box)
 	end
 
-	BALATRO.recalculate_ui(BALATRO.get_hud and BALATRO.get_hud() or nil)
+	BALATRO.recalculate_ui((G and G.HUD) or nil)
 
 	return true
 end

@@ -1,4 +1,3 @@
-local BALATRO = MP.PLATFORM.BALATRO
 local lobby_domain = MP.DOMAIN and MP.DOMAIN.LOBBY or {}
 
 local function find_lobby_player(predicate)
@@ -17,7 +16,7 @@ local function find_lobby_player(predicate)
 end
 
 function MP.get_self_lobby_player()
-	local player_id = BALATRO.get_player_id()
+	local player_id = (G and G.MP_ID or nil)
 	return find_lobby_player(function(player)
 		return player.id == player_id
 	end)

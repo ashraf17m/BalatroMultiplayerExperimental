@@ -20,9 +20,14 @@ local function get_visible_game_money()
 	return nil
 end
 
+local last_frame_money = nil
+
 function MP.get_local_money()
 	local live = get_visible_game_money()
 	if live ~= nil then
+		if MP.GAME then
+			MP.GAME.real_money = tostring(live)
+		end
 		return live
 	end
 
@@ -43,7 +48,23 @@ local function refresh_local_money_state()
 	end
 
 	MP.GAME.real_money = tostring(live)
+	last_frame_money = live
 	return live
+end
+
+function MP.check_money_frame_change()
+	local live = get_visible_game_money()
+	if live == nil then
+		last_frame_money = nil
+		return
+	end
+
+	if last_frame_money ~= nil and live ~= last_frame_money then
+		last_frame_money = live
+		MP.sync_local_money_state()
+	else
+		last_frame_money = live
+	end
 end
 
 function MP.sync_local_money_state(options)

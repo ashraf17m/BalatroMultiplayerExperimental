@@ -1,4 +1,3 @@
-local BALATRO = MP.PLATFORM.BALATRO
 MP.DOMAIN = MP.DOMAIN or {}
 MP.DOMAIN.TEAMS = MP.DOMAIN.TEAMS or {}
 local TEAMS_DOMAIN = MP.DOMAIN.TEAMS
@@ -49,13 +48,13 @@ function TEAMS_DOMAIN.can_edit_lobby_player_team(player_id, opts)
 	end
 
 	local player = MP.get_lobby_player_by_id and MP.get_lobby_player_by_id(player_id) or nil
-	return player_id == BALATRO.get_player_id() and not not player and not player.is_team_locked
+	return player_id == (G and G.MP_ID or nil) and not not player and not player.is_team_locked
 end
 
 local function can_toggle_lobby_player_team_lock(player_id, opts)
 	local options = opts or {}
 	local lobby_context = options.lobby_context or (MP.get_lobby_state_context and MP.get_lobby_state_context()) or {}
-	if not player_id or player_id == BALATRO.get_player_id() then
+	if not player_id or player_id == (G and G.MP_ID or nil) then
 		return false
 	end
 
@@ -102,7 +101,7 @@ function MP.get_self_team_id()
 	if not player then
 		return nil
 	end
-	if MP.LOBBY and MP.LOBBY.match_in_progress and not player.is_in_match then
+	if MP.LOBBY and MP.LOBBY.match_in_progress and not player.is_in_match and not (MP.is_coop_run and MP.is_coop_run()) then
 		return nil
 	end
 	return player.team or 1

@@ -30,8 +30,8 @@ local function get_wall_delta()
 end
 
 local function is_state(state_name)
-	local states = BALATRO.get_states and BALATRO.get_states() or nil
-	return states and BALATRO.get_state and BALATRO.get_state() == states[state_name]
+	local states = (G and G.STATES) or nil
+	return states and (G and G.STATE) == states[state_name]
 end
 
 local function should_tick_timer()
@@ -44,7 +44,7 @@ local function should_tick_timer()
 		if not MP.GAME.nemesis_timer_started then
 			return false, true, false
 		end
-		if (BALATRO.get_hands_left and BALATRO.get_hands_left() or 0) <= 0 then
+		if ((G and G.GAME and G.GAME.current_round and G.GAME.current_round.hands_left or nil) or 0) <= 0 then
 			return false, true, false
 		end
 		if is_state("NEW_ROUND") or is_state("ROUND_EVAL") then
@@ -98,6 +98,9 @@ end
 
 local function consume_expired_timer(is_pvp_timer)
 	MP.GAME.timer_consumed = true
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return
+	end
 	if is_pvp_timer then
 		if MP.GAME.nemesis_timer_started and MP.ACTIONS and MP.ACTIONS.fail_pvp_timer then
 			MP.ACTIONS.fail_pvp_timer()
@@ -129,7 +132,7 @@ function local_timer_runtime.update()
 	if not (MP.GAME and local_timer_context_enabled()) then
 		return
 	end
-	if BALATRO.is_game_over_or_win and BALATRO.is_game_over_or_win() then
+	if (G and (G.STATE == G.STATES.GAME_OVER or G.STATE == G.STATES.GAME_WIN) or false) then
 		return
 	end
 	if MP.GAME.timer_consumed or not MP.GAME.timer or MP.GAME.timer <= 0 then

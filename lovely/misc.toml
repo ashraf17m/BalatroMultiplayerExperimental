@@ -38,16 +38,13 @@ pattern = "function Moveable:align_to_major()"
 position = 'after'
 payload = '''
 if not self or not self.alignment or not self.role then return end
-if not self.alignment.type or not self.alignment.prev_type then return end
-if not self.alignment.offset or not self.alignment.prev_offset then return end
-if not self.alignment.offset.x or not self.alignment.offset.y then return end
-if not self.alignment.prev_offset.x or not self.alignment.prev_offset.y then return end
-if not self.T then return end
-if not self.Mid or not self.Mid.T or not self.Mid.T.w or not self.Mid.T.h or not self.Mid.T.x or not self.Mid.T.y then return end
 if not self.role.major or not self.role.major.T then return end
-if not self.role.major.T.w or not self.role.major.T.h or not self.role.major.T.x or not self.role.major.T.y then return end
-if not self.T.w or not self.T.h or not self.T.x or not self.T.y then return end
-if not self.role.offset then self.role.offset = {} end'''
+if not self.Mid or not self.Mid.T then return end
+if not self.alignment.type then return end
+self.alignment.offset = self.alignment.offset or {}
+self.alignment.offset.x = self.alignment.offset.x or 0
+self.alignment.offset.y = self.alignment.offset.y or 0
+self.role.offset = self.role.offset or {}'''
 match_indent = true
 times = 1
 

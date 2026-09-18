@@ -1,136 +1,5 @@
 local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
-function G.FUNCS.attention_text_realtime(args)
-	args = args or {}
-	args.text = args.text or "test"
-	args.scale = args.scale or 1
-	args.colour = copy_table(args.colour or G.C.WHITE)
-	args.hold = (args.hold or 0)
-	args.pos = args.pos or { x = 0, y = 0 }
-	args.align = args.align or "cm"
-
-	args.fade = 1
-
-	if args.cover then
-		args.cover_colour = copy_table(args.cover_colour or G.C.RED)
-		args.cover_colour_l = copy_table(lighten(args.cover_colour, 0.2))
-		args.cover_colour_d = copy_table(darken(args.cover_colour, 0.2))
-	else
-		args.cover_colour = copy_table(G.C.CLEAR)
-	end
-
-	args.uibox_config = {
-		align = args.align,
-		offset = args.offset or { x = 0, y = 0 },
-		major = args.cover or args.major or nil,
-	}
-
-	BALATRO.queue_event({
-		trigger = "after",
-		timer = "REAL",
-		delay = 0,
-		blockable = false,
-		blocking = false,
-		func = function()
-			args.AT = UIBox({
-				T = { args.pos.x, args.pos.y, 0, 0 },
-				definition = {
-					n = G.UIT.ROOT,
-					config = {
-						align = args.cover_align or "cm",
-						minw = (args.cover and args.cover.T.w or 0.001) + (args.cover_padding or 0),
-						minh = (args.cover and args.cover.T.h or 0.001) + (args.cover_padding or 0),
-						padding = 0.03,
-						r = 0.1,
-						emboss = args.emboss,
-						colour = args.cover_colour,
-					},
-					nodes = {
-						{
-							n = G.UIT.O,
-							config = {
-								draw_layer = 1,
-								object = DynaText({
-									scale = args.scale,
-									string = args.text,
-									maxw = args.maxw,
-									colours = { args.colour },
-									float = true,
-									shadow = true,
-									silent = not args.noisy,
-									pop_in = 0,
-									pop_in_rate = 6,
-									rotate = args.rotate or nil,
-								}),
-							},
-						},
-					},
-				},
-				config = args.uibox_config,
-			})
-			args.AT.attention_text = true
-
-			args.text = args.AT.UIRoot.children[1].config.object
-			args.text:pulse(0.5)
-
-			if args.cover then
-				Particles(args.pos.x, args.pos.y, 0, 0, {
-					timer_type = "TOTAL",
-					timer = 0.01,
-					pulse_max = 15,
-					max = 0,
-					scale = 0.3,
-					vel_variation = 0.2,
-					padding = 0.1,
-					fill = true,
-					lifespan = 0.5,
-					speed = 2.5,
-					attach = args.AT.UIRoot,
-					colours = { args.cover_colour, args.cover_colour_l, args.cover_colour_d },
-				})
-			end
-			if args.backdrop_colour then
-				args.backdrop_colour = copy_table(args.backdrop_colour)
-				Particles(args.pos.x, args.pos.y, 0, 0, {
-					timer_type = "TOTAL",
-					timer = 5,
-					scale = 2.4 * (args.backdrop_scale or 1),
-					lifespan = 5,
-					speed = 0,
-					attach = args.AT,
-					colours = { args.backdrop_colour },
-				})
-			end
-			return true
-		end,
-	})
-
-	BALATRO.queue_event({
-		trigger = "after",
-		timer = "REAL",
-		delay = args.hold,
-		blockable = false,
-		blocking = false,
-		func = function()
-			if not args.start_time then
-				args.start_time = G.TIMERS.TOTAL
-				args.text:pop_out(3)
-			else
-				args.fade = math.max(0, 1 - 3 * (G.TIMERS.TOTAL - args.start_time))
-				if args.cover_colour then args.cover_colour[4] = math.min(args.cover_colour[4], 2 * args.fade) end
-				if args.cover_colour_l then args.cover_colour_l[4] = math.min(args.cover_colour_l[4], args.fade) end
-				if args.cover_colour_d then args.cover_colour_d[4] = math.min(args.cover_colour_d[4], args.fade) end
-				if args.backdrop_colour then args.backdrop_colour[4] = math.min(args.backdrop_colour[4], args.fade) end
-				args.colour[4] = math.min(args.colour[4], args.fade)
-				if args.fade <= 0 then
-					args.AT:remove()
-					return true
-				end
-			end
-		end,
-	})
-end
-
 local function create_lives_hud_text()
 	return DynaText({
 		string = { { ref_table = MP.GAME, ref_value = "lives" } },
@@ -264,8 +133,105 @@ function MP.UI.ease_lives(mod)
 end
 
 function MP.UI.show_asteroid_hand_level_up()
-	local hand_type = MP.PLATFORM.BALATRO.get_highest_level_poker_hand(function(key)
+	local hand_type = MP.UTILS.get_highest_level_poker_hand(function(key)
 		return MP.PLATFORM.SMODS.is_poker_hand_visible(key)
 	end)
 	MP.PLATFORM.SMODS.upgrade_poker_hands({ hands = hand_type, level_up = -1 })
+end
+
+-- ============================================================================
+-- SECTION 2: STATE APPLY EFFECTS
+-- (Consolidated from state_apply_effects.lua)
+-- ============================================================================
+
+MP.UI = MP.UI or {}
+MP.UI.STATE_APPLY_EFFECTS = MP.UI.STATE_APPLY_EFFECTS or {}
+
+local effects = MP.UI.STATE_APPLY_EFFECTS
+local trace_runtime_event = (MP.UTILS and MP.UTILS.trace_runtime_event) or function() end
+
+local LIFE_LOSS_REASON_LABELS = {
+	pvp_result = "PvP result",
+	round_failed_death_on_round_loss = "failed blind with life-loss enabled",
+	team_coop_blind_failed = "team blind failed",
+	ante_timer_expired = "ante timer expired",
+	speedlatro_client_timeout = "Speedlatro timeout",
+}
+
+local function emit_life_loss_log(message)
+	if type(sendWarnMessage) == "function" then
+		sendWarnMessage(message, "MULTIPLAYER")
+	elseif type(sendDebugMessage) == "function" then
+		sendDebugMessage(message, "MULTIPLAYER")
+	elseif type(sendTraceMessage) == "function" then
+		sendTraceMessage(message, "MULTIPLAYER")
+	end
+end
+
+function effects.ease_lives(delta)
+	if MP.UI and MP.UI.ease_lives then
+		MP.UI.ease_lives(delta)
+	end
+end
+
+function effects.log_life_loss_reason(subject, update_result, options)
+	if not (update_result and update_result.life_lost) then
+		return
+	end
+
+	local reason = update_result.life_loss_reason
+	if not reason and not (options and options.log_missing_reason) then
+		return
+	end
+
+	local label = reason and (LIFE_LOSS_REASON_LABELS[reason] or tostring(reason)) or "reason not provided by server"
+	local previous_lives = update_result.server_previous_lives or update_result.previous_lives
+	local lives = update_result.lives
+	local details = ""
+	if previous_lives ~= nil and lives ~= nil then
+		details = " (" .. tostring(previous_lives) .. " -> " .. tostring(lives) .. ")"
+	end
+	local message = tostring(subject or "Life lost") .. ": " .. label .. details
+
+	emit_life_loss_log(message)
+	trace_runtime_event(reason and "life_loss.reason" or "life_loss.missing_reason", {
+		subject = subject,
+		reason = reason,
+		previous_lives = previous_lives,
+		lives = lives,
+	})
+end
+
+function effects.ease_enemy_score(enemy, score)
+	local score_shared = MP.UI and MP.UI.PLAYERS_HUD_SHARED or nil
+	if not (score_shared and score_shared.ease_standings_score_number) then
+		return
+	end
+
+	local teams_domain = MP.DOMAIN and MP.DOMAIN.TEAMS or {}
+	local cooperative_score_blind = (teams_domain.is_cooperative_blind and teams_domain.is_cooperative_blind())
+		or (MP.is_coop_blind and MP.is_coop_blind())
+	local delay = cooperative_score_blind and 0.5 or (score_shared.PVP_SCORE_EASE_DELAY or 0.8)
+	score_shared.ease_standings_score_number(enemy.score, score, { delay = delay })
+end
+
+function effects.handle_money_update(money, delta, source_player_id)
+	local team_money_ui = MP.UI and MP.UI.TEAM_MONEY or nil
+	if team_money_ui and team_money_ui.handle_money_update then
+		team_money_ui.handle_money_update(money, delta, source_player_id)
+	end
+end
+
+function effects.play_enemy_life_loss_sounds()
+	local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
+	if BALATRO.play_sound then
+		BALATRO.play_sound("holo1", 0.865, 0.9)
+		BALATRO.play_sound("gong", 0.765, 0.4)
+	end
+end
+
+function effects.juice_up_pvp_hud()
+	if MP.UI and MP.UI.juice_up_pvp_hud then
+		MP.UI.juice_up_pvp_hud()
+	end
 end

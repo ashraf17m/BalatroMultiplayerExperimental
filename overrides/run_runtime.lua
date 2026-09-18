@@ -1,4 +1,3 @@
-local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 local match_domain = MP.DOMAIN and MP.DOMAIN.MATCH or {}
 
 local function reset_multiplayer_run_transition_state()
@@ -46,9 +45,6 @@ MP.HOOKS.register_method_hook(Game, "Game", "update_shop", "mp.run_runtime.locat
 		end
 	end,
 	after = function(ctx)
-		if MP.RESUME and MP.RESUME.validate_deferred_shop_loads then
-			MP.RESUME.validate_deferred_shop_loads("update_shop")
-		end
 		suppress_original_result(ctx)
 	end,
 })
@@ -63,7 +59,11 @@ MP.HOOKS.register_method_hook(Game, "Game", "update_blind_select", "mp.run_runti
 })
 
 MP.HOOKS.register_method_hook(Game, "Game", "start_run", "mp.run_runtime.start_run", {
-	before = function()
+	before = function(ctx)
+		local run_args = ctx and ctx.args and ctx.args[1]
+		if not (run_args and run_args.savetext) then
+			G.sort_id = 0
+		end
 		local active_ruleset = MP.get_active_ruleset and MP.get_active_ruleset()
 			or (MP.LOBBY.code and MP.LOBBY.config.ruleset)
 			or nil

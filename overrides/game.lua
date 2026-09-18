@@ -1,16 +1,3 @@
-local function trace_client_action(action, suffix)
-	if not sendTraceMessage then
-		return
-	end
-
-	local message = "Client sent message: action:" .. tostring(action)
-	if suffix and suffix ~= "" then
-		message = message .. "," .. suffix
-	end
-
-	sendTraceMessage(message, "MULTIPLAYER")
-end
-
 local function is_spectating()
 	return not not (MP.SPECTATOR and MP.SPECTATOR.is_spectating)
 end
@@ -108,10 +95,21 @@ end
 
 local ease_dollars_ref = ease_dollars
 function ease_dollars(mod, instant)
-	trace_client_action("moneyMoved", "amount:" .. tostring(mod))
 	local result = ease_dollars_ref(mod, instant)
-	if MP.sync_local_money_state then
-		MP.sync_local_money_state()
+	if instant or not (G and G.E_MANAGER and type(G.E_MANAGER.add_event) == "function" and Event) then
+		if MP.sync_local_money_state then
+			MP.sync_local_money_state()
+		end
+	else
+		G.E_MANAGER:add_event(Event({
+			trigger = "immediate",
+			func = function()
+				if MP.sync_local_money_state then
+					MP.sync_local_money_state()
+				end
+				return true
+			end,
+		}))
 	end
 	return result
 end
@@ -137,11 +135,6 @@ MP.HOOKS.register_method_hook(Card, "Card", "sell_card", "mp.game.trace_sold_car
 		if MP.LOBBY.code and MP.ACTIONS and MP.ACTIONS.sold_joker then
 			MP.ACTIONS.sold_joker()
 		end
-
-		local card_name = get_card_ability_name(self)
-		if card_name then
-			trace_client_action("soldCard", "card:" .. tostring(card_name))
-		end
 	end,
 })
 
@@ -151,7 +144,6 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "reroll_shop", "mp.game.trace_
 			return
 		end
 		local cost = G.GAME and G.GAME.current_round and tonumber(G.GAME.current_round.reroll_cost) or 0
-		trace_client_action("rerollShop", "cost:" .. tostring(cost))
 
 		local stats = ensure_match_stats()
 		if stats then
@@ -171,13 +163,6 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "buy_from_shop", "mp.game.trac
 
 		local c1 = e and e.config and e.config.ref_table
 		if c1 and c1:is(Card) then
-			local card_name = get_card_ability_name(c1)
-			if card_name then
-				trace_client_action(
-					"boughtCardFromShop",
-					"card:" .. tostring(card_name) .. ",cost:" .. tostring(c1.cost)
-				)
-			end
 			add_money_spent(c1.cost)
 			send_end_game_summary_update()
 		end
@@ -188,15 +173,7 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "use_card", "mp.game.trace_use
 	before = function(ctx, e)
 		if is_spectating() then return end
 		local ref_card = e and e.config and e.config.ref_table or nil
-		local card_name = get_card_ability_name(ref_card)
-		if card_name then
-			trace_client_action("usedCard", "card:" .. tostring(card_name))
-		end
 		if ref_card and ref_card:is(Card) and is_shop_use_purchase(ref_card) then
-			trace_client_action(
-				"boughtCardFromShop",
-				"card:" .. tostring(card_name or get_card_center_key(ref_card) or "UNKNOWN") .. ",cost:" .. tostring(ref_card.cost)
-			)
 			local is_voucher = is_voucher_card(ref_card)
 			local stats = add_money_spent(ref_card.cost)
 			if is_voucher then
@@ -219,3 +196,4 @@ MP.HOOKS.register_method_hook(G.FUNCS, "G.FUNCS", "evaluate_round", "mp.game.end
 		ctx.results = { n = 0 }
 	end,
 })
+

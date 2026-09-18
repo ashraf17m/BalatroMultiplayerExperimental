@@ -13,6 +13,9 @@ local build_network_runtime_traceback =
 	or function(err) return tostring(err) end
 
 local function refresh_live_team_score()
+	if not (MP.LOBBY and MP.LOBBY.code and MP.LOBBY.match_in_progress) then
+		return
+	end
 	local teams_domain = MP.DOMAIN and MP.DOMAIN.TEAMS or nil
 	if teams_domain and teams_domain.refresh_live_score then
 		teams_domain.refresh_live_score()
@@ -134,14 +137,13 @@ function network_loop.dispatch_network_action(parsed_action)
 end
 
 function network_loop.decode_network_action_message(msg)
-	local ok, parsed_action = xpcall(function()
-		return json.decode(msg)
-	end, build_network_runtime_traceback)
+	local ok, parsed_action = pcall(json.decode, msg)
 
 	if not ok then
+		local err_trace = build_network_runtime_traceback(parsed_action)
 		network_loop.warn_runtime_issue(
 			"Failed to decode multiplayer message.",
-			tostring(parsed_action) .. "\nRaw payload: " .. get_network_message_preview(msg)
+			tostring(err_trace) .. "\nRaw payload: " .. get_network_message_preview(msg)
 		)
 		return nil
 	end
@@ -204,6 +206,10 @@ function network_loop.run_update_cycle()
 
 	refresh_live_team_score()
 
+	if MP.check_money_frame_change then
+		MP.check_money_frame_change()
+	end
+
 	network_loop.process_network_messages()
 end
 
@@ -229,4 +235,5 @@ end, 40)
 MP.NETWORKING_INTERNAL.warn_runtime_issue = network_loop.warn_runtime_issue
 MP.NETWORKING_INTERNAL.install_runtime_loop = network_loop.install_runtime_loop
 MP.NETWORKING_INTERNAL.process_network_messages = network_loop.process_network_messages
+MP.NETWORKING_INTERNAL.decode_network_action_message = network_loop.decode_network_action_message
 MP.NETWORKING_INTERNAL.transition_to_menu_after_connection_loss = network_loop.transition_to_menu_after_connection_loss

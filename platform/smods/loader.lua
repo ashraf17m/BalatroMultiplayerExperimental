@@ -12,6 +12,20 @@ function MP.BOOTSTRAP_INTERNAL.build_traceback(err)
 	return message
 end
 
+local unpack_values = table.unpack or unpack
+
+function MP.BOOTSTRAP_INTERNAL.pack_values(...)
+	return { n = select("#", ...), ... }
+end
+
+function MP.BOOTSTRAP_INTERNAL.unpack_packed(values)
+	if not values then
+		return
+	end
+
+	return unpack_values(values, 1, values.n or #values)
+end
+
 local function set_bootstrap_failure(summary, details)
 	MP.BOOTSTRAP_INTERNAL.failure_summary = summary
 	MP.BOOTSTRAP_INTERNAL.failure_details = details
@@ -181,14 +195,6 @@ local function is_bootstrap_module_ready(module)
 	return false
 end
 
-local function is_balatro_runtime_ready()
-	return get_table_path(MP, "PLATFORM.BALATRO.add_event")
-		and get_table_path(MP, "PLATFORM.BALATRO.get_hud")
-		and get_table_path(MP, "PLATFORM.BALATRO.read_saved_table")
-		and get_table_path(MP, "PLATFORM.BALATRO.play_sound")
-		and get_table_path(MP, "PLATFORM.BALATRO.register_wheelmoved_handler")
-end
-
 local PLATFORM_BOOTSTRAP_MODULES = {
 	bootstrap_module("platform/smods/identity.lua", "PLATFORM.SMODS.get_current_mod_id"),
 	bootstrap_module("platform/smods/registry.lua", "PLATFORM.SMODS.install_legacy_registry_alias"),
@@ -197,15 +203,14 @@ local PLATFORM_BOOTSTRAP_MODULES = {
 	bootstrap_module("platform/smods/mod_actions.lua", "register_mod_action"),
 	bootstrap_module("platform/smods/bootstrap_map.lua", "PLATFORM.SMODS.BOOTSTRAP_MAP"),
 	bootstrap_module("platform/balatro/threading.lua", "PLATFORM.BALATRO.create_thread"),
-	bootstrap_module("platform/balatro/state.lua", "PLATFORM.BALATRO.get_game"),
-	{
-		path = "platform/balatro/runtime.lua",
-		ready = is_balatro_runtime_ready,
-	},
+	bootstrap_module("platform/balatro/runtime_ui.lua", "PLATFORM.BALATRO.add_event"),
+	bootstrap_module("platform/balatro/runtime_hud.lua", "PLATFORM.BALATRO.get_hud"),
+	bootstrap_module("platform/balatro/runtime_save.lua", "PLATFORM.BALATRO.read_saved_table"),
+	bootstrap_module("platform/balatro/runtime_wrappers.lua", "PLATFORM.BALATRO.play_sound"),
+	bootstrap_module("platform/balatro/runtime_input.lua", "PLATFORM.BALATRO.register_wheelmoved_handler"),
 	bootstrap_module("platform/balatro/presentation.lua", "PLATFORM.BALATRO.create_player_blind_icon_object"),
 	bootstrap_module("platform/smods/capabilities.lua", "PLATFORM.SMODS.compare_versions"),
 	bootstrap_module("platform/hooks/registry.lua", "HOOKS.register_method_hook"),
-	bootstrap_module("platform/hooks/targets.lua", "PLATFORM.HOOKS.capture_known_target"),
 	bootstrap_module("platform/hooks/install.lua", "PLATFORM.HOOKS.install_known_override"),
 	{
 		path = "platform/hooks/round_hooks.lua",

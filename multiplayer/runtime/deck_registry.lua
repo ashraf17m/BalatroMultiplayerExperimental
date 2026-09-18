@@ -59,5 +59,8 @@ MP.GAME_UPDATE_CYCLE.register_after("mp.compatibility.stake_queue", function()
 			MP.DECK.set_max_stake(key)
 			stake_queue[key] = nil
 		end
+		if not next(stake_queue) and MP.GAME_UPDATE_CYCLE and MP.GAME_UPDATE_CYCLE.unregister_after then
+			MP.GAME_UPDATE_CYCLE.unregister_after("mp.compatibility.stake_queue")
+		end
 	end
 end, 20)

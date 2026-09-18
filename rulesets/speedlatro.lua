@@ -3,7 +3,6 @@ local BASE_TIMER_SECONDS = 147
 local PVP_BLIND_TIMER_SECONDS = BASE_TIMER_SECONDS / 2
 local NORMAL_TIMER_MULTIPLIER = 1
 local STARTED_NON_PVP_TIMER_MULTIPLIER = 2
-local HUD_TIMER_SENTINEL = 999
 local DISPLAY_DECIMAL_PADDING_SECONDS = 100
 local DISPLAY_DECIMAL_SCALE = 100
 local PVP_ENTRY_WAIT_SECONDS = 4
@@ -167,6 +166,9 @@ end
 
 local function handle_speedlatro_timeout(timer)
 	timer.real = 0
+	if MP.SPECTATOR and MP.SPECTATOR.is_spectating then
+		return
+	end
 	if MP.LOBBY.code then
 		if not timer.failed then
 			trace_runtime_event("speedlatro.timeout", {
@@ -187,7 +189,7 @@ local function handle_speedlatro_timeout(timer)
 end
 
 local function update_speedlatro_timer_display(timer)
-	MP.GAME.timer = HUD_TIMER_SENTINEL
+	MP.GAME.timer = math.max(0, math.floor(timer.real or 0))
 
 	local suffix = string.sub(
 		math.floor((timer.real + DISPLAY_DECIMAL_PADDING_SECONDS) * DISPLAY_DECIMAL_SCALE),

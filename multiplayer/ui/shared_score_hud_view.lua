@@ -9,14 +9,6 @@ local function get_team_local_score_text()
 	return teams_domain and teams_domain.get_local_score_text and teams_domain.get_local_score_text() or nil
 end
 
-local function get_round_score_labels()
-	local language = BALATRO.get_setting_value and BALATRO.get_setting_value("language") or nil
-	return {
-		top = language == "vi" and localize("k_lower_score") or localize("k_round"),
-		bottom = language == "vi" and localize("k_round") or localize("k_lower_score"),
-	}
-end
-
 local function uses_cooperative_shared_score()
 	return (teams_domain.is_cooperative_blind and teams_domain.is_cooperative_blind())
 		or (MP.is_coop_blind and MP.is_coop_blind())
@@ -46,134 +38,72 @@ local function get_cooperative_shared_display_score()
 	return total_score
 end
 
-local function get_shared_score_scale_from_insane_int(score, base_scale, max_value, cap)
-	base_scale = base_scale or 1.1
-	max_value = max_value or 10000
-	cap = cap or 0.8
-
-	if not score then
-		return cap
-	end
-
-	local coeff = math.abs(tonumber(score.coefficient) or 0)
-	local exponent = math.max(0, tonumber(score.exponent) or 0)
-	local e_count = math.max(0, tonumber(score.e_count) or 0)
-	if coeff <= 0 then
-		return cap
-	end
-
-	local max_digits = math.floor(math.log(max_value * 10, 10))
-	local fixed_huge_scale = base_scale * max_digits / math.floor(math.log(1000000 * 10, 10))
-	if e_count > 0 then
-		return math.min(cap, fixed_huge_scale)
-	end
-
-	local huge_threshold = math.max(1, math.floor(math.log((G.E_SWITCH_POINT or 100000000000) * 10, 10)))
-	local total_digits = exponent + math.max(1, math.floor(math.log(coeff * 10, 10)))
-	if total_digits >= huge_threshold then
-		return math.min(cap, fixed_huge_scale)
-	end
-	if total_digits >= max_digits then
-		return math.min(cap, base_scale * max_digits / total_digits)
-	end
-
-	return math.min(cap, base_scale)
+local function are_scores_equal(a, b)
+	if not (a and b) then return false end
+	return a.e_count == b.e_count and a.exponent == b.exponent and a.coefficient == b.coefficient
 end
 
-local function get_shared_score_display_state()
-	local use_cooperative_score = uses_cooperative_shared_score()
-	local displayed_text
-	local scale
-
-	if use_cooperative_score then
-		local display_score = get_cooperative_shared_display_score()
-		displayed_text = score_shared.format_score_int(display_score, "0")
-		scale = get_shared_score_scale_from_insane_int(display_score, 1.1, 10000, 0.8)
-	else
-		local live_chips = BALATRO.get_chips and BALATRO.get_chips() or 0
-		displayed_text = number_format(live_chips)
-		BALATRO.set_chips_text(displayed_text)
-		scale = math.min(0.8, scale_number(BALATRO.get_chips and BALATRO.get_chips() or 0, 1.1))
+local function ensure_coop_display_score()
+	if not (MP.GAME and MP.INSANE_INT) then
+		return nil
 	end
-
-	if MP.GAME and match_domain.set_shared_score_text then
-		match_domain.set_shared_score_text(displayed_text)
+	if not MP.GAME.coop_display_score then
+		MP.GAME.coop_display_score = MP.INSANE_INT.copy(get_cooperative_shared_display_score())
 	end
-
-	return {
-		text = displayed_text,
-		scale = scale,
-		mode = use_cooperative_score and "cooperative" or "round",
-	}
+	return MP.GAME.coop_display_score
 end
 
-local function recalc_row_dollars_chips_layout()
-	if not BALATRO.get_hud then
-		return
-	end
-
-	local row_dollars_chips = BALATRO.get_hud_element_by_id("row_dollars_chips")
-	if row_dollars_chips and row_dollars_chips.recalculate then
-		row_dollars_chips:recalculate()
-	end
-
-	BALATRO.recalculate_ui(BALATRO.get_hud())
-end
-
-local function apply_shared_score_display(target, display_state, force_text_refresh)
-	if not (target and target.config) then
+local function is_display_score_easing(score_display)
+	if not (score_display and score_display._mp_score_ease_proxy) then
 		return false
 	end
-
-	local config = target.config
-	local text_changed = config.last_mp_score_text ~= display_state.text
-	local scale_changed = config.last_mp_score_scale ~= display_state.scale
-	local mode_changed = config.last_mp_score_mode ~= display_state.mode
-	if not (force_text_refresh or text_changed or scale_changed or mode_changed) then
-		return false
-	end
-
-	config.last_mp_score_text = display_state.text
-	config.last_mp_score_scale = display_state.scale
-	config.last_mp_score_mode = display_state.mode
-	config.scale = display_state.scale
-
-	if target.update_text then
-		target:update_text()
-	end
-
-	return true
+	local proxy = score_display._mp_score_ease_proxy
+	local target = score_display._mp_score_ease_target
+	return proxy.value ~= nil and target ~= nil and proxy.value ~= target
 end
 
-local function refresh_shared_score_text_node(opts)
-	opts = opts or {}
-
-	if not BALATRO.get_hud then
+local function update_coop_chip_ui(e)
+	local target_score = get_cooperative_shared_display_score()
+	local display_score = ensure_coop_display_score()
+	if not display_score then
 		return
 	end
 
-	local chip_UI = BALATRO.get_hud_element_by_id("chip_UI_count")
-	if not (chip_UI and chip_UI.config and chip_UI.config.func == "mp_shared_chip_UI_set") then
-		return
+	if not is_display_score_easing(display_score) then
+		MP.INSANE_INT.copy_into(display_score, target_score)
 	end
 
-	local display_state = get_shared_score_display_state()
-	if not apply_shared_score_display(chip_UI, display_state, opts.force_text_refresh) then
-		return
+	local displayed_text = score_shared.format_score_int(display_score, "0")
+	if G and G.GAME then
+		G.GAME.chips_text = displayed_text
+	end
+	if MP.GAME then
+		MP.GAME.shared_score_text = displayed_text
+		if match_domain.set_shared_score_text then
+			match_domain.set_shared_score_text(displayed_text)
+		end
 	end
 
-	if opts.recalc_layout then
-		recalc_row_dollars_chips_layout()
+	if e and e.config then
+		local safe_num = MP.INSANE_INT.to_safe_number(display_score)
+		e.config.scale = math.min(0.8, scale_number(safe_num or 0, 1.1))
 	end
 end
 
-BALATRO.set_ui_function("mp_shared_chip_UI_set", function(e)
-	if not (e and e.config) then
-		return
+local orig_chip_UI_set = G and G.FUNCS and G.FUNCS.chip_UI_set
+local function unified_chip_UI_set(e)
+	if uses_cooperative_shared_score() then
+		update_coop_chip_ui(e)
+	elseif orig_chip_UI_set then
+		orig_chip_UI_set(e)
 	end
+end
 
-	apply_shared_score_display(e, get_shared_score_display_state())
-end)
+if G and G.FUNCS then
+	G.FUNCS.chip_UI_set = unified_chip_UI_set
+end
+BALATRO.set_ui_function("mp_shared_chip_UI_set", unified_chip_UI_set)
+BALATRO.set_ui_function("chip_UI_set", unified_chip_UI_set)
 
 local function create_row_dollars_chips_label_line(text, width)
 	width = width or 1.3
@@ -284,8 +214,29 @@ local function create_enemy_location_blind_render()
 	return Moveable()
 end
 
+local function is_coop_mode_active()
+	return uses_cooperative_shared_score()
+		or (MP.is_coop_blind and MP.is_coop_blind())
+		or (MP.is_coop_run and MP.is_coop_run())
+		or (MP.is_coop_gamemode and MP.is_coop_gamemode())
+		or (MP.is_coop_lobby_type and MP.is_coop_lobby_type())
+end
+
+local function get_enemy_location_label_lines()
+	local is_coop = is_coop_mode_active()
+	local key = is_coop and "ml_teammate_loc" or "ml_enemy_loc"
+	local label_lines = localize(key)
+	if type(label_lines) == "table" and #label_lines >= 2 then
+		return label_lines
+	end
+	if is_coop then
+		return { "Teammate", "location" }
+	end
+	return { "Enemy", "location" }
+end
+
 local function create_enemy_location_row()
-	local label_lines = localize("ml_enemy_loc")
+	local label_lines = get_enemy_location_label_lines()
 	local display = get_enemy_location_display()
 	local has_icon = display.icon_kind or display.blind_key
 	local text = has_icon and (display.text or "") or (display.full_text or display.text or "")
@@ -299,7 +250,7 @@ local function create_enemy_location_row()
 				config = {
 					w = 0.5,
 					h = 0.5,
-					object = get_stake_sprite(BALATRO.get_stake and BALATRO.get_stake() or 1, 0.5),
+					object = get_stake_sprite((G and G.GAME and G.GAME.stake or nil) or 1, 0.5),
 					hover = true,
 					can_collide = false,
 				},
@@ -499,15 +450,13 @@ BALATRO.set_ui_function("mp_setup_hover_enemy_location_display", function(e)
 end)
 
 local function create_shared_score_row()
-	local score_labels = get_round_score_labels()
-
-	local row = create_row_dollars_chips_row({ score_labels.top, score_labels.bottom }, {
+	local row = create_row_dollars_chips_row({ localize("k_round"), localize("k_lower_score") }, {
 		{
 			n = G.UIT.O,
 			config = {
 				w = 0.5,
 				h = 0.5,
-				object = get_stake_sprite(BALATRO.get_stake and BALATRO.get_stake() or 1, 0.5),
+				object = get_stake_sprite((G and G.GAME and G.GAME.stake or nil) or 1, 0.5),
 				hover = true,
 				can_collide = false,
 			},
@@ -516,13 +465,13 @@ local function create_shared_score_row()
 		{
 			n = G.UIT.T,
 			config = {
-				ref_table = MP.GAME,
-				ref_value = "shared_score_text",
+				ref_table = G.GAME,
+				ref_value = "chips_text",
 				lang = G.LANGUAGES["en-us"],
 				scale = 0.85,
 				colour = G.C.WHITE,
 				id = "chip_UI_count",
-				func = "mp_shared_chip_UI_set",
+				func = "chip_UI_set",
 				shadow = true,
 			},
 		},
@@ -570,7 +519,7 @@ local function update_enemy_location_row_content()
 end
 
 local function replace_row_dollars_chips(node)
-	local hud = BALATRO.get_hud and BALATRO.get_hud() or nil
+	local hud = (G and G.HUD) or nil
 	local row_dollars_chips = BALATRO.get_hud_element_by_id("row_dollars_chips")
 	if not row_dollars_chips then
 		return false
@@ -593,6 +542,14 @@ local function replace_row_dollars_chips(node)
 	return true
 end
 
+local function recalc_row_dollars_chips_layout()
+	local row_dollars_chips = BALATRO.get_hud_element_by_id and BALATRO.get_hud_element_by_id("row_dollars_chips")
+	if row_dollars_chips and row_dollars_chips.recalculate then
+		row_dollars_chips:recalculate()
+	end
+	BALATRO.recalculate_ui((G and G.HUD or nil))
+end
+
 function MP.UI.show_enemy_location()
 	if replace_row_dollars_chips(create_enemy_location_row()) then
 		recalc_row_dollars_chips_layout()
@@ -608,17 +565,37 @@ end
 
 function MP.UI.hide_enemy_location()
 	if replace_row_dollars_chips(create_shared_score_row()) then
-		refresh_shared_score_text_node({
-			force_text_refresh = true,
-			recalc_layout = true,
-		})
+		recalc_row_dollars_chips_layout()
+		if MP.UI.refresh_shared_score_ui then
+			MP.UI.refresh_shared_score_ui()
+		end
 	end
 end
 
 function MP.UI.refresh_shared_score_ui()
-	if not (BALATRO.get_hud and BALATRO.get_hud() and MP.LOBBY and MP.LOBBY.code) then
+	if not (MP.LOBBY and MP.LOBBY.code and uses_cooperative_shared_score()) then
 		return
 	end
 
-	refresh_shared_score_text_node()
+	local target_score = get_cooperative_shared_display_score()
+	local display_score = ensure_coop_display_score()
+	if not (display_score and MP.INSANE_INT) then
+		return
+	end
+
+	if MP.INSANE_INT.greater_than(target_score, display_score) then
+		display_score._mp_score_ease_target = MP.INSANE_INT.to_safe_number(target_score)
+		MP.INSANE_INT.ease_display_score(display_score, target_score, { delay = 0.5 })
+
+		local chip_UI = BALATRO.get_hud_element_by_id and BALATRO.get_hud_element_by_id("chip_UI_count")
+		if chip_UI and chip_UI.juice_up then
+			chip_UI:juice_up(0.3, 0.3)
+		end
+		if play_sound then
+			play_sound("chips2")
+		end
+	elseif not are_scores_equal(target_score, display_score) then
+		display_score._mp_score_ease_target = nil
+		MP.INSANE_INT.copy_into(display_score, target_score)
+	end
 end

@@ -32,7 +32,7 @@ end
 local function is_current_pvp_blind()
 	if MP and type(MP.is_pvp_boss) == "function" and MP.is_pvp_boss() then return true end
 
-	local blind = BALATRO and BALATRO.get_current_blind and BALATRO.get_current_blind() or nil
+	local blind = BALATRO and (G and G.GAME and G.GAME.blind) or nil
 	if not blind then return false end
 
 	local blind_key = blind.config and blind.config.blind and blind.config.blind.key or blind.name
@@ -271,5 +271,5 @@ function CALC.request()
 		return
 	end
 
-	G.E_MANAGER:add_event(Event({ trigger = "after", blockable = false, blocking = false, delay = delay, func = start_backend }))
+	G.E_MANAGER:add_event(Event({ trigger = "after", blockable = false, blocking = false, timer = "REAL", delay = delay, func = start_backend }))
 end

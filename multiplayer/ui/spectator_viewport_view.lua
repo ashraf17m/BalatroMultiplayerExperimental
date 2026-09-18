@@ -1,6 +1,5 @@
 MP.UI = MP.UI or {}
 
-local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 
 local function get_alive_players()
 	if MP.SPECTATOR and MP.SPECTATOR.get_spectatable_players then
@@ -38,10 +37,13 @@ local SWITCHER_PART_DEFAULTS = {
 	arrows = { align = "bm", offset = { x = 0, y = 1.3 } },
 }
 
-local function build_spectator_name_definition(target_player_id)
+local function build_spectator_name_definition(target_player_id, target_username)
 	local alive = get_alive_players()
-	local current = alive[get_target_index(alive, target_player_id)]
-	local name = (current and (current.username or "Player")) or "Player"
+	local current = #alive > 0 and alive[get_target_index(alive, target_player_id)] or nil
+	local name = (current and (current.username or "Player"))
+		or target_username
+		or (MP.SPECTATOR and MP.SPECTATOR.target_username)
+		or "Player"
 
 	return {
 		n = G.UIT.ROOT,
@@ -141,8 +143,11 @@ function MP.UI.show_spectator_viewport(target_player_id, target_username)
 		return
 	end
 
+	target_player_id = target_player_id or (MP.SPECTATOR and MP.SPECTATOR.target_player_id)
+	target_username = target_username or (MP.SPECTATOR and MP.SPECTATOR.target_username)
+
 	local alive = get_alive_players()
-	if #alive == 0 then
+	if #alive == 0 and not (target_player_id and target_player_id ~= "") then
 		return
 	end
 
@@ -154,7 +159,7 @@ function MP.UI.show_spectator_viewport(target_player_id, target_username)
 
 	MP.UI.hide_spectator_viewport()
 
-	G.mp_spectator_bar = create_spectator_part_box(build_spectator_name_definition(target_player_id), "name")
+	G.mp_spectator_bar = create_spectator_part_box(build_spectator_name_definition(target_player_id, target_username), "name")
 	G.mp_spectator_bar_arrows = create_spectator_part_box(build_spectator_arrows_definition(), "arrows")
 	MP.UI.spectator_viewport_target_id = target_player_id
 
@@ -184,9 +189,11 @@ local function cycle_spectator_target(delta)
 		return
 	end
 
-	local current_index = get_target_index(alive, MP.SPECTATOR and MP.SPECTATOR.target_player_id)
+	local current_target_id = (MP.SPECTATOR and MP.SPECTATOR.queued_watch and MP.SPECTATOR.queued_watch.id)
+		or (MP.SPECTATOR and MP.SPECTATOR.target_player_id)
+	local current_index = get_target_index(alive, current_target_id)
 	local target = alive[((current_index - 1 + delta) % #alive) + 1]
-	if not target or (MP.SPECTATOR and MP.SPECTATOR.target_player_id == target.id) then
+	if not target or (current_target_id == target.id) then
 		return
 	end
 	if MP.SPECTATOR and MP.SPECTATOR.start_spectating then
@@ -241,13 +248,49 @@ local function is_deck_inspect_ui(box)
 	return box.config and box.config.major == G.deck
 end
 
+local SPECTATOR_HUD_BUTTONS = {
+	run_info = true,
+	options = true,
+	lobby_info = true,
+}
+
+local function is_spectator_hud_button(node)
+	if not (node and node.config) then
+		return false
+	end
+	if SPECTATOR_HUD_BUTTONS[node.config.button] then
+		return true
+	end
+	local owner = node.config.button_UIE
+	return owner and owner.config and SPECTATOR_HUD_BUTTONS[owner.config.button]
+end
+
+local function restrict_hud_buttons(node)
+	if not node then
+		return
+	end
+	if node.config and (node.config.button or node.config.button_UIE) and not is_spectator_hud_button(node) then
+		disable_node_input(node)
+	end
+	if node.children then
+		for _, child in pairs(node.children) do
+			restrict_hud_buttons(child)
+		end
+	end
+end
+
 local function isolate_spectator_input()
 	if not G or G.OVERLAY_MENU then
 		return
 	end
 	if G.I and G.I.UIBOX then
 		for _, box in ipairs(G.I.UIBOX) do
-			if box ~= G.mp_spectator_bar and box ~= G.mp_spectator_bar_arrows and not is_deck_inspect_ui(box) then
+			if
+				box ~= G.mp_spectator_bar
+				and box ~= G.mp_spectator_bar_arrows
+				and box ~= G.HUD
+				and not is_deck_inspect_ui(box)
+			then
 				disable_node_input(box)
 			end
 		end
@@ -259,7 +302,7 @@ local function isolate_spectator_input()
 			end
 		end
 	end
-	for _, bar in ipairs({ G.mp_spectator_bar, G.mp_spectator_bar_arrows }) do
+	for _, bar in ipairs({ G.mp_spectator_bar, G.mp_spectator_bar_arrows, debugger_overlay, G.HUD }) do
 		if bar and bar.states then
 			for _, state_name in ipairs(INTERACTABLE_STATES) do
 				local state = bar.states[state_name]
@@ -268,6 +311,9 @@ local function isolate_spectator_input()
 				end
 			end
 		end
+	end
+	if G.HUD and G.HUD.UIRoot then
+		restrict_hud_buttons(G.HUD.UIRoot)
 	end
 end
 
@@ -301,20 +347,11 @@ if MP.GAME_UPDATE_CYCLE and MP.GAME_UPDATE_CYCLE.register_after then
 			if MP.SPECTATOR.drain_pending_replay_actions then
 				MP.SPECTATOR.drain_pending_replay_actions()
 			end
+			if MP.SPECTATOR.ensure_post_pack_ui then
+				MP.SPECTATOR.ensure_post_pack_ui()
+			end
 			if MP.SPECTATOR.remove_stale_eval_surfaces then
 				MP.SPECTATOR.remove_stale_eval_surfaces()
-			end
-			if MP.SPECTATOR.sync_watched_player_lives then
-				MP.SPECTATOR.sync_watched_player_lives()
-			end
-			if MP.is_pvp_boss and MP.is_pvp_boss() and MP.UI and MP.UI.create_unified_player_list
-				and G and G.STATES
-				and G.STATE ~= G.STATES.ROUND_EVAL
-				and G.STATE ~= G.STATES.NEW_ROUND
-				and G.STATE ~= G.STATES.SHOP
-				and G.STATE ~= G.STATES.BLIND_SELECT
-			then
-				MP.UI.create_unified_player_list()
 			end
 
 			if G.jokers or G.consumeables then

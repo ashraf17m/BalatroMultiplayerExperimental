@@ -6,7 +6,7 @@ local BALATRO = MP.PLATFORM and MP.PLATFORM.BALATRO or {}
 local COOP_SAVES_FILENAME = "mp_coop_saves.jkr"
 
 local function get_profile_prefix()
-	local profile = BALATRO.get_setting_value and BALATRO.get_setting_value("profile", 1) or 1
+	local profile = (G and G.SETTINGS and G.SETTINGS["profile"] or 1)
 	return tostring(profile) .. "/"
 end
 
