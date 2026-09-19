@@ -369,13 +369,6 @@ function match_action_runtime.ready_blind(e)
 	Client.queue_send(payload)
 end
 
-function match_action_runtime.blind_preview(preview_key, targets)
-	local payload = MP.MATCH_WIRE.build_blind_preview_payload(preview_key, targets)
-	if payload then
-		Client.queue_send(payload)
-	end
-end
-
 function match_action_runtime.coop_boss_blind(phase, ante, boss_key)
 	local payload = MP.MATCH_WIRE.build_coop_boss_blind_payload(phase, ante, boss_key)
 	if payload then
@@ -666,7 +659,6 @@ end
 
 MP.ACTIONS.start_game = match_action_runtime.start_game
 MP.ACTIONS.ready_blind = match_action_runtime.ready_blind
-MP.ACTIONS.blind_preview = match_action_runtime.blind_preview
 MP.ACTIONS.coop_boss_blind = match_action_runtime.coop_boss_blind
 MP.ACTIONS.unready_blind = match_action_runtime.unready_blind
 MP.ACTIONS.ready_skip_blind = match_action_runtime.ready_skip_blind
@@ -930,10 +922,6 @@ function match_flow_runtime.start_match_blind_runtime(blind_row, blind_kind, due
 	end
 	set_server_coop_blind_target(is_pvp_blind and nil or blind_target)
 
-	if match_domain.begin_coop_blind_generation then
-		match_domain.begin_coop_blind_generation()
-	end
-
 	if is_pvp_blind then
 		MP.ANTE_TIMER_RUNTIME.reset_for_ante(get_match_timer_start_time("pvp"))
 	end
@@ -1036,14 +1024,9 @@ function match_flow_runtime.end_current_coop_blind_runtime(lost)
 	set_server_coop_blind_target(nil)
 	if match_domain.mark_end_coop_blind then
 		match_domain.mark_end_coop_blind(lost)
-	elseif match_domain.mark_end_pvp then
-		match_domain.mark_end_pvp()
 	end
 	if MP.release_cooperative_deck_out_resolution then
 		MP.release_cooperative_deck_out_resolution()
-	end
-	if MP.RECORDER and MP.RECORDER.is_recording and not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
-		MP.RECORDER.record_end_pvp(lost, false)
 	end
 	local blind_choice = get_blind_choice_internal()
 	if blind_choice.clear_skip_ready_state then
@@ -1218,24 +1201,11 @@ function match_message_runtime.handle_end_pvp(lost, pvp_timer_lost)
 	call_match_flow_runtime("end_current_pvp_runtime", lost, pvp_timer_lost)
 end
 
-function match_message_runtime.handle_end_coop_blind(lost, ante, blind_row)
+function match_message_runtime.handle_end_coop_blind(lost)
 	if not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
 		if buffer_resume_method("buffer_runtime_match_outcome", "endCoopBlind", lost) then
 			return
 		end
-	end
-
-	if match_domain.should_ignore_stale_end_coop_blind
-		and match_domain.should_ignore_stale_end_coop_blind(ante, blind_row, lost)
-	then
-		trace_runtime_event("match.end_coop_blind_ignored_stale", {
-			lost = not not lost,
-			ante = ante,
-			blind_row = blind_row,
-			generation = MP.GAME and MP.GAME.coop_blind_generation or nil,
-			ended_generation = MP.GAME and MP.GAME.coop_blind_ended_generation or nil,
-		})
-		return
 	end
 
 	call_match_flow_runtime("end_current_coop_blind_runtime", lost)
@@ -1329,13 +1299,6 @@ function match_message_runtime.handle_enemy_location(options)
 	apply_state_update("enemy_location", options)
 end
 
-function match_message_runtime.handle_coop_blind_preview(preview_key, targets)
-	local blind_choice_state = MP.UI and MP.UI.BLIND_CHOICE_STATE or nil
-	if blind_choice_state and blind_choice_state.handle_coop_blind_preview then
-		blind_choice_state.handle_coop_blind_preview(preview_key, targets)
-	end
-end
-
 function match_message_runtime.handle_coop_boss_blind(phase, ante, revision, source_player_id, boss_key, is_reroll)
 	if MP.COOP_BOSS_BLIND and MP.COOP_BOSS_BLIND.handle_server_update then
 		MP.COOP_BOSS_BLIND.handle_server_update({
@@ -1362,7 +1325,6 @@ MP.NETWORKING_INTERNAL.handle_lose_game = match_message_runtime.handle_lose_game
 MP.NETWORKING_INTERNAL.handle_match_ended = match_message_runtime.handle_match_ended
 MP.NETWORKING_INTERNAL.handle_enemy_info = match_message_runtime.handle_enemy_info
 MP.NETWORKING_INTERNAL.handle_enemy_location = match_message_runtime.handle_enemy_location
-MP.NETWORKING_INTERNAL.handle_coop_blind_preview = match_message_runtime.handle_coop_blind_preview
 MP.NETWORKING_INTERNAL.handle_coop_boss_blind = match_message_runtime.handle_coop_boss_blind
 
 return match_flow_runtime

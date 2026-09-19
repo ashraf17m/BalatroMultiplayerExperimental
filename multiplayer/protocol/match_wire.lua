@@ -49,28 +49,6 @@ function MP.MATCH_WIRE.build_ready_blind_payload(blind_row, blind_kind, options)
 	return build_match_payload("readyBlind", payload)
 end
 
-local function normalize_blind_preview_targets(targets)
-	local normalized_targets = {}
-	for _, row in ipairs({ "Small", "Big", "Boss" }) do
-		local target = targets and targets[row] or nil
-		if target ~= nil then
-			normalized_targets[row] = normalize_big_number(target)
-		end
-	end
-	return normalized_targets
-end
-
-function MP.MATCH_WIRE.build_blind_preview_payload(preview_key, targets)
-	if preview_key == nil or preview_key == "" then
-		return nil
-	end
-
-	return build_match_payload("blindPreview", {
-		previewKey = tostring(preview_key),
-		targets = normalize_blind_preview_targets(targets),
-	})
-end
-
 function MP.MATCH_WIRE.build_coop_boss_blind_payload(phase, ante, boss_key)
 	if phase ~= "start" and phase ~= "result" then
 		return nil

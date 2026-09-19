@@ -222,7 +222,7 @@ function action_dispatch.build_protocol_v2_match_routes()
 		),
 		[build_protocol_route_key("match", "endCoopBlind", MATCH_STATE_SCHEMA_ID)] = route_fields(
 			"handle_end_coop_blind",
-			{ "lost", "ante", "blindRow" }
+			{ "lost" }
 		),
 		[build_protocol_route_key("match", "enemyInfo", MATCH_STATE_SCHEMA_ID)] = route_action("handle_enemy_info"),
 		[build_protocol_route_key("match", "playerInfo", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_player_info", {
@@ -236,10 +236,6 @@ function action_dispatch.build_protocol_v2_match_routes()
 			{ "money", "delta", "sourcePlayerId" }
 		),
 		[build_protocol_route_key("match", "enemyLocation", MATCH_STATE_SCHEMA_ID)] = route_action("handle_enemy_location"),
-		[build_protocol_route_key("match", "coopBlindPreview", MATCH_STATE_SCHEMA_ID)] = route_fields(
-			"handle_coop_blind_preview",
-			{ "previewKey", "targets" }
-		),
 		[build_protocol_route_key("match", "coopBossBlind", MATCH_STATE_SCHEMA_ID)] = route_fields(
 			"handle_coop_boss_blind",
 			{ "phase", "ante", "revision", "sourcePlayerId", "bossKey", "isReroll" }

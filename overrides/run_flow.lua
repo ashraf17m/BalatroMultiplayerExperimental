@@ -23,14 +23,24 @@ local function mark_after_pvp_context() G.after_pvp = true end
 
 local function set_current_round_hands_left(hands_left) G.GAME.current_round.hands_left = hands_left end
 
+local function is_coop_run_active()
+	return MP.is_coop_run and MP.is_coop_run()
+end
+
 local function is_cooperative_server_blind()
-	return (MP.is_coop_run and MP.is_coop_run())
+	return is_coop_run_active()
 		or (teams_domain.is_cooperative_blind and teams_domain.is_cooperative_blind())
 		or (MP.is_coop_blind and MP.is_coop_blind())
 end
 
 local function is_cooperative_round_ended()
-	return not not (MP.GAME and (MP.GAME.end_coop_blind or MP.GAME.end_pvp))
+	if not MP.GAME then
+		return false
+	end
+	if is_coop_run_active() then
+		return not not MP.GAME.end_coop_blind
+	end
+	return not not MP.GAME.end_pvp
 end
 
 local function enter_coop_new_round(options)
@@ -40,18 +50,11 @@ local function enter_coop_new_round(options)
 		G.hand:unhighlight_all()
 	end
 
-	if options.draw_to_deck and G.STATE ~= G.STATES.NEW_ROUND then
-		if G.FUNCS and G.FUNCS.draw_from_hand_to_deck then
-			G.FUNCS.draw_from_hand_to_deck()
-		end
-		if G.FUNCS and G.FUNCS.draw_from_discard_to_deck then
-			G.FUNCS.draw_from_discard_to_deck()
-		end
-	end
+	-- Leave hand and discard in place. Vanilla evaluate_round pays gold cards,
+	-- blue seals, and other end-of-round effects from those areas.
 	local state_complete = (options.state_complete ~= nil) and options.state_complete or false
 	transition_to_state(G.STATES.NEW_ROUND, state_complete)
 	trace_runtime_event("run_flow.enter_coop_new_round", {
-		draw_to_deck = options.draw_to_deck == true,
 		lost = not not (MP.GAME and MP.GAME.end_coop_lost),
 		hands_left = G.GAME and G.GAME.current_round and G.GAME.current_round.hands_left,
 	})
@@ -59,13 +62,18 @@ local function enter_coop_new_round(options)
 	if match_domain.clear_end_coop_blind then
 		match_domain.clear_end_coop_blind()
 	end
-	if match_domain.clear_end_pvp then
-		match_domain.clear_end_pvp()
-	end
 	if MP.GAME then
 		MP.GAME.end_coop_blind = false
 		MP.GAME.end_coop_lost = false
-		MP.GAME.end_pvp = false
+	end
+	-- Teams cooperative blinds still end via end_pvp and reuse this wait path.
+	if not is_coop_run_active() then
+		if match_domain.clear_end_pvp then
+			match_domain.clear_end_pvp()
+		end
+		if MP.GAME then
+			MP.GAME.end_pvp = false
+		end
 	end
 end
 
@@ -344,7 +352,7 @@ local function resolve_server_hand_played_event()
 	MP.ACTIONS.play_hand(G.GAME.chips, G.GAME.current_round.hands_left)
 	if should_wait_after_server_resolved_hand() then
 		show_wait_for_enemy_hand_text()
-		if should_eval_waiting_hand() then
+		if should_eval_waiting_hand() and not is_cooperative_server_blind() then
 			eval_hand_and_jokers()
 			G.FUNCS.draw_from_hand_to_discard()
 		end
@@ -575,10 +583,9 @@ function Game:update_new_round(dt)
 
 	if is_cooperative_round_ended() and is_cooperative_server_blind() then
 		enter_coop_new_round({
-			draw_to_deck = true,
 			state_complete = false,
 		})
-	elseif MP.GAME.end_pvp and MP.is_server_resolved_blind() then
+	elseif MP.GAME.end_pvp and MP.is_server_resolved_blind() and not is_coop_run_active() then
 		enter_pvp_new_round({
 			draw_to_deck = true,
 			state_complete = false,
@@ -695,7 +702,7 @@ function Game:update_selecting_hand(dt)
 
 	if should_enter_new_round_after_selecting_hand() then
 		if is_cooperative_server_blind() then
-			enter_coop_new_round({ unhighlight_hand = true, draw_to_deck = true, state_complete = false })
+			enter_coop_new_round({ unhighlight_hand = true, state_complete = false })
 		else
 			enter_pvp_new_round({ unhighlight_hand = true, state_complete = false })
 		end
