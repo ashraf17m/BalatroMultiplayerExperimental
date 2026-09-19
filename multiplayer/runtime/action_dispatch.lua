@@ -220,9 +220,9 @@ function action_dispatch.build_protocol_v2_match_routes()
 			"handle_end_pvp",
 			{ "lost", "pvpTimerLost" }
 		),
-		[build_protocol_route_key("match", "endCoopBlind", MATCH_STATE_SCHEMA_ID)] = route_field(
+		[build_protocol_route_key("match", "endCoopBlind", MATCH_STATE_SCHEMA_ID)] = route_fields(
 			"handle_end_coop_blind",
-			"lost"
+			{ "lost", "ante", "blindRow" }
 		),
 		[build_protocol_route_key("match", "enemyInfo", MATCH_STATE_SCHEMA_ID)] = route_action("handle_enemy_info"),
 		[build_protocol_route_key("match", "playerInfo", MATCH_STATE_SCHEMA_ID)] = route_fields("handle_player_info", {

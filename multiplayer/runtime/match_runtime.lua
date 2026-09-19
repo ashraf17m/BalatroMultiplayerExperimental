@@ -930,6 +930,10 @@ function match_flow_runtime.start_match_blind_runtime(blind_row, blind_kind, due
 	end
 	set_server_coop_blind_target(is_pvp_blind and nil or blind_target)
 
+	if match_domain.begin_coop_blind_generation then
+		match_domain.begin_coop_blind_generation()
+	end
+
 	if is_pvp_blind then
 		MP.ANTE_TIMER_RUNTIME.reset_for_ante(get_match_timer_start_time("pvp"))
 	end
@@ -1214,8 +1218,23 @@ function match_message_runtime.handle_end_pvp(lost, pvp_timer_lost)
 	call_match_flow_runtime("end_current_pvp_runtime", lost, pvp_timer_lost)
 end
 
-function match_message_runtime.handle_end_coop_blind(lost)
-	if buffer_resume_method("buffer_runtime_match_outcome", "endCoopBlind", lost) then
+function match_message_runtime.handle_end_coop_blind(lost, ante, blind_row)
+	if not (MP.SPECTATOR and MP.SPECTATOR.is_spectating) then
+		if buffer_resume_method("buffer_runtime_match_outcome", "endCoopBlind", lost) then
+			return
+		end
+	end
+
+	if match_domain.should_ignore_stale_end_coop_blind
+		and match_domain.should_ignore_stale_end_coop_blind(ante, blind_row, lost)
+	then
+		trace_runtime_event("match.end_coop_blind_ignored_stale", {
+			lost = not not lost,
+			ante = ante,
+			blind_row = blind_row,
+			generation = MP.GAME and MP.GAME.coop_blind_generation or nil,
+			ended_generation = MP.GAME and MP.GAME.coop_blind_ended_generation or nil,
+		})
 		return
 	end
 

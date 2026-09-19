@@ -10,7 +10,7 @@ local function get_curve_meta(exp)
 	local is_default = math.abs(val - 1.4) < 0.05
 	return {
 		title = string.format("CURVE %.1f%s", val, is_default and " (Default)" or ""),
-		desc = "Ante 1 to 8 blind scaling preview",
+		desc = "Ante 1–8 preview; player scaling continues after ante 8",
 	}
 end
 

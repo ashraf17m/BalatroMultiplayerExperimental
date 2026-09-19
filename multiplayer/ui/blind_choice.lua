@@ -315,37 +315,9 @@ local function build_blind_amount(blind_choice_config, type, is_pvp_blind)
 
 	if can_sync_coop_blind_preview() then
 		record_local_coop_blind_preview(type, blind_amt)
-		local preview_target = get_server_preview_target(type)
-		if preview_target ~= nil then
-			return preview_target
-		end
 	end
 
 	return blind_amt
-end
-
-local function get_preview_score_node(row)
-	local box = (G and G.blind_select_opts and row and G.blind_select_opts[string.lower(row)] or nil)
-	if not (box and box.get_UIE_by_ID) then
-		return nil, nil
-	end
-
-	return box:get_UIE_by_ID("mp_blind_preview_score_" .. tostring(row)), box
-end
-
-function blind_choice_state.refresh_coop_blind_preview_scores()
-	for _, row in ipairs(PREVIEW_BLIND_ROWS) do
-		local target = get_server_preview_target(row)
-		if target ~= nil then
-			local score_node, box = get_preview_score_node(row)
-			if score_node and score_node.config then
-				score_node.config.text = number_format(target)
-				score_node.config.scale = score_number_scale(0.9, target)
-				BALATRO.recalculate_ui(score_node)
-				BALATRO.recalculate_ui(box)
-			end
-		end
-	end
 end
 
 function blind_choice_state.handle_coop_blind_preview(preview_key, targets)
@@ -365,7 +337,6 @@ function blind_choice_state.handle_coop_blind_preview(preview_key, targets)
 
 	MP.GAME.coop_blind_preview_key = tostring(preview_key or "")
 	MP.GAME.coop_blind_preview_targets = parsed_targets
-	blind_choice_state.refresh_coop_blind_preview_scores()
 end
 
 local function get_run_info_colour(run_info, blind_state)

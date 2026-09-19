@@ -142,9 +142,10 @@ MP.HOOKS.register_method_hook(Blind, "Blind", "set_blind", "mp.blind_hud.nemesis
 		local is_pvp_blind = blind_key == "bl_mp_nemesis"
 		if not is_pvp_blind then
 			if blind then
-				if not reset or self.mp_coop_base_chips ~= nil then
-					apply_coop_blind_score_scaling(self)
+				if not reset then
+					clear_coop_blind_base(self)
 				end
+				apply_coop_blind_score_scaling(self)
 			elseif not reset then
 				clear_coop_blind_base(self)
 			end

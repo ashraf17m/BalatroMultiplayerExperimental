@@ -210,17 +210,40 @@ local function get_coop_curve_exponent()
 	return exponent
 end
 
-local function get_coop_effective_ante(ante)
-	if type(ante) == "number" and ante >= 1 then
-		return ante
+local function to_lua_number(value)
+	if type(value) == "number" then
+		if value ~= value or value == math.huge or value == -math.huge then
+			return nil
+		end
+		return value
 	end
-	local round_resets = (BALATRO and (G and G.GAME and G.GAME.round_resets))
-		or (G and G.GAME and G.GAME.round_resets)
-		or nil
-	local game_ante = (round_resets and (round_resets.blind_ante or round_resets.ante))
-		or (BALATRO and (G and G.GAME and G.GAME.round_resets and G.GAME.round_resets.ante or nil))
-		or 1
-	return math.max(1, tonumber(game_ante) or 1)
+	if type(to_number) == "function" then
+		local ok, n = pcall(to_number, value)
+		if ok and type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge then
+			return n
+		end
+	end
+	if type(value) == "string" then
+		return tonumber((string.gsub(value, ",", "")))
+	end
+	if value == nil then
+		return nil
+	end
+	return tonumber(value) or tonumber((string.gsub(tostring(value), ",", "")))
+end
+
+local function get_coop_effective_ante(ante)
+	local parsed = to_lua_number(ante)
+	if parsed and parsed >= 1 and parsed <= 64 then
+		return math.floor(parsed)
+	end
+	local round_resets = (G and G.GAME and G.GAME.round_resets) or nil
+	local game_ante = (round_resets and (round_resets.blind_ante or round_resets.ante)) or 1
+	parsed = to_lua_number(game_ante)
+	if parsed and parsed >= 1 then
+		return math.min(64, math.floor(parsed))
+	end
+	return 1
 end
 
 local function get_coop_blind_multiplier(ante, custom_count)
@@ -234,36 +257,15 @@ local function get_coop_blind_multiplier(ante, custom_count)
 		return start_multiplier
 	end
 
-	local t = math.min(1, (current_ante - 1) / 7)
+	-- (ante - 1) / 7 reaches 1 at ante 8, then keeps growing so player-count
+	-- difficulty never freezes on endless antes.
+	local t = (current_ante - 1) / 7
 	local exponent = get_coop_curve_exponent()
 	local progress = t ^ exponent
 	return start_multiplier + (target_multiplier - start_multiplier) * progress
 end
 
-local function to_lua_number(value)
-	if type(value) == "number" then
-		return value
-	end
-	if type(to_number) == "function" then
-		local ok, n = pcall(to_number, value)
-		if ok and type(n) == "number" then
-			return n
-		end
-	end
-	if type(value) == "string" then
-		return tonumber((string.gsub(value, ",", "")))
-	end
-	if value == nil then
-		return nil
-	end
-	return tonumber(value) or tonumber((string.gsub(tostring(value), ",", "")))
-end
-
-local function round_coop_blind_amount(value, ante)
-	if ante ~= nil and get_coop_effective_ante(ante) > 8 then
-		return to_lua_number(value) or value
-	end
-
+local function round_coop_blind_amount(value)
 	local num = to_lua_number(value)
 	if not num or num <= 0 then
 		return value
@@ -303,7 +305,7 @@ function MP.scale_coop_blind_amount(amount, ante, blind_mult)
 		row_mult = 1
 	end
 	local unit = num_amount / row_mult
-	return round_coop_blind_amount(unit * coop_mult, ante) * row_mult
+	return round_coop_blind_amount(unit * coop_mult) * row_mult
 end
 
 function MP.is_coop_blind()

@@ -101,6 +101,8 @@ local function build_initial_round_state(starting_lives)
 		duplicate_end = false,
 		coop_deck_out_waiting = false,
 		coop_deck_out_resolved = false,
+		coop_blind_generation = 0,
+		coop_blind_ended_generation = 0,
 		highest_score = MP.INSANE_INT.empty(),
 		furthest_blind = 0,
 	}
@@ -852,6 +854,8 @@ end
 function MATCH_DOMAIN.prepare_blind_selection(state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.end_pvp = false
+	state.end_coop_blind = false
+	state.end_coop_lost = false
 	state.duel_blind_role = nil
 	state.duel_bye_waiting = false
 	state.prevent_eval = false
@@ -864,6 +868,92 @@ function MATCH_DOMAIN.prepare_blind_selection(state)
 	state.score_display = MP.INSANE_INT.empty()
 	state.ante_key = tostring(math.random())
 	return state
+end
+
+local function score_value_is_positive(value)
+	if value == nil then
+		return false
+	end
+	if type(value) == "number" then
+		return value > 0
+	end
+	if type(value) == "table" then
+		local coefficient = tonumber(value.coefficient or value.coeffiocient)
+		if coefficient and coefficient ~= 0 then
+			return true
+		end
+	end
+	local text = tostring(value):gsub(",", "")
+	if text == "" or text == "0" or text == "nil" then
+		return false
+	end
+	local numeric = tonumber(text)
+	if numeric ~= nil then
+		return numeric > 0
+	end
+	return true
+end
+
+local function coop_round_has_scored(state)
+	state = state or MATCH_DOMAIN.ensure_state()
+	local chips = G and G.GAME and G.GAME.chips or nil
+	if score_value_is_positive(chips) then
+		return true
+	end
+	local round = G and G.GAME and G.GAME.current_round or nil
+	if (tonumber(round and round.hands_played) or 0) > 0 then
+		return true
+	end
+	for _, enemy in pairs(state.enemies or {}) do
+		if enemy and enemy.in_match ~= false then
+			if score_value_is_positive(enemy.synced_score or enemy.score or enemy.score_text) then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function MATCH_DOMAIN.begin_coop_blind_generation(state)
+	state = state or MATCH_DOMAIN.ensure_state()
+	state.coop_blind_generation = (tonumber(state.coop_blind_generation) or 0) + 1
+	return state.coop_blind_generation
+end
+
+-- Drop leftover/late endCoopBlind that would cash out a newer blind.
+-- Real ends still apply: sitting players see teammate scores; 0-chip losses use lost=true.
+function MATCH_DOMAIN.should_ignore_stale_end_coop_blind(packet_ante, packet_row, lost)
+	if MP.SPECTATOR and (MP.SPECTATOR.is_spectating or MP.SPECTATOR.is_spectator_role) then
+		return false
+	end
+
+	local state = MATCH_DOMAIN.ensure_state()
+	if state.end_coop_blind then
+		return true
+	end
+
+	local generation = tonumber(state.coop_blind_generation) or 0
+	local ended = tonumber(state.coop_blind_ended_generation) or 0
+	if generation > 0 and ended >= generation then
+		return true
+	end
+
+	local round_resets = G and G.GAME and G.GAME.round_resets or nil
+	local current_ante = tonumber(round_resets and (round_resets.blind_ante or round_resets.ante))
+	local current_row = G and G.GAME and G.GAME.blind_on_deck or nil
+	local parsed_ante = tonumber(packet_ante)
+	if parsed_ante and current_ante and parsed_ante ~= current_ante then
+		return true
+	end
+	if packet_row and packet_row ~= "" and current_row and tostring(packet_row) ~= tostring(current_row) then
+		return true
+	end
+
+	if generation > ended and ended > 0 and not lost and not coop_round_has_scored(state) then
+		return true
+	end
+
+	return false
 end
 
 function MATCH_DOMAIN.advance_furthest_blind(temp_furthest_blind, state)
@@ -942,6 +1032,7 @@ function MATCH_DOMAIN.mark_end_coop_blind(state, lost)
 	mark_server_resolved_blind(state, { preserve_timer_state = true })
 	state.end_coop_blind = true
 	state.end_coop_lost = not not lost
+	state.coop_blind_ended_generation = tonumber(state.coop_blind_generation) or 0
 	return true
 end
 

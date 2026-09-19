@@ -17,6 +17,7 @@ state.consumed_reroll_keys = state.consumed_reroll_keys or {}
 state.remote_mirror_active = state.remote_mirror_active or false
 state.remote_mirror_generated = state.remote_mirror_generated or false
 state.applying_remote = state.applying_remote or false
+state.local_tag_boss_reroll = state.local_tag_boss_reroll or false
 state.reroll_hook_original = state.reroll_hook_original
 state.reroll_hook_wrapper = state.reroll_hook_wrapper
 
@@ -33,6 +34,7 @@ local function reset_match_state()
 	state.remote_mirror_ante = nil
 	state.remote_mirror_revision = nil
 	state.applying_remote = false
+	state.local_tag_boss_reroll = false
 	if G and G.CONTROLLER and G.CONTROLLER.locks then
 		G.CONTROLLER.locks.boss_reroll = nil
 	end
@@ -119,13 +121,6 @@ local function send_reroll_start()
 	end
 end
 
-local function refresh_coop_preview_scores()
-	local blind_choice_state = MP.UI and MP.UI.BLIND_CHOICE_STATE or nil
-	if blind_choice_state and blind_choice_state.refresh_coop_blind_preview_scores then
-		blind_choice_state.refresh_coop_blind_preview_scores()
-	end
-end
-
 local function refresh_boss_button()
 	if G and G.blind_select_opts and G.blind_select_opts.boss and G.FUNCS and G.FUNCS.reroll_boss_button then
 		local boss_button = G.blind_select_opts.boss:get_UIE_by_ID("reroll_boss_button")
@@ -200,7 +195,6 @@ local function rebuild_boss_choice_ui()
 	end
 
 	refresh_boss_button()
-	refresh_coop_preview_scores()
 	return ok
 end
 
@@ -301,7 +295,6 @@ local function apply_authoritative_result(ante, boss_key, revision, options)
 	if options.save and save_run then
 		pcall(save_run)
 	end
-	refresh_coop_preview_scores()
 	return true
 end
 
@@ -397,7 +390,6 @@ local function complete_remote_mirror_reroll()
 	else
 		rebuild_boss_choice_ui()
 	end
-	refresh_coop_preview_scores()
 end
 
 function start_remote_mirror_reroll(ante, revision)
@@ -470,10 +462,32 @@ function start_remote_mirror_reroll(ante, revision)
 	})
 end
 
+local function is_boss_skip_tag(tag)
+	if not tag then
+		return false
+	end
+	local key = tostring(tag.key or "")
+	local name = tostring(tag.name or "")
+	return key == "tag_boss" or name == "Boss Tag"
+end
+
+local function mark_local_skip_tag_boss_reroll()
+	state.local_tag_boss_reroll = true
+end
+
+local function consume_local_skip_tag_boss_reroll()
+	if not state.local_tag_boss_reroll then
+		return false
+	end
+	state.local_tag_boss_reroll = false
+	return true
+end
+
 local function should_announce_local_reroll()
 	return is_same_seed_coop_enabled()
 		and not state.remote_mirror_active
 		and not state.applying_remote
+		and not state.local_tag_boss_reroll
 end
 
 function coop_boss.ensure_reroll_hook()
@@ -517,6 +531,9 @@ function coop_boss.observe_current_boss()
 	end
 
 	record_local_boss(ante, boss_key)
+	if consume_local_skip_tag_boss_reroll() then
+		return
+	end
 	if not state.remote_mirror_active and not state.applying_remote then
 		send_boss_result(ante, boss_key)
 	end
@@ -620,8 +637,33 @@ function coop_boss.handle_server_update(update)
 	})
 end
 
+function coop_boss.ensure_boss_tag_hook()
+	if not (Tag and type(Tag.apply_to_run) == "function") then
+		return false
+	end
+	if state.boss_tag_hook_installed then
+		return true
+	end
+	if not (MP.HOOKS and MP.HOOKS.register_method_hook) then
+		return false
+	end
+
+	MP.HOOKS.register_method_hook(Tag, "Tag", "apply_to_run", "mp.coop.local_boss_skip_tag", {
+		before = function(ctx)
+			local tag = ctx.self
+			local context = ctx.args and ctx.args[1]
+			if context and context.type == "new_blind_choice" and is_boss_skip_tag(tag) then
+				mark_local_skip_tag_boss_reroll()
+			end
+		end,
+	})
+	state.boss_tag_hook_installed = true
+	return true
+end
+
 function coop_boss.update()
 	coop_boss.ensure_reroll_hook()
+	coop_boss.ensure_boss_tag_hook()
 	coop_boss.observe_current_boss()
 	apply_pending_result_for_current_ante()
 end
