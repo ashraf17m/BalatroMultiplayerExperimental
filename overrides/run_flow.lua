@@ -30,7 +30,7 @@ local function is_cooperative_server_blind()
 end
 
 local function is_cooperative_round_ended()
-	return not not (MP.GAME and MP.GAME.end_coop_blind)
+	return not not (MP.GAME and (MP.GAME.end_coop_blind or MP.GAME.end_pvp))
 end
 
 local function enter_coop_new_round(options)
@@ -48,7 +48,8 @@ local function enter_coop_new_round(options)
 			G.FUNCS.draw_from_discard_to_deck()
 		end
 	end
-	transition_to_state(G.STATES.NEW_ROUND, options.state_complete)
+	local state_complete = (options.state_complete ~= nil) and options.state_complete or false
+	transition_to_state(G.STATES.NEW_ROUND, state_complete)
 	trace_runtime_event("run_flow.enter_coop_new_round", {
 		draw_to_deck = options.draw_to_deck == true,
 		lost = not not (MP.GAME and MP.GAME.end_coop_lost),
@@ -58,9 +59,13 @@ local function enter_coop_new_round(options)
 	if match_domain.clear_end_coop_blind then
 		match_domain.clear_end_coop_blind()
 	end
+	if match_domain.clear_end_pvp then
+		match_domain.clear_end_pvp()
+	end
 	if MP.GAME then
 		MP.GAME.end_coop_blind = false
 		MP.GAME.end_coop_lost = false
+		MP.GAME.end_pvp = false
 	end
 end
 
@@ -571,12 +576,12 @@ function Game:update_new_round(dt)
 	if is_cooperative_round_ended() and is_cooperative_server_blind() then
 		enter_coop_new_round({
 			draw_to_deck = true,
-			state_complete = releasing_coop_deck_out and false or nil,
+			state_complete = false,
 		})
 	elseif MP.GAME.end_pvp and MP.is_server_resolved_blind() then
 		enter_pvp_new_round({
 			draw_to_deck = true,
-			state_complete = releasing_coop_deck_out and false or nil,
+			state_complete = false,
 		})
 	end
 	if should_use_multiplayer_new_round_flow() then

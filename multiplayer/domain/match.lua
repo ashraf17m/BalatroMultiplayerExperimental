@@ -882,6 +882,14 @@ function MATCH_DOMAIN.clear_end_pvp(state)
 	return false
 end
 
+function MATCH_DOMAIN.clear_end_coop_blind(state)
+	state = state or MATCH_DOMAIN.ensure_state()
+	state.end_coop_blind = false
+	state.end_coop_lost = false
+	state.end_pvp = false
+	return false
+end
+
 function MATCH_DOMAIN.set_wait_for_enemy_furthest_blind(should_wait, state)
 	state = state or MATCH_DOMAIN.ensure_state()
 	state.wait_for_enemys_furthest_blind = not not should_wait
@@ -924,8 +932,17 @@ function MATCH_DOMAIN.mark_end_pvp(state)
 	return mark_server_resolved_blind(state)
 end
 
-function MATCH_DOMAIN.mark_end_coop_blind(state)
-	return mark_server_resolved_blind(state, { preserve_timer_state = true })
+function MATCH_DOMAIN.mark_end_coop_blind(state, lost)
+	if type(state) ~= "table" then
+		lost = state
+		state = MATCH_DOMAIN.ensure_state()
+	else
+		state = state or MATCH_DOMAIN.ensure_state()
+	end
+	mark_server_resolved_blind(state, { preserve_timer_state = true })
+	state.end_coop_blind = true
+	state.end_coop_lost = not not lost
+	return true
 end
 
 function MATCH_DOMAIN.mark_match_won(state)

@@ -1,8 +1,8 @@
 return {
 	["username"] = "Guest",
 	["blind_col"] = 1,
-	["server_url"] = "interchange.proxy.rlwy.net",
-	["server_port"] = 21487,
+	["server_url"] = "tramway.proxy.rlwy.net",
+	["server_port"] = 22654,
 	["integrations"] = {
 		["Preview"] = true,
 	},

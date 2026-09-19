@@ -7,6 +7,9 @@ local function reset_multiplayer_run_transition_state()
 	if match_domain.clear_end_pvp then
 		match_domain.clear_end_pvp()
 	end
+	if match_domain.clear_end_coop_blind then
+		match_domain.clear_end_coop_blind()
+	end
 end
 
 local function show_enemy_location()
